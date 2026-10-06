@@ -1,0 +1,308 @@
+<!-- file: customer.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Selfcare Diagnostics - Empowering Wellness</title>
+  
+  <!-- Favicon & PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Versioned Stylesheets for Instant Synchronization -->
+  <link rel="stylesheet" href="assets/css/global.css?v=8.4.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=8.4.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=8.4.0">
+  <link rel="stylesheet" href="assets/css/customer.css?v=8.5.0">
+
+  <!-- Packages Page Mathiri Neon Glowing Light & Badges Direct Styles -->
+  <style>
+    .catalogue-section .tests-grid {
+      padding-top: 10px !important;
+    }
+
+    /* Base Neon Glowing Card Setup */
+    .neon-glowing-card {
+      position: relative !important;
+    }
+
+    /* Priority 1: Vibrant Mint & Emerald Neon Glow (⚡ ESSENTIAL) */
+    .neon-card-1 {
+      border: 2px solid #05FFA1 !important;
+      background: linear-gradient(160deg, #FFFFFF 0%, #F0FDF8 100%) !important;
+      box-shadow: 0 0 14px rgba(5, 255, 161, 0.5), 0 0 28px rgba(5, 255, 161, 0.22), 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+      animation: neonGlow1Cust 2.4s infinite alternate ease-in-out !important;
+    }
+
+    @keyframes neonGlow1Cust {
+      0% {
+        border-color: #05FFA1;
+        box-shadow: 0 0 10px rgba(5, 255, 161, 0.4), 0 0 20px rgba(5, 255, 161, 0.18), inset 0 0 6px rgba(5, 255, 161, 0.1);
+        transform: translateY(0);
+      }
+      50% {
+        border-color: #00F59B;
+        box-shadow: 0 0 18px rgba(5, 255, 161, 0.75), 0 0 36px rgba(0, 245, 155, 0.35), inset 0 0 12px rgba(5, 255, 161, 0.2);
+        transform: translateY(-2px);
+      }
+      100% {
+        border-color: #05FFA1;
+        box-shadow: 0 0 10px rgba(5, 255, 161, 0.4), 0 0 20px rgba(5, 255, 161, 0.18), inset 0 0 6px rgba(5, 255, 161, 0.1);
+        transform: translateY(0);
+      }
+    }
+
+    /* Priority 2: Electric Cyan & Sky Blue Neon Glow (🔥 POPULAR) */
+    .neon-card-2 {
+      border: 2px solid #00D2FF !important;
+      background: linear-gradient(160deg, #FFFFFF 0%, #F0F9FF 100%) !important;
+      box-shadow: 0 0 14px rgba(0, 210, 255, 0.5), 0 0 28px rgba(0, 210, 255, 0.22), 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+      animation: neonGlow2Cust 2.4s infinite alternate ease-in-out !important;
+    }
+
+    @keyframes neonGlow2Cust {
+      0% {
+        border-color: #00D2FF;
+        box-shadow: 0 0 10px rgba(0, 210, 255, 0.4), 0 0 20px rgba(0, 210, 255, 0.18), inset 0 0 6px rgba(0, 210, 255, 0.1);
+        transform: translateY(0);
+      }
+      50% {
+        border-color: #38E1FF;
+        box-shadow: 0 0 18px rgba(0, 210, 255, 0.75), 0 0 36px rgba(56, 225, 255, 0.35), inset 0 0 12px rgba(0, 210, 255, 0.2);
+        transform: translateY(-2px);
+      }
+      100% {
+        border-color: #00D2FF;
+        box-shadow: 0 0 10px rgba(0, 210, 255, 0.4), 0 0 20px rgba(0, 210, 255, 0.18), inset 0 0 6px rgba(0, 210, 255, 0.1);
+        transform: translateY(0);
+      }
+    }
+
+    /* Priority 3: Ultra Turquoise / Teal Neon Glow (✨ RECOMMENDED) */
+    .neon-card-3 {
+      border: 2px solid #00F5D4 !important;
+      background: linear-gradient(160deg, #FFFFFF 0%, #E6FCF7 100%) !important;
+      box-shadow: 0 0 18px rgba(0, 245, 212, 0.65), 0 0 36px rgba(0, 245, 212, 0.3), 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+      animation: neonGlow3Cust 2.2s infinite alternate ease-in-out !important;
+    }
+
+    @keyframes neonGlow3Cust {
+      0% {
+        border-color: #00F5D4;
+        box-shadow: 0 0 12px rgba(0, 245, 212, 0.45), 0 0 24px rgba(0, 245, 212, 0.2), inset 0 0 8px rgba(0, 245, 212, 0.1);
+        transform: translateY(0);
+      }
+      50% {
+        border-color: #05FFA1;
+        box-shadow: 0 0 24px rgba(0, 245, 212, 0.85), 0 0 44px rgba(5, 255, 161, 0.45), inset 0 0 14px rgba(0, 245, 212, 0.25);
+        transform: translateY(-2px);
+      }
+      100% {
+        border-color: #00F5D4;
+        box-shadow: 0 0 12px rgba(0, 245, 212, 0.45), 0 0 24px rgba(0, 245, 212, 0.2), inset 0 0 8px rgba(0, 245, 212, 0.1);
+        transform: translateY(0);
+      }
+    }
+
+    /* Floating Badges */
+    .neon-recommended-badge {
+      position: absolute !important;
+      top: -10px !important;
+      right: 10px !important;
+      font-size: 8.5px !important;
+      font-weight: 900 !important;
+      letter-spacing: 0.6px !important;
+      padding: 3px 8px !important;
+      border-radius: 20px !important;
+      text-transform: uppercase !important;
+      z-index: 10 !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 3px !important;
+      animation: badgeSparkleCust 1.8s infinite alternate ease-in-out !important;
+    }
+
+    .neon-badge-1 {
+      background: linear-gradient(135deg, #05FFA1, #078866) !important;
+      color: #033F33 !important;
+      box-shadow: 0 0 12px rgba(5, 255, 161, 0.75), 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .neon-badge-2 {
+      background: linear-gradient(135deg, #00D2FF, #0077B6) !important;
+      color: #FFFFFF !important;
+      box-shadow: 0 0 12px rgba(0, 210, 255, 0.75), 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .neon-badge-3 {
+      background: linear-gradient(135deg, #00F5D4, #078866) !important;
+      color: #033F33 !important;
+      box-shadow: 0 0 14px rgba(0, 245, 212, 0.9), 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    @keyframes badgeSparkleCust {
+      0% { transform: scale(1); filter: brightness(1); }
+      100% { transform: scale(1.05); filter: brightness(1.2); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Glass App Header with Logo -->
+  <header class="app-header glass-card">
+    <div class="header-left">
+      <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="header-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="fallback-logo" style="display:none;">
+        <h1 class="logo-text">SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
+        <p class="tagline">Empowering Wellness</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" aria-label="Notifications" onclick="Utils.showToast('No new notifications', 'info')">
+        🔔
+      </button>
+      <button class="icon-btn cart-btn" aria-label="Cart" onclick="window.location.href='cart.html'">
+        🛒
+        <span class="cart-badge" style="display:none;">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Container -->
+  <main class="main-container">
+
+    <!-- Top Sticky Search & Offers Section -->
+    <section class="search-section">
+      <!-- Search Bar (Click redirects to tests page) -->
+      <div class="search-bar glass-card" onclick="window.location.href='tests.html'" style="cursor: pointer;">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="dashboard-search-input" placeholder="Search tests by name and symptoms..." readonly style="cursor: pointer;">
+        <button class="voice-search-btn" onclick="event.stopPropagation(); window.location.href='tests.html';" title="Voice Search">🎙</button>
+      </div>
+
+      <!-- Slim 3D Glassmorphic Package Advertisement Auto-Slider -->
+<div class="single-slider-box">
+  <div class="slider-track" id="singleSliderTrack">
+
+    <!-- Slide 1: Free Home Collection (Orders Above ₹500) -->
+    <div class="slide-item">
+      <div class="slide-content">
+        <span class="slide-badge">🏠 COMPLIMENTARY PICKUP</span>
+        <h4>Zero Doorstep Collection Charges</h4>
+        <p>100% Free certified home sample collection on orders above ₹500</p>
+      </div>
+      <button class="slide-btn" onclick="window.location.href='tests.html'">Book Now →</button>
+    </div>
+
+    <!-- Slide 2: Corporate & Apartment Camp (₹1,299 Package @ ₹999 - Min 20 Persons) -->
+    <div class="slide-item">
+      <div class="slide-content">
+        <span class="slide-badge">🏢 CORPORATE & APARTMENT CAMP</span>
+        <h4>₹1,299 Health Package @ ₹999 Only</h4>
+        <p>Comprehensive group screening panel • Minimum 20 persons required</p>
+      </div>
+      <button class="slide-btn" onclick="window.location.href='https://wa.me/917010174890?text=Hi%2C%20I%20would%20like%20to%20enquire%20about%20the%20Corporate%2FApartment%20Health%20Camp%20offer%20(Rs.999%20package%20for%20min%2020%20persons).'">Enquire →</button>
+    </div>
+
+    <!-- Slide 3: Routine Blood Tests Starts from ₹40 -->
+    <div class="slide-item">
+      <div class="slide-content">
+        <span class="slide-badge">🧪 ACCESSIBLE HEALTHCARE</span>
+        <h4>Routine Blood Tests Starting @ ₹40</h4>
+        <p>Certified clinical diagnostics including Blood Glucose from ₹40</p>
+      </div>
+      <button class="slide-btn" onclick="window.location.href='tests.html'">Explore →</button>
+    </div>
+
+  </div>
+</div>
+
+
+    <!-- Popular Health Packages Section (Exact Tests Page 2-Column Grid) -->
+    <section class="catalogue-section">
+      <div class="section-header">
+        <h3>Popular Health Packages</h3>
+        <a href="packages.html" class="view-all-link">View All →</a>
+      </div>
+      <div id="popular-packages-container" class="tests-grid">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+    </section>
+
+    <!-- Trust / Why Selfcare Section -->
+    <section class="trust-section glass-card animate-fade">
+      <h3>Why Selfcare Diagnostics?</h3>
+      <div class="trust-grid">
+        <div class="trust-item">
+          <span>👥</span>
+          <div>
+            <h4>1000+ Trusted Customers</h4>
+            <p>Delivering accurate and dependable diagnostic care across Chennai.</p>
+          </div>
+        </div>
+        <div class="trust-item">
+          <span>🛡️</span>
+          <div>
+            <h4>NABL Accredited Labs</h4>
+            <p>100% precise and reliable clinical testing standards.</p>
+          </div>
+        </div>
+        <div class="trust-item">
+          <span>🛵</span>
+          <div>
+            <h4>Home Sample Collection</h4>
+            <p>Safe sample pickup right from your doorstep.</p>
+          </div>
+        </div>
+        <div class="trust-item">
+          <span>⚡</span>
+          <div>
+            <h4>Smart Digital Reports</h4>
+            <p>Fast turnaround delivered directly to your device.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 5-Tab Fixed Bottom Navigation Matching Tests Page -->
+  <nav class="bottom-nav glass-card">
+    <a href="customer.html" class="nav-item active">
+      <span>🏠</span>
+      <span>Home</span>
+    </a>
+    <a href="reports.html" class="nav-item">
+      <span>📑</span>
+      <span>Reports</span>
+    </a>
+    <a href="bookings.html" class="nav-item">
+      <span>📍</span>
+      <span>Track Booking</span>
+    </a>
+    <a href="cart.html" class="nav-item">
+      <span>🛒</span>
+      <span>Cart</span>
+      <span class="cart-badge" style="display:none;">0</span>
+    </a>
+    <a href="profile.html" class="nav-item">
+      <span>👤</span>
+      <span>Profile</span>
+    </a>
+  </nav>
+
+  <!-- Versioned JavaScript Scripts -->
+  <script src="assets/js/config.js?v=8.4.0"></script>
+  <script src="assets/js/utils.js?v=8.4.0"></script>
+  <script src="assets/js/api.js?v=8.4.0"></script>
+  <script src="assets/js/offline-db.js?v=8.4.0"></script>
+  <script src="assets/js/offline-sync.js?v=8.4.0"></script>
+  <script src="assets/js/auth.js?v=8.4.0"></script>
+  <script src="assets/js/app.js?v=8.4.0"></script>
+  <script src="assets/js/customer.js?v=8.5.0"></script>
+</body>
+</html>

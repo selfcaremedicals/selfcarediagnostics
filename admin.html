@@ -1,0 +1,1383 @@
+<!-- file: admin.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>Master Operations & Financial OS - Selfcare Diagnostics</title>
+  <link rel="stylesheet" href="assets/css/global.css?v=8.0.0">
+  <link rel="stylesheet" href="assets/css/admin.css?v=8.0.0">
+</head>
+<body class="admin-body">
+
+  <!-- TOP ADMIN BAR -->
+  <header class="admin-topbar">
+    <div class="topbar-left">
+      <!-- ☰ Hamburger Toggle for Mobile & Desktop Drawer -->
+      <button class="hamburger-btn" id="admin-hamburger-btn" onclick="AdminApp.toggleDrawer()" aria-label="Open Navigation Menu">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+
+      <div class="topbar-brand">
+        <span class="brand-shield">🛡️</span>
+        <div>
+          <h1>SELFCARE <span>DIAGNOSTICS</span></h1>
+          <p class="brand-tagline">Empowering Wellness • Admin OS</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Categorized Search Input -->
+    <div class="topbar-search-wrap">
+      <div class="global-search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="admin-global-search-input" placeholder="Search Bookings, Patients, Tests, Techs..." oninput="AdminApp.handleGlobalSearch(this.value)">
+        <button class="clear-search-btn" id="btn-clear-search" onclick="AdminApp.clearGlobalSearch()" style="display: none;">✕</button>
+      </div>
+      <!-- Global Search Dropdown Results -->
+      <div class="global-search-results" id="global-search-results-dropdown" style="display: none;"></div>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="btn-sync-cloud" onclick="AdminApp.forceSyncCloud()" title="Sync with Google Sheets">
+        🔄 <span class="action-btn-text">Cloud Sync</span>
+      </button>
+      <div class="notification-bell-wrap" onclick="AdminApp.switchTab('tab-notifications-center')">
+        <span class="bell-icon">🔔</span>
+        <span class="bell-badge" id="admin-notif-count">0</span>
+      </div>
+      <span class="admin-status-badge">🟢 Live Operations</span>
+      <button class="btn-admin-logout" onclick="AdminApp.logout()">Logout ➔</button>
+    </div>
+  </header>
+
+  <!-- NAVIGATION DRAWER OVERLAY -->
+  <div class="drawer-overlay" id="admin-drawer-overlay" onclick="AdminApp.closeDrawer()"></div>
+
+  <!-- NAVIGATION DRAWER (SIDEBAR) -->
+  <aside class="admin-drawer" id="admin-drawer">
+    <div class="drawer-header">
+      <div class="drawer-brand">
+        <span class="brand-shield-sm">🛡️</span>
+        <div>
+          <h3>Selfcare Diagnostics</h3>
+          <small>Administration Hub</small>
+        </div>
+      </div>
+      <button class="drawer-close-btn" onclick="AdminApp.closeDrawer()">✕</button>
+    </div>
+
+    <nav class="drawer-nav">
+      <!-- DASHBOARD -->
+      <div class="nav-section-title">DASHBOARD</div>
+      <button class="nav-item active" data-tab="tab-home" onclick="AdminApp.switchTab('tab-home')">
+        <span class="icon">📊</span> Home & Performance
+      </button>
+      <button class="nav-item" data-tab="tab-finance" onclick="AdminApp.switchTab('tab-finance')">
+        <span class="icon">💰</span> Revenue Analytics
+      </button>
+
+      <!-- OPERATIONS -->
+      <div class="nav-section-title">OPERATIONS</div>
+      <button class="nav-item" data-tab="tab-bookings" onclick="AdminApp.switchTab('tab-bookings')">
+        <span class="icon">📋</span> Cart Bookings Queue
+      </button>
+      <button class="nav-item" data-tab="tab-home-collections" onclick="AdminApp.switchTab('tab-home-collections')">
+        <span class="icon">🛵</span> Home Collections
+      </button>
+      <button class="nav-item" data-tab="tab-customers" onclick="AdminApp.switchTab('tab-customers')">
+        <span class="icon">👥</span> Patients / Customers
+      </button>
+      <button class="nav-item" data-tab="tab-family" onclick="AdminApp.switchTab('tab-family')">
+        <span class="icon">👨‍👩‍👧‍👦</span> Family Members
+      </button>
+
+      <!-- LAB CATALOG -->
+      <div class="nav-section-title">LAB CATALOG</div>
+      <button class="nav-item" data-tab="tab-tests" onclick="AdminApp.switchTab('tab-tests')">
+        <span class="icon">🧪</span> Diagnostic Tests
+      </button>
+      <button class="nav-item" data-tab="tab-packages" onclick="AdminApp.switchTab('tab-packages')">
+        <span class="icon">📦</span> Health Packages
+      </button>
+      <button class="nav-item" data-tab="tab-package-mapping" onclick="AdminApp.switchTab('tab-package-mapping')">
+        <span class="icon">🔗</span> Package-Test Mapping
+      </button>
+      <button class="nav-item" data-tab="tab-categories" onclick="AdminApp.switchTab('tab-categories')">
+        <span class="icon">🏷️</span> Categories & Departments
+      </button>
+      <button class="nav-item" data-tab="tab-parameters" onclick="AdminApp.switchTab('tab-parameters')">
+        <span class="icon">🔬</span> Test Parameters
+      </button>
+
+      <!-- TECHNICIANS -->
+      <div class="nav-section-title">TECHNICIANS (PHLEBOMISTS)</div>
+      <button class="nav-item" data-tab="tab-technicians" onclick="AdminApp.switchTab('tab-technicians')">
+        <span class="icon">🧑‍⚕️</span> Technician Management
+      </button>
+      <button class="nav-item" data-tab="tab-duty-status" onclick="AdminApp.switchTab('tab-duty-status')">
+        <span class="icon">⏱️</span> Live Duty & Fleet Status
+      </button>
+      <button class="nav-item" data-tab="tab-freelance" onclick="AdminApp.switchTab('tab-freelance')">
+        <span class="icon">📡</span> Broadcast / Freelance Fleet
+      </button>
+
+      <!-- REPORTS -->
+      <div class="nav-section-title">REPORTS HUB</div>
+      <button class="nav-item" data-tab="tab-reports" onclick="AdminApp.switchTab('tab-reports')">
+        <span class="icon">📑</span> Upload & Publish Reports
+      </button>
+      <button class="nav-item" data-tab="tab-report-history" onclick="AdminApp.switchTab('tab-report-history')">
+        <span class="icon">🗂️</span> Report Archive & Ready
+      </button>
+
+      <!-- FINANCE -->
+      <div class="nav-section-title">FINANCE & LEDGER</div>
+      <button class="nav-item" data-tab="tab-payments" onclick="AdminApp.switchTab('tab-payments')">
+        <span class="icon">💳</span> Payments & Transactions
+      </button>
+      <button class="nav-item" data-tab="tab-invoices" onclick="AdminApp.switchTab('tab-invoices')">
+        <span class="icon">🧾</span> Invoices & Receipts
+      </button>
+
+      <!-- MARKETING -->
+      <div class="nav-section-title">MARKETING & GROWTH</div>
+      <button class="nav-item" data-tab="tab-carousel" onclick="AdminApp.switchTab('tab-carousel')">
+        <span class="icon">🖼️</span> Advertisements & Banners
+      </button>
+      <button class="nav-item" data-tab="tab-coupons" onclick="AdminApp.switchTab('tab-coupons')">
+        <span class="icon">🎟️</span> Coupons & Promo Codes
+      </button>
+      <button class="nav-item" data-tab="tab-social-sharing" onclick="AdminApp.switchTab('tab-social-sharing')">
+        <span class="icon">📢</span> Social & WhatsApp Sharing
+      </button>
+
+      <!-- B2B & CORPORATE -->
+      <div class="nav-section-title">B2B & CORPORATE</div>
+      <button class="nav-item" data-tab="tab-b2b" onclick="AdminApp.switchTab('tab-b2b')">
+        <span class="icon">🏢</span> Corporate Accounts & Pricing
+      </button>
+
+      <!-- AI / SIA -->
+      <div class="nav-section-title">AI / SIA ENGINE</div>
+      <button class="nav-item" data-tab="tab-ai-settings" onclick="AdminApp.switchTab('tab-ai-settings')">
+        <span class="icon">🤖</span> SIA AI Rules & OCR
+      </button>
+
+      <!-- INVENTORY -->
+      <div class="nav-section-title">INVENTORY & LAB CONSUMABLES</div>
+      <button class="nav-item" data-tab="tab-inventory" onclick="AdminApp.switchTab('tab-inventory')">
+        <span class="icon">📦</span> Stock & Reagent Supplies
+      </button>
+
+      <!-- STAFF & ACCESS -->
+      <div class="nav-section-title">STAFF & ACCESS</div>
+      <button class="nav-item" data-tab="tab-staff" onclick="AdminApp.switchTab('tab-staff')">
+        <span class="icon">🔐</span> Roles & Permissions
+      </button>
+
+      <!-- SYSTEM -->
+      <div class="nav-section-title">SYSTEM</div>
+      <button class="nav-item" data-tab="tab-audit-logs" onclick="AdminApp.switchTab('tab-audit-logs')">
+        <span class="icon">📜</span> Audit & Activity Logs
+      </button>
+      <button class="nav-item" data-tab="tab-settings" onclick="AdminApp.switchTab('tab-settings')">
+        <span class="icon">⚙️</span> Settings & Doorstep Rules
+      </button>
+    </nav>
+  </aside>
+
+  <!-- MAIN VIEWPORT CONTAINER -->
+  <main class="admin-main-wrap">
+
+    <!-- =========================================================
+         TAB 0: HOME / EXECUTIVE DASHBOARD (REVENUE FOCUS ONLY)
+         ========================================================= -->
+    <section id="tab-home" class="admin-tab-content active">
+      <div class="home-hero-header">
+        <div>
+          <h2>Executive Business & Revenue Overview</h2>
+          <p>Real-time financial pulse, cash collection, and gross lab profit metrics</p>
+        </div>
+        <div class="home-date-badge">
+          📅 <span id="home-current-date">Today</span>
+        </div>
+      </div>
+
+      <!-- 8 Key Business Performance Cards -->
+      <div class="home-metrics-grid">
+        <!-- 1. Today's Revenue -->
+        <div class="revenue-card glass-card clickable" onclick="AdminApp.switchTab('tab-finance')">
+          <div class="rev-card-top">
+            <span class="rev-title">Today's Revenue</span>
+            <span class="rev-icon">💵</span>
+          </div>
+          <strong class="rev-amount green-text" id="kpi-today-revenue">₹0</strong>
+          <div class="rev-footer">
+            <span class="rev-trend positive" id="kpi-today-orders-count">0 Orders</span>
+            <span class="rev-action-hint">View Ledger ➔</span>
+          </div>
+        </div>
+
+        <!-- 2. This Week Revenue -->
+        <div class="revenue-card glass-card clickable" onclick="AdminApp.switchTab('tab-finance')">
+          <div class="rev-card-top">
+            <span class="rev-title">This Week Revenue</span>
+            <span class="rev-icon">🗓️</span>
+          </div>
+          <strong class="rev-amount green-text" id="kpi-week-revenue">₹0</strong>
+          <div class="rev-footer">
+            <span class="rev-trend" id="kpi-week-orders-count">Last 7 Days</span>
+            <span class="rev-action-hint">Analytics ➔</span>
+          </div>
+        </div>
+
+        <!-- 3. This Month Revenue -->
+        <div class="revenue-card glass-card clickable" onclick="AdminApp.switchTab('tab-finance')">
+          <div class="rev-card-top">
+            <span class="rev-title">This Month Revenue</span>
+            <span class="rev-icon">📈</span>
+          </div>
+          <strong class="rev-amount green-text" id="kpi-month-revenue">₹0</strong>
+          <div class="rev-footer">
+            <span class="rev-trend positive" id="kpi-month-orders-count">Current Billing Cycle</span>
+            <span class="rev-action-hint">Breakdown ➔</span>
+          </div>
+        </div>
+
+        <!-- 4. Today's MRP Value -->
+        <div class="revenue-card glass-card">
+          <div class="rev-card-top">
+            <span class="rev-title">Today's MRP Value</span>
+            <span class="rev-icon">🏷️</span>
+          </div>
+          <strong class="rev-amount strikethrough" id="kpi-today-mrp">₹0</strong>
+          <div class="rev-footer">
+            <span class="rev-trend" id="kpi-today-discount-savings">Customer Savings: ₹0</span>
+          </div>
+        </div>
+
+        <!-- 5. This Month MRP Value -->
+        <div class="revenue-card glass-card">
+          <div class="rev-card-top">
+            <span class="rev-title">This Month MRP Value</span>
+            <span class="rev-icon">📑</span>
+          </div>
+          <strong class="rev-amount strikethrough" id="kpi-month-mrp">₹0</strong>
+          <div class="rev-footer">
+            <span class="rev-trend">Standard Catalogue Sum</span>
+          </div>
+        </div>
+
+        <!-- 6. B2B Lab Outsourcing Cost -->
+        <div class="revenue-card glass-card">
+          <div class="rev-card-top">
+            <span class="rev-title">B2B Lab Cost (Outsourcing)</span>
+            <span class="rev-icon">🔬</span>
+          </div>
+          <strong class="rev-amount b2b-color" id="kpi-month-b2b">₹0</strong>
+          <div class="rev-footer">
+            <span class="rev-trend b2b-sub">Strictly Confidential</span>
+          </div>
+        </div>
+
+        <!-- 7. Estimated Profit (Highlight Card) -->
+        <div class="revenue-card glass-card highlight-profit-card clickable" onclick="AdminApp.switchTab('tab-finance')">
+          <div class="rev-card-top">
+            <span class="rev-title" style="color:#045D49;">Estimated Profit (Month)</span>
+            <span class="rev-icon">✨</span>
+          </div>
+          <strong class="rev-amount profit-val" id="kpi-month-profit">₹0</strong>
+          <div class="rev-footer">
+            <span class="rev-trend positive" id="kpi-profit-margin">Margin: 0%</span>
+            <span class="rev-action-hint" style="color:#045D49;">Detailed ➔</span>
+          </div>
+        </div>
+
+        <!-- 8. Pending Payments -->
+        <div class="revenue-card glass-card">
+          <div class="rev-card-top">
+            <span class="rev-title">Pending Collections</span>
+            <span class="rev-icon">⏳</span>
+          </div>
+          <strong class="rev-amount" style="color: var(--admin-pink);" id="kpi-pending-payments">₹0</strong>
+          <div class="rev-footer">
+            <span class="rev-trend" id="kpi-pending-orders-count">0 Uncollected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pure SVG High-Performance Revenue Trend Chart -->
+      <div class="glass-card chart-container-card" style="margin-top: 24px;">
+        <div class="chart-header-flex">
+          <div>
+            <h3>Revenue Trend Overview</h3>
+            <p>Direct cash and online collections (Revenue = Customer Price)</p>
+          </div>
+          <div class="chart-period-tabs">
+            <button class="chart-tab-btn" id="chart-tab-today" onclick="AdminApp.renderRevenueChart('today')">Today</button>
+            <button class="chart-tab-btn active" id="chart-tab-7days" onclick="AdminApp.renderRevenueChart('7days')">7 Days</button>
+            <button class="chart-tab-btn" id="chart-tab-30days" onclick="AdminApp.renderRevenueChart('30days')">30 Days</button>
+          </div>
+        </div>
+        <div class="svg-chart-wrapper" id="revenue-svg-chart-container">
+          <!-- Dynamically generated SVG Chart -->
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 1: REVENUE & FINANCIAL LEDGER (PRESERVES EXISTING IDS)
+         ========================================================= -->
+    <section id="tab-finance" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Financial Ledger & Monthly Profit Performance</h2>
+          <p>Real-time calculation comparing Customer Revenue against Lab B2B Outsourcing Cost</p>
+        </div>
+        <div class="ledger-period-toggle">
+          <button class="period-btn active" id="btn-period-month" onclick="AdminApp.setFinancialPeriod('month')">This Month</button>
+          <button class="period-btn" id="btn-period-all" onclick="AdminApp.setFinancialPeriod('all')">All Time</button>
+        </div>
+      </div>
+
+      <!-- 4 High-Impact Financial Metrics Cards (EXACT EXISTING IDS PRESERVED) -->
+      <div class="financial-metrics-grid">
+        <div class="metric-card glass-card">
+          <span class="m-icon">🏷️</span>
+          <div class="m-data">
+            <span class="m-label">Total Tests MRP</span>
+            <strong class="m-val strikethrough" id="fin-total-mrp">₹0</strong>
+            <small class="m-sub">Listed catalogue value</small>
+          </div>
+        </div>
+
+        <div class="metric-card glass-card">
+          <span class="m-icon">💵</span>
+          <div class="m-data">
+            <span class="m-label">Customer Price (Revenue)</span>
+            <strong class="m-val green-text" id="fin-total-revenue">₹0</strong>
+            <small class="m-sub">Collected via Online & Cash</small>
+          </div>
+        </div>
+
+        <div class="metric-card glass-card">
+          <span class="m-icon">🔬</span>
+          <div class="m-data">
+            <span class="m-label">B2B Lab Cost (Outsourcing)</span>
+            <strong class="m-val b2b-color" id="fin-total-b2b">₹0</strong>
+            <small class="m-sub">Strictly hidden from customer UI</small>
+          </div>
+        </div>
+
+        <div class="metric-card glass-card highlight-profit-card">
+          <span class="m-icon">📈</span>
+          <div class="m-data">
+            <span class="m-label">Actual Profit <span id="fin-profit-period-label">(This Month)</span></span>
+            <strong class="m-val profit-val" id="fin-actual-profit">₹0</strong>
+            <small class="m-sub" id="fin-margin-percentage">Profit Margin: 0%</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breakdown Ledger Table -->
+      <div class="admin-table-responsive glass-card" style="margin-top: 20px;">
+        <div class="table-card-head">
+          <h4>Order-wise Profit Distribution Breakdown</h4>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Booking ID</th>
+              <th>Patient</th>
+              <th>Items Booked</th>
+              <th>MRP</th>
+              <th>Customer Price</th>
+              <th>B2B Cost (Hidden)</th>
+              <th>Net Profit</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="finance-ledger-table-body">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 2: CART BOOKINGS & TECHNICIAN DISPATCH PIPELINE
+         ========================================================= -->
+    <section id="tab-bookings" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Customer Cart Bookings Queue</h2>
+          <p>Orders coming from Cart checkout. Assign individual technician or broadcast to all nearby phlebotomists</p>
+        </div>
+        <div class="search-filter-box">
+          <input type="text" id="booking-search-input" placeholder="Search by Booking ID, Phone, or Patient..." oninput="AdminApp.filterBookings()">
+        </div>
+      </div>
+
+      <!-- Operational Status Filter Pills -->
+      <div class="status-filter-scroll">
+        <button class="filter-pill active" onclick="AdminApp.filterBookingsByStatus('all')">All Bookings</button>
+        <button class="filter-pill" onclick="AdminApp.filterBookingsByStatus('today')">Today's Pickups</button>
+        <button class="filter-pill" onclick="AdminApp.filterBookingsByStatus('pending')">Dispatch Pending</button>
+        <button class="filter-pill" onclick="AdminApp.filterBookingsByStatus('payment_pending')">Payment Pending</button>
+        <button class="filter-pill" onclick="AdminApp.filterBookingsByStatus('completed')">Completed</button>
+      </div>
+
+      <div class="admin-table-responsive glass-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Booking ID</th>
+              <th>Patient & Mobile</th>
+              <th>Pickup Address / Mode</th>
+              <th>Appointment Slot</th>
+              <th>Payment & Amount</th>
+              <th>Dispatch Status</th>
+              <th>Report Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="bookings-table-body">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 2B: HOME COLLECTIONS MANAGEMENT
+         ========================================================= -->
+    <section id="tab-home-collections" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Home Collection Dispatch & Route Logistics</h2>
+          <p>Automated distance tier pricing: Below 5 km (₹100/₹150) • 5 to 20 km (₹20/₹30 per km)</p>
+        </div>
+      </div>
+
+      <div class="panel-split-layout">
+        <div class="glass-card form-card">
+          <h3>🛵 Quick Distance & Doorstep Fee Calculator</h3>
+          <p class="card-subtitle">Verify doorstep logistics charge for any Chennai address</p>
+          <div class="form-group">
+            <label>Distance from Kodambakkam Hub (km)</label>
+            <input type="number" id="calc-distance-input" placeholder="e.g. 7.5" step="0.1" oninput="AdminApp.calculateDeliveryRate()">
+          </div>
+          <div class="form-group">
+            <label>Visit Type</label>
+            <select id="calc-visit-type" onchange="AdminApp.calculateDeliveryRate()">
+              <option value="single">Single Visit (Fasting / Random)</option>
+              <option value="multiple">Multiple / Postprandial Visit (PP)</option>
+            </select>
+          </div>
+          <div class="fee-result-card" style="margin-top: 14px; padding: 14px; background: #ECFDF5; border: 1.5px solid #A7F3D0; border-radius: 12px;">
+            <span style="font-size: 11.5px; font-weight: 800; color: #045D49;">Calculated Home Collection Fee:</span>
+            <h3 style="color: #078866; font-size: 24px; margin-top: 4px;" id="calc-fee-result">₹100</h3>
+            <small style="color: #536E66;" id="calc-fee-explanation">Within 5 km radius flat rate applied.</small>
+          </div>
+        </div>
+
+        <div class="glass-card directory-card">
+          <h3>Active Home Sample Collections</h3>
+          <div class="admin-table-responsive" style="margin-top: 10px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Booking ID</th>
+                  <th>Patient</th>
+                  <th>Address</th>
+                  <th>Distance</th>
+                  <th>Doorstep Fee</th>
+                  <th>Assigned Phlebo</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="home-collections-table-body">
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 3: TECHNICIANS DIRECTORY & CREATION
+         ========================================================= -->
+    <section id="tab-technicians" class="admin-tab-content">
+      <div class="panel-split-layout">
+        <div class="glass-card form-card">
+          <h3>➕ Create New Technician ID</h3>
+          <p class="card-subtitle">Generate credentials and coverage territory in Chennai</p>
+
+          <form id="tech-create-form" onsubmit="AdminApp.handleCreateTechnician(event)">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Technician ID</label>
+                <input type="text" id="tech-id-input" placeholder="e.g. SCDTECH001" required>
+              </div>
+              <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="tech-name-input" placeholder="e.g. Ramesh Phlebotomist" required>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Contact Mobile</label>
+                <input type="tel" id="tech-phone-input" placeholder="e.g. 9840123456" required>
+              </div>
+              <div class="form-group">
+                <label>Assigned Zone / Territory (Chennai)</label>
+                <input type="text" id="tech-zone-input" placeholder="e.g. T. Nagar, Kodambakkam" required>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Login Password</label>
+                <input type="text" id="tech-pass-input" placeholder="Enter secure password" required>
+              </div>
+              <div class="form-group">
+                <label>Duty Status</label>
+                <select id="tech-status-select">
+                  <option value="Active">Active / On Duty</option>
+                  <option value="Inactive">Inactive / On Leave</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-emerald-solid">Create Technician ID ✓</button>
+          </form>
+        </div>
+
+        <div class="glass-card directory-card">
+          <h3>Registered Technicians & Live Dispatch Status</h3>
+          <div class="tech-card-list" id="technicians-card-container">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 4: DIAGNOSTIC TESTS (MATCHING ALL 15 BACKEND COLUMNS)
+         ========================================================= -->
+    <section id="tab-tests" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Lab Diagnostic Tests Database</h2>
+          <p>Syncs to Backend Sheet and updates Frontend catalogue immediately without B2B leak</p>
+        </div>
+        <div class="flex-actions-bar">
+          <input type="text" class="input-filter-sm" id="test-search-filter" placeholder="Search test name or code..." oninput="AdminApp.renderTests()">
+          <select class="select-filter-sm" id="test-category-filter" onchange="AdminApp.renderTests()">
+            <option value="">All Categories</option>
+          </select>
+          <button class="btn-emerald-solid" onclick="AdminApp.openTestModal('add')">+ Add Diagnostic Test</button>
+        </div>
+      </div>
+
+      <div class="admin-table-responsive glass-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>TestID</th>
+              <th>TestCode</th>
+              <th>TestName</th>
+              <th>Category</th>
+              <th>SampleType</th>
+              <th>Fasting</th>
+              <th>MRP</th>
+              <th>Customer Price</th>
+              <th class="b2b-header-highlight">B2B Cost (Hidden)</th>
+              <th>Profit / Test</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tests-table-body">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 5: HEALTH PACKAGES
+         ========================================================= -->
+    <section id="tab-packages" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Health Checkup Packages Database</h2>
+          <p>Includes bundled TestIDs, parameters, retail pricing, and B2B lab cost margin</p>
+        </div>
+        <div class="flex-actions-bar">
+          <input type="text" class="input-filter-sm" id="package-search-filter" placeholder="Search package..." oninput="AdminApp.renderPackages()">
+          <button class="btn-emerald-solid" onclick="AdminApp.openPackageModal('add')">+ Add Health Package</button>
+        </div>
+      </div>
+
+      <div class="admin-table-responsive glass-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>PackageID</th>
+              <th>PackageCode</th>
+              <th>PackageName</th>
+              <th>Category</th>
+              <th>Parameters</th>
+              <th>MRP</th>
+              <th>Customer Price</th>
+              <th class="b2b-header-highlight">B2B Cost (Hidden)</th>
+              <th>Profit / Pkg</th>
+              <th>Featured</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="packages-table-body">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 5B: PACKAGE-TEST MAPPING
+         ========================================================= -->
+    <section id="tab-package-mapping" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Package to Test Mapping Engine</h2>
+          <p>Select a health package to assemble individual test codes and compute bundled parameters</p>
+        </div>
+      </div>
+
+      <div class="glass-card">
+        <div class="form-group" style="max-width: 480px; margin-bottom: 20px;">
+          <label>Select Target Health Package:</label>
+          <select id="map-target-package-select" onchange="AdminApp.handlePackageMappingSelection(this.value)">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <div class="mapping-split-grid">
+          <div class="mapping-col glass-card">
+            <h4>Available Tests in Catalogue</h4>
+            <input type="text" id="map-search-available" class="input-filter-sm" placeholder="Filter available tests..." oninput="AdminApp.filterMappingAvailable(this.value)">
+            <div class="mapping-list-box" id="map-available-tests-list">
+              <!-- Available Tests Checkboxes -->
+            </div>
+            <div class="mapping-actions-row">
+              <button class="btn-cancel" onclick="AdminApp.selectAllAvailableTests()">Select All</button>
+              <button class="btn-emerald-solid" onclick="AdminApp.addSelectedTestsToPackage()">Add to Package ➔</button>
+            </div>
+          </div>
+
+          <div class="mapping-col glass-card">
+            <h4>Selected Tests in Package</h4>
+            <div class="mapping-summary-pill" id="map-selection-summary">
+              <span>Tests: <strong>0</strong></span> | <span>Total MRP: <strong>₹0</strong></span> | <span>Outsourced B2B: <strong>₹0</strong></span>
+            </div>
+            <div class="mapping-list-box" id="map-bundled-tests-list">
+              <!-- Selected Tests -->
+            </div>
+            <div class="mapping-actions-row">
+              <button class="btn-cancel" onclick="AdminApp.removeAllTestsFromPackage()">Remove All</button>
+              <button class="btn-emerald-solid" onclick="AdminApp.savePackageTestMapping()">Save Mapping ✓</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 6: REPORT UPLOAD HUB
+         ========================================================= -->
+    <section id="tab-reports" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Patient Diagnostic Report Upload Hub</h2>
+          <p>Direct upload of verified PDF reports or Google Drive share links</p>
+        </div>
+      </div>
+
+      <div class="glass-card max-form-box">
+        <form id="report-upload-form" onsubmit="AdminApp.handleReportSubmit(event)">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label>Select Confirmed Booking</label>
+              <select id="report-booking-select" onchange="AdminApp.autofillReportPatient(this.value)" required>
+                <!-- Populated via JS -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Patient Info (Auto-detected)</label>
+              <input type="text" id="report-patient-info" placeholder="Patient details will appear here" readonly>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Automated File Naming Format Standard</label>
+            <div class="naming-preview-tag" id="report-naming-tag">SCDBOOK000001_PATIENT.pdf</div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label>Verified By Pathologist / Doctor</label>
+              <input type="text" id="report-doctor-input" placeholder="e.g. Dr. A. Muthukrishnan, MD (Path)" required>
+            </div>
+            <div class="form-group">
+              <label>Clinical Status</label>
+              <select id="report-status-input">
+                <option value="Normal">Normal Parameters</option>
+                <option value="Attention Required">Attention Required</option>
+                <option value="Critical">Critical Findings</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Upload Lab Report File (PDF / Images)</label>
+            <div class="file-upload-zone" onclick="document.getElementById('report-file-input').click()">
+              <input type="file" id="report-file-input" accept=".pdf,image/*" style="display:none;" onchange="AdminApp.previewReportFile(this)">
+              <span class="upload-icon">📄</span>
+              <p id="upload-file-label">Click to choose report PDF or drag & drop</p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Cloud / Drive Link (Alternative to file upload)</label>
+            <input type="url" id="report-link-input" placeholder="https://drive.google.com/file/d/your-report-link">
+          </div>
+
+          <button type="submit" class="btn-emerald-solid">Publish Report to Patient App ✓</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 7: APP CAROUSEL BANNER CONTROLS
+         ========================================================= -->
+    <section id="tab-carousel" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Home Screen Carousel Banners & Advertisements</h2>
+          <p>Controls the banners displayed on the customer dashboard and promotional deep-links</p>
+        </div>
+        <button class="btn-emerald-solid" onclick="AdminApp.openCarouselModal('add')">+ Add Banner</button>
+      </div>
+
+      <div class="carousel-cards-grid" id="carousel-cards-list">
+        <!-- Populated via JS -->
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 8: SOCIAL & WHATSAPP MARKETING
+         ========================================================= -->
+    <section id="tab-social-sharing" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Social Media Sharing & Patient Outreach</h2>
+          <p>Generate compliant WhatsApp, Facebook, and Instagram share cards</p>
+        </div>
+      </div>
+
+      <div class="panel-split-layout">
+        <div class="glass-card form-card">
+          <h3>📢 Compose Offer Broadcast</h3>
+          <div class="form-group">
+            <label>Select Test / Package to Promote</label>
+            <select id="social-share-item-select" onchange="AdminApp.prepareSocialSharePreview()">
+              <!-- Populated via JS -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Promotional Message Text</label>
+            <textarea id="social-share-msg" rows="4"></textarea>
+          </div>
+          <div class="social-share-buttons-row">
+            <button class="btn-social-whatsapp" onclick="AdminApp.shareOnWhatsApp()">
+              🟢 Share on WhatsApp
+            </button>
+            <button class="btn-social-fb" onclick="AdminApp.shareOnFacebook()">
+              🔵 Facebook Share Link
+            </button>
+            <button class="btn-social-insta" onclick="AdminApp.copyInstagramCaption()">
+              🟣 Copy for Instagram Post
+            </button>
+          </div>
+          <p class="social-disclaimer-note">
+            ℹ️ Direct automated posting to Instagram requires Instagram Graph API Business Account verification. Click "Copy for Instagram Post" to copy formatted captions & hashtags directly to clipboard.
+          </p>
+        </div>
+
+        <div class="glass-card directory-card">
+          <h3>📱 Live Mobile Preview</h3>
+          <div class="social-preview-box" id="social-preview-box">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 9: PATIENTS & CUSTOMER VAULT
+         ========================================================= -->
+    <section id="tab-customers" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Registered Customers & Patient Directory</h2>
+          <p>Access lifetime test history, family member profiles, and financial transactions</p>
+        </div>
+        <input type="text" class="input-filter-sm" id="customer-search-input" placeholder="Search customer by name or phone..." oninput="AdminApp.filterCustomers(this.value)">
+      </div>
+
+      <div class="admin-table-responsive glass-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Patient / Customer</th>
+              <th>Contact Phone</th>
+              <th>Location</th>
+              <th>Total Bookings</th>
+              <th>Lifetime Spent</th>
+              <th>Last Booking</th>
+              <th>Reports Ready</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="customers-table-body">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 10: COUPONS & DISCOUNTS
+         ========================================================= -->
+    <section id="tab-coupons" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Coupons & Promotional Discount Codes</h2>
+          <p>Manage cart checkout coupon codes, flat discounts, and maximum discount limits</p>
+        </div>
+        <button class="btn-emerald-solid" onclick="AdminApp.openCouponModal()">+ Create New Coupon</button>
+      </div>
+
+      <div class="admin-table-responsive glass-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Coupon Code</th>
+              <th>Discount Type</th>
+              <th>Value</th>
+              <th>Min Order</th>
+              <th>Max Discount</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="coupons-table-body">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 11: SIA AI ASSISTANT SETTINGS
+         ========================================================= -->
+    <section id="tab-ai-settings" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>SIA AI Health Assistant & Clinical Symptom Engine</h2>
+          <p>Controls symptom-to-test mapping, OCR prescription triaging, and safety recommendation rules</p>
+        </div>
+      </div>
+
+      <div class="ai-banner-card glass-card">
+        <span class="ai-shield-icon">🤖</span>
+        <div>
+          <h4>Clinical Safety Standard & Compliance Guard</h4>
+          <p>SIA recommendations are informational triaging aids only. The engine strictly encourages professional medical consultation and does not diagnose disease.</p>
+        </div>
+      </div>
+
+      <div class="glass-card" style="margin-top: 18px;">
+        <h3>Symptom to Diagnostic Test Triaging Rules</h3>
+        <div class="admin-table-responsive" style="margin-top: 10px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Reported Symptom</th>
+                <th>Recommended Diagnostic Tests</th>
+                <th>Suggested Health Package</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ai-symptom-rules-table-body">
+              <tr>
+                <td><strong>Fatigue & General Weakness</strong></td>
+                <td>Complete Blood Count (CBC), TSH, Vitamin B12, Vitamin D3</td>
+                <td>Selfcare Basic Health Panel</td>
+                <td><span class="status-pill status-assigned">Active</span></td>
+              </tr>
+              <tr>
+                <td><strong>Excessive Thirst / Frequent Urination</strong></td>
+                <td>Fasting Blood Sugar (FBS), HbA1c, Urine Routine</td>
+                <td>Diabetic Health Checkup</td>
+                <td><span class="status-pill status-assigned">Active</span></td>
+              </tr>
+              <tr>
+                <td><strong>Joint Pain / Body Stiffness</strong></td>
+                <td>RA Factor, Uric Acid, Calcium, Vitamin D3</td>
+                <td>Bone & Joint Screening</td>
+                <td><span class="status-pill status-assigned">Active</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 12: INVENTORY & CONSUMABLES
+         ========================================================= -->
+    <section id="tab-inventory" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>Lab Consumables & Blood Collection Tubes Inventory</h2>
+          <p>Real-time tracking of Vacutainers, EDTA Vials, Syringes, and Reagents</p>
+        </div>
+        <button class="btn-emerald-solid" onclick="alert('Consumable restock entry modal')">+ Record Stock Purchase</button>
+      </div>
+
+      <div class="admin-table-responsive glass-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Category</th>
+              <th>Current Stock</th>
+              <th>Minimum Reorder Level</th>
+              <th>Unit</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="inventory-table-body">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 13: AUDIT & SYSTEM ACTIVITY LOGS
+         ========================================================= -->
+    <section id="tab-audit-logs" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>System Audit & Activity Logs</h2>
+          <p>Transparent ledger of pricing edits, technician dispatches, and report publications</p>
+        </div>
+        <button class="btn-cancel" onclick="AdminApp.clearAuditLogs()">Clear Log History</button>
+      </div>
+
+      <div class="admin-table-responsive glass-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Admin User</th>
+              <th>Module</th>
+              <th>Action Executed</th>
+              <th>Record ID</th>
+            </tr>
+          </thead>
+          <tbody id="audit-logs-table-body">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         TAB 14: SETTINGS & HOME COLLECTION CHARGES
+         ========================================================= -->
+    <section id="tab-settings" class="admin-tab-content">
+      <div class="panel-head-flex">
+        <div>
+          <h2>System Settings & Business Configuration</h2>
+          <p>Configure phlebotomy dispatch charges, GST rate, and laboratory operating rules</p>
+        </div>
+      </div>
+
+      <div class="glass-card max-form-box">
+        <form onsubmit="AdminApp.saveSystemSettings(event)">
+          <h3>🛵 Doorstep Collection Fee Configuration</h3>
+          <div class="form-grid-2" style="margin-top: 14px;">
+            <div class="form-group">
+              <label>Single Visit Fee (&lt; 5 km)</label>
+              <input type="number" id="setting-fee-single-5km" value="100" required>
+            </div>
+            <div class="form-group">
+              <label>Multiple Visit Fee (&lt; 5 km)</label>
+              <input type="number" id="setting-fee-multi-5km" value="150" required>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label>Per KM Rate (5 to 20 km - Single Visit)</label>
+              <input type="number" id="setting-rate-single-km" value="20" required>
+            </div>
+            <div class="form-group">
+              <label>Per KM Rate (5 to 20 km - Multiple Visit)</label>
+              <input type="number" id="setting-rate-multi-km" value="30" required>
+            </div>
+          </div>
+
+          <h3 style="margin-top: 20px;">🏢 Central Laboratory Details</h3>
+          <div class="form-grid-2" style="margin-top: 14px;">
+            <div class="form-group">
+              <label>Hub Location</label>
+              <input type="text" value="Kodambakkam, Chennai - 600024" readonly>
+            </div>
+            <div class="form-group">
+              <label>Emergency Helpline Phone</label>
+              <input type="text" value="+91 98401 23456">
+            </div>
+          </div>
+
+          <button type="submit" class="btn-emerald-solid" style="margin-top: 14px;">Save Configuration ✓</button>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =========================================================
+       MODALS (PRESERVING ALL EXISTING IDS FOR COMPATIBILITY)
+       ========================================================= -->
+
+  <!-- 1. ASSIGN TECHNICIAN MODAL -->
+  <div id="assign-tech-modal" class="admin-modal-overlay" style="display: none;">
+    <div class="admin-modal-content glass-card animate-pop">
+      <div class="modal-header">
+        <h3>📍 Assign Technician for Sample Collection</h3>
+        <button class="modal-close-x" onclick="AdminApp.closeModal('assign-tech-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="booking-summary-pill" id="assign-booking-details"></div>
+
+        <div class="assignment-choice-box">
+          <label class="choice-container">
+            <input type="radio" name="assign_type" value="particular" checked onchange="AdminApp.toggleAssignMode('particular')">
+            <div class="choice-text">
+              <strong>Select Particular Technician</strong>
+              <span>Directly assign this order to a specific phlebotomist</span>
+            </div>
+          </label>
+
+          <label class="choice-container">
+            <input type="radio" name="assign_type" value="all_nearby" onchange="AdminApp.toggleAssignMode('all_nearby')">
+            <div class="choice-text">
+              <strong>Broadcast to All Nearby Technicians 📡</strong>
+              <span>Sends order notification to all phlebotomists in customer's zone</span>
+            </div>
+          </label>
+        </div>
+
+        <div id="particular-tech-select-wrap" class="form-group" style="margin-top: 14px;">
+          <label>Select Technician</label>
+          <select id="modal-select-particular-tech"></select>
+        </div>
+
+        <div id="nearby-broadcast-notice" class="broadcast-alert-box" style="display: none; margin-top: 14px;">
+          <span class="icon">📢</span>
+          <p>Order will be broadcasted to <strong>all on-duty technicians</strong> in this zone. The first technician to accept in their app will be locked to the booking.</p>
+        </div>
+
+        <div class="modal-actions-bar">
+          <button type="button" class="btn-emerald-solid" onclick="AdminApp.executeTechnicianAssignment()">Confirm Assignment ➔</button>
+          <button type="button" class="btn-cancel" onclick="AdminApp.closeModal('assign-tech-modal')">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. TEST ADD / EDIT MODAL -->
+  <div id="test-edit-modal" class="admin-modal-overlay" style="display: none;">
+    <div class="admin-modal-content glass-card modal-lg animate-pop">
+      <div class="modal-header">
+        <h3 id="test-modal-title">Test Details Editor</h3>
+        <button class="modal-close-x" onclick="AdminApp.closeModal('test-edit-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="test-backend-form" onsubmit="AdminApp.saveTestRecord(event)">
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label>TestID</label>
+              <input type="text" id="t-TestID" required>
+            </div>
+            <div class="form-group">
+              <label>TestCode</label>
+              <input type="text" id="t-TestCode" placeholder="e.g. CBC01" required>
+            </div>
+            <div class="form-group">
+              <label>TestName</label>
+              <input type="text" id="t-TestName" placeholder="Complete Blood Count" required>
+            </div>
+          </div>
+
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label>Category</label>
+              <input type="text" id="t-Category" placeholder="e.g. Hematology, Thyroid">
+            </div>
+            <div class="form-group">
+              <label>SampleType</label>
+              <input type="text" id="t-SampleType" placeholder="e.g. EDTA Blood, Serum">
+            </div>
+            <div class="form-group">
+              <label>FastingRequired</label>
+              <select id="t-FastingRequired">
+                <option value="No">No Fasting</option>
+                <option value="Yes (8-10 Hours)">Yes (8-10 Hours)</option>
+                <option value="Yes (10-12 Hours)">Yes (10-12 Hours)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label>Preparation</label>
+              <input type="text" id="t-Preparation" placeholder="Water allowed, morning preferred">
+            </div>
+            <div class="form-group">
+              <label>Parameters (Count / Names)</label>
+              <input type="text" id="t-Parameters" placeholder="24 Vital Parameters">
+            </div>
+          </div>
+
+          <div class="form-grid-4">
+            <div class="form-group">
+              <label>TAT (Turnaround Time)</label>
+              <input type="text" id="t-TAT" placeholder="e.g. 6 Hours">
+            </div>
+            <div class="form-group">
+              <label>MRP (₹)</label>
+              <input type="number" id="t-MRP" required>
+            </div>
+            <div class="form-group">
+              <label>OfferPrice / Retail (₹)</label>
+              <input type="number" id="t-OfferPrice" required>
+            </div>
+            <div class="form-group highlight-b2b-field">
+              <label>B2B Lab Cost (₹) 🔒</label>
+              <input type="number" id="t-B2BCost" placeholder="Lab cost" required>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label>Status</label>
+              <select id="t-Status">
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>SearchKeywords</label>
+              <input type="text" id="t-SearchKeywords" placeholder="cbc, blood count, hemoglobin">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>WhyDone (Clinical Indication)</label>
+            <textarea id="t-WhyDone" rows="2" placeholder="Detect infection, anemia..."></textarea>
+          </div>
+
+          <div class="modal-actions-bar">
+            <button type="submit" class="btn-emerald-solid">Save Test to Database ✓</button>
+            <button type="button" class="btn-cancel" onclick="AdminApp.closeModal('test-edit-modal')">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. PACKAGE ADD / EDIT MODAL -->
+  <div id="package-edit-modal" class="admin-modal-overlay" style="display: none;">
+    <div class="admin-modal-content glass-card modal-lg animate-pop">
+      <div class="modal-header">
+        <h3 id="package-modal-title">Package Details Editor</h3>
+        <button class="modal-close-x" onclick="AdminApp.closeModal('package-edit-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="package-backend-form" onsubmit="AdminApp.savePackageRecord(event)">
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label>PackageID</label>
+              <input type="text" id="p-PackageID" required>
+            </div>
+            <div class="form-group">
+              <label>PackageCode</label>
+              <input type="text" id="p-PackageCode" placeholder="e.g. PKG-WELL-01" required>
+            </div>
+            <div class="form-group">
+              <label>PackageName</label>
+              <input type="text" id="p-PackageName" placeholder="Full Body Wellness Profile" required>
+            </div>
+          </div>
+
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label>Category</label>
+              <input type="text" id="p-Category" placeholder="e.g. Master Checkup">
+            </div>
+            <div class="form-group">
+              <label>Parameters Included</label>
+              <input type="text" id="p-Parameters" placeholder="e.g. 82 Parameters Checked">
+            </div>
+            <div class="form-group">
+              <label>TestIDs (Comma separated)</label>
+              <input type="text" id="p-TestIDs" placeholder="T101, T102, T103">
+            </div>
+          </div>
+
+          <div class="form-grid-4">
+            <div class="form-group">
+              <label>SampleType</label>
+              <input type="text" id="p-SampleType" placeholder="Blood & Urine">
+            </div>
+            <div class="form-group">
+              <label>FastingRequired</label>
+              <select id="p-FastingRequired">
+                <option value="Yes (10-12 Hours Fasting)">Yes (10-12 Hours Fasting)</option>
+                <option value="No Fasting Required">No Fasting Required</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>TAT</label>
+              <input type="text" id="p-TAT" placeholder="12 Hours">
+            </div>
+            <div class="form-group">
+              <label>Featured on Home?</label>
+              <select id="p-Featured">
+                <option value="TRUE">TRUE (Showcase Badge)</option>
+                <option value="FALSE">FALSE</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label>MRP (₹)</label>
+              <input type="number" id="p-MRP" required>
+            </div>
+            <div class="form-group">
+              <label>OfferPrice / Retail (₹)</label>
+              <input type="number" id="p-OfferPrice" required>
+            </div>
+            <div class="form-group highlight-b2b-field">
+              <label>B2B Lab Cost (₹) 🔒</label>
+              <input type="number" id="p-B2BCost" placeholder="Lab cost" required>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label>Preparation</label>
+              <input type="text" id="p-Preparation" placeholder="Overnight fasting required">
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <select id="p-Status">
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="p-Description" rows="2" placeholder="Full body checkup covering Vital Organs"></textarea>
+          </div>
+
+          <div class="modal-actions-bar">
+            <button type="submit" class="btn-emerald-solid">Save Package to Database ✓</button>
+            <button type="button" class="btn-cancel" onclick="AdminApp.closeModal('package-edit-modal')">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. CAROUSEL BANNER MODAL -->
+  <div id="carousel-edit-modal" class="admin-modal-overlay" style="display: none;">
+    <div class="admin-modal-content glass-card animate-pop">
+      <div class="modal-header">
+        <h3 id="carousel-modal-title">Carousel Banner Item</h3>
+        <button class="modal-close-x" onclick="AdminApp.closeModal('carousel-edit-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="carousel-form" onsubmit="AdminApp.saveCarouselBanner(event)">
+          <input type="hidden" id="banner-id-input">
+          <div class="form-group">
+            <label>Banner Title</label>
+            <input type="text" id="banner-title-input" placeholder="e.g. Master Checkup 50% OFF" required>
+          </div>
+          <div class="form-group">
+            <label>Subtitle / Offer Tagline</label>
+            <input type="text" id="banner-subtitle-input" placeholder="e.g. 80+ Vital Parameters at ₹1,299">
+          </div>
+          <div class="form-group">
+            <label>Image URL</label>
+            <input type="url" id="banner-img-input" placeholder="https://..." required>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label>Target Page Link</label>
+              <input type="text" id="banner-link-input" placeholder="packages.html">
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <select id="banner-status-input">
+                <option value="Active">Active</option>
+                <option value="Hidden">Hidden</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-actions-bar">
+            <button type="submit" class="btn-emerald-solid">Save Banner ✓</button>
+            <button type="button" class="btn-cancel" onclick="AdminApp.closeModal('carousel-edit-modal')">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS POPUP -->
+  <div class="toast-container" id="admin-toast-container"></div>
+
+  <!-- SCRIPTS -->
+  <script src="assets/js/config.js?v=8.0.0"></script>
+  <script src="assets/js/offline-db.js?v=8.0.0"></script>
+  <script src="assets/js/api.js?v=8.0.0"></script>
+  <script src="assets/js/admin.js?v=8.0.0"></script>
+</body>
+</html>

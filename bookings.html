@@ -1,0 +1,179 @@
+<!-- file: bookings.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Track Bookings - Selfcare Diagnostics</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Versioned Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/bookings.css?v=5.8.0">
+</head>
+<body>
+
+  <!-- Floating App Header -->
+  <header class="app-header glass-card">
+    <div class="header-left" onclick="window.location.href='customer.html'" style="cursor: pointer;">
+      <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="header-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="fallback-logo" style="display:none;">
+        <h1 class="logo-text">SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
+        <p class="tagline">Empowering Wellness</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="live-status-pill">● Live Tracking</span>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- Section 1: Name-Wise Patient & Family Selector (Customer + Family Members) -->
+    <section class="patient-selector-section glass-card animate-fade">
+      <div class="section-title-wrap">
+        <div>
+          <h3>👥 Patient Bookings</h3>
+          <p>Select a family member to view their live sample tracking</p>
+        </div>
+        <button type="button" class="add-member-mini-btn" onclick="window.location.href='profile.html'">+ Add Member</button>
+      </div>
+
+      <!-- Horizontal Scrollable Patient Name Chips -->
+      <div class="patient-chips-scroll" id="patient-chips-list">
+        <!-- Dynamically rendered: Customer (Self), Member 1, Member 2 -->
+      </div>
+    </section>
+
+    <!-- Section 2: If Selected Patient Has Multiple Bookings, Show Booking Switcher -->
+    <div id="patient-bookings-subnav" class="bookings-subnav-container" style="display: none;">
+      <!-- Populated when a patient has >1 booking -->
+    </div>
+
+    <!-- Section 3: DIRECT ACTIVE LIVE TRACKING VIEW (NO SEARCH REQUIRED) -->
+    <div id="active-track-view" style="display: none;">
+
+      <!-- Booking Info Overview Card -->
+      <section class="booking-meta-card glass-card animate-fade">
+        <div class="meta-head-row">
+          <div>
+            <span class="meta-label">Booking Reference:</span>
+            <strong class="meta-id-val" id="disp-booking-id">SCDBOOK000000</strong>
+          </div>
+          <span class="meta-mode-badge" id="disp-collection-mode">🏠 Home Pickup</span>
+        </div>
+
+        <div class="meta-info-grid">
+          <div class="info-block">
+            <span>👤 Patient Name:</span>
+            <strong id="disp-patient-name">-</strong>
+          </div>
+          <div class="info-block">
+            <span>⏱️ Scheduled Slot:</span>
+            <strong id="disp-time-slot">-</strong>
+          </div>
+          <div class="info-block">
+            <span>💳 Payment:</span>
+            <strong id="disp-payment-status">-</strong>
+          </div>
+          <div class="info-block">
+            <span>💰 Amount:</span>
+            <strong id="disp-amount-val">₹0</strong>
+          </div>
+        </div>
+
+        <div class="location-banner" id="disp-location-box">
+          <span id="disp-location-icon">📍</span>
+          <span id="disp-location-text">Pickup address details</span>
+        </div>
+      </section>
+
+      <!-- Dynamic Live Tracking Stepper -->
+      <section class="stepper-card glass-card animate-fade">
+        <div class="stepper-title-row">
+          <h4>🧪 Live Diagnostic Progress</h4>
+          <span class="step-update-time" id="disp-last-updated">Updated Just Now</span>
+        </div>
+
+        <div class="vertical-stepper" id="tracking-stepper-list">
+          <!-- Dynamically Injected by bookings.js -->
+        </div>
+      </section>
+
+      <!-- Booked Tests Summary List -->
+      <section class="tests-summary-card glass-card animate-fade">
+        <h4>📋 Booked Tests & Packages</h4>
+        <div class="booked-tests-list" id="disp-tests-list">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+
+      <!-- Phlebotomist / Lab Support Action -->
+      <section class="support-card glass-card animate-fade">
+        <div class="support-details">
+          <strong>Need Instant Help with Sample Pickup?</strong>
+          <p>Directly chat with our Chennai Diagnostic Coordinator via WhatsApp.</p>
+        </div>
+        <button type="button" class="whatsapp-support-btn" onclick="BookingsPage.openWhatsAppSupport()">
+          <span>💬</span> Chat on WhatsApp
+        </button>
+      </section>
+
+    </div>
+
+    <!-- Section 4: EMPTY STATE (If the selected family member has no booking yet) -->
+    <section id="patient-empty-state" class="empty-state-card glass-card" style="display: none;">
+      <div class="empty-state-icon">📋</div>
+      <h3 id="empty-patient-title">No Active Bookings</h3>
+      <p id="empty-patient-desc">There are no diagnostic bookings for this member yet. You can book tests or health checkup packages anytime.</p>
+      <div class="empty-action-btns">
+        <button type="button" class="action-btn primary-btn" onclick="window.location.href='tests.html'">Book Tests Now ➔</button>
+        <button type="button" class="action-btn secondary-btn" onclick="window.location.href='packages.html'">View Packages ➔</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 5-Tab Fixed Bottom Navigation (Track Booking Active) -->
+  <nav class="bottom-nav">
+    <a href="customer.html" class="nav-item">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="reports.html" class="nav-item">
+      <span class="nav-icon">📑</span>
+      <span class="nav-label">Reports</span>
+    </a>
+    <a href="bookings.html" class="nav-item active">
+      <span class="nav-icon">📍</span>
+      <span class="nav-label">Track Booking</span>
+    </a>
+    <a href="profile.html" class="nav-item">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">My Account</span>
+    </a>
+    <a href="cart.html" class="nav-item">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">Cart</span>
+      <span class="cart-badge" style="display:none;">0</span>
+    </a>
+  </nav>
+
+  <!-- Core JavaScript Scripts Matching Customer & Cart Pages -->
+  <script src="assets/js/config.js?v=5.8.0"></script>
+  <script src="assets/js/utils.js?v=5.8.0"></script>
+  <script src="assets/js/api.js?v=5.8.0"></script>
+  <script src="assets/js/offline-db.js?v=5.8.0"></script>
+  <script src="assets/js/offline-sync.js?v=5.8.0"></script>
+  <script src="assets/js/auth.js?v=5.8.0"></script>
+  <script src="assets/js/app.js?v=5.8.0"></script>
+  <script src="assets/js/bookings.js?v=5.8.0"></script>
+</body>
+</html>

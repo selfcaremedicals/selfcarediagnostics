@@ -1,0 +1,472 @@
+<!-- file: tests.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Tests Catalogue - Selfcare Diagnostics</title>
+  
+  <!-- Favicon & Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Versioned Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=6.4.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=6.4.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=6.4.0">
+  <link rel="stylesheet" href="assets/css/tests.css?v=6.4.0">
+
+  <style>
+    /* Sticky Top Bar (Search + Single Box Slider) */
+    .search-section {
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 100 !important;
+      background: #F4FBF9 !important;
+      padding-top: 10px !important;
+      padding-bottom: 8px !important;
+      backdrop-filter: blur(16px) !important;
+      -webkit-backdrop-filter: blur(16px) !important;
+      margin-bottom: 15px !important;
+    }
+
+    .search-bar {
+      display: flex !important;
+      align-items: center !important;
+      padding: 10px 14px !important;
+      gap: 10px !important;
+      border-radius: 14px !important;
+      background: rgba(255, 255, 255, 0.98) !important;
+      box-shadow: 0 4px 18px rgba(7, 136, 102, 0.08) !important;
+      border: 1px solid rgba(7, 136, 102, 0.22) !important;
+      margin-bottom: 10px !important;
+    }
+
+    .search-bar input {
+      flex: 1 !important;
+      background: transparent !important;
+      font-size: 13px !important;
+      color: #10231E !important;
+      font-weight: 500 !important;
+      border: none !important;
+      outline: none !important;
+    }
+
+    /* Premium 3D Glassmorphic Horizontal Promo Slider */
+    .single-slider-box {
+      width: 100% !important;
+      min-height: 84px !important;
+      position: relative !important;
+      overflow: hidden !important;
+      border-radius: 18px !important;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 253, 249, 0.88) 100%) !important;
+      backdrop-filter: blur(24px) saturate(190%) !important;
+      -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+      border: 1.5px solid rgba(255, 255, 255, 0.95) !important;
+      box-shadow: 
+        0 14px 36px -8px rgba(4, 93, 73, 0.14),
+        0 4px 12px rgba(0, 0, 0, 0.03),
+        inset 0 1.5px 2px rgba(255, 255, 255, 1),
+        inset 0 -1.5px 3px rgba(7, 136, 102, 0.08) !important;
+      box-sizing: border-box !important;
+    }
+
+    .single-slider-box::before {
+      content: "" !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      height: 1px !important;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95) 30%, rgba(16, 185, 129, 0.4) 70%, transparent) !important;
+      pointer-events: none !important;
+      z-index: 2 !important;
+    }
+
+    .slider-track {
+      display: flex !important;
+      width: 100% !important;
+      height: 100% !important;
+      transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1) !important;
+      will-change: transform !important;
+    }
+
+    .slide-item {
+      min-width: 100% !important;
+      width: 100% !important;
+      height: 100% !important;
+      padding: 12px 18px !important;
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      gap: 14px !important;
+      box-sizing: border-box !important;
+    }
+
+    .slide-content {
+      flex: 1 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      gap: 2px !important;
+    }
+
+    .slide-badge {
+      font-size: 9px !important;
+      font-weight: 800 !important;
+      color: #E4005A !important;
+      background: linear-gradient(135deg, rgba(253, 242, 248, 0.95), rgba(255, 228, 230, 0.9)) !important;
+      border: 1px solid rgba(225, 29, 72, 0.2) !important;
+      box-shadow: 0 2px 6px rgba(225, 29, 72, 0.08), inset 0 1px 1px #ffffff !important;
+      padding: 2.5px 8px !important;
+      border-radius: 6px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: fit-content !important;
+      letter-spacing: 0.4px !important;
+      text-transform: uppercase !important;
+      margin-bottom: 2px !important;
+    }
+
+    .slide-content h4 {
+      font-size: 13.5px !important;
+      font-weight: 900 !important;
+      color: #045D49 !important;
+      line-height: 1.25 !important;
+      letter-spacing: -0.2px !important;
+      margin: 0 !important;
+    }
+
+    .slide-content p {
+      font-size: 11px !important;
+      color: #536E66 !important;
+      font-weight: 600 !important;
+      line-height: 1.35 !important;
+      margin: 0 !important;
+    }
+
+    .slide-btn {
+      flex-shrink: 0 !important;
+      background: linear-gradient(135deg, #078866, #045D49) !important;
+      color: #ffffff !important;
+      border: 1px solid rgba(255, 255, 255, 0.4) !important;
+      padding: 8px 14px !important;
+      border-radius: 10px !important;
+      font-size: 11.5px !important;
+      font-weight: 800 !important;
+      cursor: pointer !important;
+      white-space: nowrap !important;
+      box-shadow: 0 4px 14px rgba(7, 136, 102, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.5) !important;
+      transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    .slide-btn:active {
+      transform: translateY(1px) scale(0.96) !important;
+      box-shadow: 0 2px 6px rgba(7, 136, 102, 0.25) !important;
+    }
+
+    /* 2-Column Compact Tests Grid */
+    .tests-grid {
+      display: grid !important;
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 10px !important;
+      margin-bottom: 40px !important;
+    }
+
+    .test-card {
+      padding: 12px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      background: #FFFFFF !important;
+      border: 1px solid rgba(0, 0, 0, 0.08) !important;
+      border-radius: 14px !important;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .test-card-top {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 4px !important;
+    }
+
+    .test-card-header-row {
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      margin-bottom: 2px !important;
+    }
+
+    .test-card-top h4 {
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      color: #10231E !important;
+      line-height: 1.3 !important;
+      min-height: 32px !important;
+    }
+
+    .test-code-tag {
+      font-size: 9px !important;
+      font-weight: 700 !important;
+      color: #536E66 !important;
+      text-transform: uppercase !important;
+    }
+
+    .card-fasting-tag {
+      font-size: 8px !important;
+      font-weight: 800 !important;
+      padding: 2px 6px !important;
+      border-radius: 6px !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.2px !important;
+      white-space: nowrap !important;
+    }
+
+    .card-fasting-tag.fasting {
+      background: rgba(228, 0, 90, 0.1) !important;
+      color: #E4005A !important;
+      border: 1px solid rgba(228, 0, 90, 0.25) !important;
+    }
+
+    .card-fasting-tag.non-fasting {
+      background: rgba(7, 136, 102, 0.1) !important;
+      color: #078866 !important;
+      border: 1px solid rgba(7, 136, 102, 0.25) !important;
+    }
+
+    .card-param-badge {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      background: rgba(7, 136, 102, 0.08) !important;
+      color: #045D49 !important;
+      border: 1px solid rgba(7, 136, 102, 0.2) !important;
+      font-size: 9.5px !important;
+      font-weight: 700 !important;
+      padding: 3px 6px !important;
+      border-radius: 6px !important;
+      width: fit-content !important;
+      margin-top: 2px !important;
+    }
+
+    .know-more-row {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 6px 8px !important;
+      background: rgba(111, 66, 193, 0.05) !important;
+      border-radius: 6px !important;
+      cursor: pointer !important;
+    }
+
+    .know-more-text {
+      flex: 1 !important;
+      margin-left: 5px !important;
+      font-size: 11px !important;
+      font-weight: 600 !important;
+      color: #6b21a8 !important;
+    }
+
+    .info-icon, .arrow-icon {
+      font-size: 11px !important;
+      color: #6b21a8 !important;
+    }
+
+    .test-pricing-row {
+      display: flex !important;
+      align-items: baseline !important;
+      gap: 6px !important;
+    }
+
+    .mrp {
+      font-size: 11px !important;
+      color: #dc2626 !important;
+      text-decoration: line-through !important;
+      font-weight: 600 !important;
+    }
+
+    .offer-price {
+      font-size: 13px !important;
+      font-weight: 800 !important;
+      color: #10231E !important;
+    }
+
+    .book-btn {
+      width: 100% !important;
+      padding: 8px 6px !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      border-radius: 8px !important;
+      border: none !important;
+      cursor: pointer !important;
+      text-align: center !important;
+    }
+
+    .add-cart-btn {
+      background: #E4005A !important;
+      color: #ffffff !important;
+    }
+
+    .book-btn.added-btn {
+      background: #10b981 !important;
+      color: #ffffff !important;
+    }
+
+    /* 5-Tab Footer Navigation */
+    .bottom-nav {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      z-index: 900 !important;
+      display: flex !important;
+      justify-content: space-around !important;
+      padding: 8px 6px calc(8px + env(safe-area-inset-bottom)) 6px !important;
+      background: rgba(255, 255, 255, 0.98) !important;
+      backdrop-filter: blur(24px) !important;
+      -webkit-backdrop-filter: blur(24px) !important;
+      border-top: 1px solid rgba(7, 136, 102, 0.15) !important;
+      box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.06) !important;
+    }
+
+    .nav-item {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      gap: 2px !important;
+      text-decoration: none !important;
+      color: #536E66 !important;
+      font-size: 10px !important;
+      font-weight: 700 !important;
+      position: relative !important;
+      flex: 1 !important;
+      text-align: center !important;
+    }
+
+    .nav-item span:first-child {
+      font-size: 18px !important;
+    }
+
+    .nav-item.active, .nav-item:hover {
+      color: #E4005A !important;
+    }
+
+    .cart-badge {
+      position: absolute !important;
+      top: -4px !important;
+      right: calc(50% - 16px) !important;
+      background: #E4005A !important;
+      color: #FFFFFF !important;
+      font-size: 9px !important;
+      font-weight: 800 !important;
+      padding: 1px 5px !important;
+      border-radius: 10px !important;
+      min-width: 16px !important;
+      text-align: center !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Main Container -->
+  <main class="main-container" style="padding-top: 10px;">
+    
+    <!-- Top Sticky Search Bar & 3D Auto-Slider -->
+    <section class="search-section">
+      <div class="search-bar glass-card">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="tests-search-input" placeholder="Search tests by name, symptoms (e.g. fever, joint pain)..." autocomplete="off">
+        <button class="voice-search-btn" id="voice-search-btn" onclick="TestsPage.startVoiceSearch()" title="Voice Search">🎙️</button>
+      </div>
+
+      <!-- Premium 3D Glassmorphic Promo Slider -->
+      <div class="single-slider-box">
+        <div class="slider-track" id="singleSliderTrack">
+          
+          <!-- Slide 1: Free Home Collection (Orders Above ₹500) -->
+          <div class="slide-item">
+            <div class="slide-content">
+              <span class="slide-badge">🏠 COMPLIMENTARY PICKUP</span>
+              <h4>Zero Doorstep Collection Charges</h4>
+              <p>100% Free certified home sample collection on orders above ₹500</p>
+            </div>
+            <button class="slide-btn" onclick="window.location.href='tests.html'">Book Now →</button>
+          </div>
+
+          <!-- Slide 2: Corporate & Apartment Camp (₹1,299 Package @ ₹999 - Min 20 Persons) -->
+          <div class="slide-item">
+            <div class="slide-content">
+              <span class="slide-badge">🏢 CORPORATE & APARTMENT CAMP</span>
+              <h4>₹1,299 Health Package @ ₹999 Only</h4>
+              <p>Comprehensive group screening panel • Minimum 20 persons required</p>
+            </div>
+            <button class="slide-btn" onclick="window.location.href='https://wa.me/917010174890?text=Hi%2C%20I%20would%20like%20to%20enquire%20about%20the%20Corporate%2FApartment%20Health%20Camp%20offer%20(Rs.999%20package%20for%20min%2020%20persons).'">Enquire →</button>
+          </div>
+
+          <!-- Slide 3: Routine Blood Tests Starts from ₹40 -->
+          <div class="slide-item">
+            <div class="slide-content">
+              <span class="slide-badge">🧪 ACCESSIBLE HEALTHCARE</span>
+              <h4>Routine Blood Tests Starting @ ₹40</h4>
+              <p>Certified clinical diagnostics including Blood Glucose from ₹40</p>
+            </div>
+            <button class="slide-btn" onclick="window.location.href='tests.html'">Explore →</button>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Tests Catalogue Container -->
+    <section class="catalogue-section">
+      <div id="tests-catalogue-container" class="tests-grid">
+        <!-- Dynamically rendered via tests.js -->
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 5-Tab Footer Navigation -->
+  <nav class="bottom-nav glass-card">
+    <a href="customer.html" class="nav-item">
+      <span>🏠</span>
+      <span>Home</span>
+    </a>
+    <a href="reports.html" class="nav-item">
+      <span>📑</span>
+      <span>Reports</span>
+    </a>
+    <a href="bookings.html" class="nav-item">
+      <span>📍</span>
+      <span>Track Booking</span>
+    </a>
+    <a href="cart.html" class="nav-item">
+      <span>🛒</span>
+      <span>Cart</span>
+      <span class="cart-badge" style="display:none;">0</span>
+    </a>
+    <a href="profile.html" class="nav-item">
+      <span>👤</span>
+      <span>Profile</span>
+    </a>
+  </nav>
+
+  <!-- Core JavaScript Scripts -->
+  <script src="assets/js/config.js?v=6.4.0"></script>
+  <script src="assets/js/utils.js?v=6.4.0"></script>
+  <script src="assets/js/api.js?v=6.4.0"></script>
+  <script src="assets/js/offline-db.js?v=6.4.0"></script>
+  <script src="assets/js/offline-sync.js?v=6.4.0"></script>
+  <script src="assets/js/auth.js?v=6.4.0"></script>
+  <script src="assets/js/app.js?v=6.4.0"></script>
+  <script src="assets/js/tests.js?v=6.4.0"></script>
+</body>
+</html>

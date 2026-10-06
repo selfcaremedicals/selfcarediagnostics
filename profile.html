@@ -1,0 +1,532 @@
+<!-- file: profile.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>My Account - Selfcare Diagnostics</title>
+  
+  <!-- Favicon & PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Versioned Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/profile.css?v=6.0.0">
+</head>
+<body>
+
+  <!-- Top App Logo Bar -->
+  <header class="account-top-header">
+    <div class="logo-wrapper" onclick="window.location.href='customer.html'">
+      <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="brand-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="brand-logo-fallback" style="display: none;">
+        <h1 class="logo-text">SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
+        <p class="tagline">Empowering Wellness</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main My Account Container -->
+  <main class="account-container">
+
+    <!-- Curved Header Banner ("My Account") -->
+    <div class="curved-account-banner">
+      <div class="banner-title-wrap">
+        <span class="user-avatar-icon">👤</span>
+        <h2>My Account</h2>
+      </div>
+    </div>
+
+    <!-- Clean Menu List Group -->
+    <div class="account-menu-list">
+
+      <!-- 1. My Profile -->
+      <div class="menu-item-row" onclick="ProfilePage.openMyProfileModal()">
+        <div class="menu-left">
+          <span class="menu-icon">👤</span>
+          <span class="menu-label">My Profile</span>
+        </div>
+        <span class="menu-chevron">›</span>
+      </div>
+
+      <!-- 2. Add Family Members -->
+      <div class="menu-item-row" onclick="ProfilePage.openFamilyMembersModal()">
+        <div class="menu-left">
+          <span class="menu-icon">👨‍👩‍👧‍👦</span>
+          <span class="menu-label">Add Family Members</span>
+        </div>
+        <span class="menu-chevron">›</span>
+      </div>
+
+      <!-- 3. Addresses -->
+      <div class="menu-item-row" onclick="ProfilePage.openAddressesModal()">
+        <div class="menu-left">
+          <span class="menu-icon">📍</span>
+          <span class="menu-label">Addresses</span>
+        </div>
+        <span class="menu-chevron">›</span>
+      </div>
+
+      <!-- 4. Refer And Earn -->
+      <div class="menu-item-row" onclick="ProfilePage.openReferEarnModal()">
+        <div class="menu-left">
+          <span class="menu-icon">🎁</span>
+          <span class="menu-label">Refer And Earn</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="refer-badge-pill" id="referral-reward-badge" style="display:none;">10% OFF</span>
+          <span class="menu-chevron">›</span>
+        </div>
+      </div>
+
+      <!-- 5. General Info -->
+      <div class="menu-item-row" onclick="ProfilePage.openGeneralInfoModal()">
+        <div class="menu-left">
+          <span class="menu-icon">ℹ️</span>
+          <span class="menu-label">General Info</span>
+        </div>
+        <span class="menu-chevron">›</span>
+      </div>
+
+      <!-- 6. Logout -->
+      <div class="menu-item-row" onclick="ProfilePage.handleLogout()">
+        <div class="menu-left">
+          <span class="menu-icon">🚪</span>
+          <span class="menu-label">Logout</span>
+        </div>
+        <span class="menu-chevron">›</span>
+      </div>
+
+      <!-- 7. Support Desk -->
+      <div class="menu-item-row" onclick="ProfilePage.openSupportDeskModal()">
+        <div class="menu-left">
+          <span class="menu-icon">🎧</span>
+          <span class="menu-label">Support Desk</span>
+        </div>
+        <span class="menu-chevron">›</span>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- =========================================================================
+       MODALS
+       ========================================================================= -->
+
+  <!-- Modal 1: My Profile Details & Edit (Self) -->
+  <div id="modal-my-profile" class="sia-modal-overlay">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>👤</span>
+          <h3>My Personal Profile</h3>
+        </div>
+        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-my-profile')">✕</button>
+      </div>
+
+      <div class="sia-modal-body">
+        <div id="profile-view-mode">
+          <div class="profile-meta-head">
+            <div class="profile-avatar-circle" id="self-avatar-letter">U</div>
+            <div>
+              <h4 id="self-display-name">Valued Customer</h4>
+              <p id="self-display-relation" style="font-size:11px; color:#078866; font-weight:700;">Account Primary (Self)</p>
+            </div>
+          </div>
+
+          <div class="details-data-box">
+            <div class="info-row"><span class="lbl">Mobile:</span><strong class="val" id="self-view-mobile">+91 7010174890</strong></div>
+            <div class="info-row"><span class="lbl">Email:</span><strong class="val" id="self-view-email">selfcaremedicals@gmail.com</strong></div>
+            <div class="info-row"><span class="lbl">Age / Gender:</span><strong class="val" id="self-view-age-gender">28 Yrs • Male</strong></div>
+            <div class="info-row"><span class="lbl">Blood Group:</span><strong class="val" id="self-view-blood">O+</strong></div>
+            <div class="info-row"><span class="lbl">Address:</span><strong class="val" id="self-view-address">Chennai, Tamil Nadu</strong></div>
+            <div class="info-row"><span class="lbl">Location:</span><strong class="val loc-val" id="self-view-location">Not set</strong></div>
+          </div>
+
+          <button class="modal-action-btn" onclick="ProfilePage.toggleSelfEditMode(true)">✏️ Edit Profile Details</button>
+        </div>
+
+        <div id="profile-edit-mode" style="display: none;">
+          <div class="form-field">
+            <label>Full Name</label>
+            <input type="text" id="self-edit-name" placeholder="Enter your full name">
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Mobile Number</label>
+              <input type="tel" id="self-edit-mobile" maxlength="10" placeholder="10-digit mobile">
+            </div>
+            <div class="form-field">
+              <label>Blood Group</label>
+              <select id="self-edit-blood">
+                <option value="A+">A +ve</option>
+                <option value="A-">A -ve</option>
+                <option value="B+">B +ve</option>
+                <option value="B-">B -ve</option>
+                <option value="O+">O +ve</option>
+                <option value="O-">O -ve</option>
+                <option value="AB+">AB +ve</option>
+                <option value="AB-">AB -ve</option>
+                <option value="Unknown">Not Known</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Age (Years)</label>
+              <input type="number" id="self-edit-age" placeholder="Age" min="1" max="120">
+            </div>
+            <div class="form-field">
+              <label>Gender</label>
+              <select id="self-edit-gender">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label>Email Address</label>
+            <input type="email" id="self-edit-email" placeholder="email@example.com">
+          </div>
+
+          <div class="form-field">
+            <label>Address</label>
+            <input type="text" id="self-edit-address" placeholder="Flat No, Street, Area">
+          </div>
+
+          <div class="form-field">
+            <div class="loc-head-flex">
+              <label>Location (Paste link or Detect GPS)</label>
+              <button type="button" class="gps-btn" onclick="ProfilePage.detectGpsLocation('self-edit-location')">📍 Get Location</button>
+            </div>
+            <input type="text" id="self-edit-location" placeholder="Google Maps link or coordinates">
+          </div>
+
+          <div class="btn-group-row">
+            <button class="cancel-btn" onclick="ProfilePage.toggleSelfEditMode(false)">Cancel</button>
+            <button class="modal-action-btn" onclick="ProfilePage.saveSelfDetails()">Save Changes ✓</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Family & Friends Members Management -->
+  <div id="modal-family-members" class="sia-modal-overlay">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span id="family-modal-icon">👨‍👩‍👧‍👦</span>
+          <h3 id="family-modal-title">Family & Friends Members</h3>
+        </div>
+        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-family-members')">✕</button>
+      </div>
+
+      <div class="sia-modal-body">
+        
+        <!-- VIEW 1: FAMILY MEMBERS LIST -->
+        <div id="family-list-view">
+          <div class="family-top-bar">
+            <div>
+              <span class="family-count-label" id="family-total-count">0 Members Saved</span>
+              <p class="family-sub-note">Select member in cart to use their mobile number</p>
+            </div>
+            <button type="button" class="add-member-top-btn" onclick="ProfilePage.openMemberForm()">
+              <span>+</span> Add Member
+            </button>
+          </div>
+
+          <div id="family-cards-container" class="family-cards-scroll">
+            <!-- Dynamically populated via ProfilePage.renderFamilyCards() -->
+          </div>
+        </div>
+
+        <!-- VIEW 2: ADD / EDIT MEMBER FORM (Initially Hidden) -->
+        <div id="family-form-view" style="display: none;">
+          <div class="form-sub-header">
+            <button type="button" class="back-link-btn" onclick="ProfilePage.closeMemberForm()">
+              ← Back to Members
+            </button>
+            <h4 id="member-form-title" style="font-size:13px; font-weight:800; color:#045D49;">Add Member Details</h4>
+          </div>
+
+          <input type="hidden" id="family-edit-id">
+
+          <div class="form-field">
+            <label>Member / Patient Name *</label>
+            <input type="text" id="family-name-input" placeholder="Full name of family or friend">
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Relationship *</label>
+              <select id="family-relation-select">
+                <option value="Father">Father</option>
+                <option value="Mother">Mother</option>
+                <option value="Spouse">Spouse / Partner</option>
+                <option value="Son">Son</option>
+                <option value="Daughter">Daughter</option>
+                <option value="Brother">Brother</option>
+                <option value="Sister">Sister</option>
+                <option value="Friend">Friend</option>
+                <option value="Grandfather">Grandfather</option>
+                <option value="Grandmother">Grandmother</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Blood Group</label>
+              <select id="family-blood-select">
+                <option value="A+">A +ve</option>
+                <option value="A-">A -ve</option>
+                <option value="B+">B +ve</option>
+                <option value="B-">B -ve</option>
+                <option value="O+">O +ve</option>
+                <option value="O-">O -ve</option>
+                <option value="AB+">AB +ve</option>
+                <option value="AB-">AB -ve</option>
+                <option value="Unknown">Not Known</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Age (Years) *</label>
+              <input type="number" id="family-age-input" placeholder="Age" min="1" max="120">
+            </div>
+            <div class="form-field">
+              <label>Gender *</label>
+              <select id="family-gender-select">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label>Mobile Number (For Lab Reports & Cart Booking) *</label>
+            <input type="tel" id="family-mobile-input" maxlength="10" placeholder="10-digit mobile of this member">
+            <small style="font-size:10px; color:#536E66; margin-top:2px;">This exact number will appear in cart bookings when this member is selected.</small>
+          </div>
+
+          <div class="form-field">
+            <label>Email Address (Optional)</label>
+            <input type="email" id="family-email-input" placeholder="member@example.com">
+          </div>
+
+          <div class="form-field">
+            <label>Pickup Address (Optional)</label>
+            <input type="text" id="family-address-input" placeholder="Door No, Street, Area">
+          </div>
+
+          <div class="form-field">
+            <div class="loc-head-flex">
+              <label>GPS Location (Optional)</label>
+              <button type="button" class="gps-btn" onclick="ProfilePage.detectGpsLocation('family-location-input')">📍 Get GPS</button>
+            </div>
+            <input type="text" id="family-location-input" placeholder="Google Maps link or coordinates">
+          </div>
+
+          <div class="btn-group-row">
+            <button type="button" class="cancel-btn" onclick="ProfilePage.closeMemberForm()">Cancel</button>
+            <button type="button" class="modal-action-btn" onclick="ProfilePage.saveFamilyMember()">Save Member ✓</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Addresses -->
+  <div id="modal-addresses" class="sia-modal-overlay">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>📍</span>
+          <h3>Saved Pickup Addresses</h3>
+        </div>
+        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-addresses')">✕</button>
+      </div>
+
+      <div class="sia-modal-body">
+        <div id="addresses-list-container" class="items-list-box"></div>
+
+        <div class="new-address-form-box" style="margin-top:14px; padding-top:12px; border-top:1px solid rgba(0,0,0,0.08);">
+          <h5 style="font-size:12px; color:#045D49; margin-bottom:8px;">+ Add New Address</h5>
+          <div class="form-field">
+            <input type="text" id="addr-label-input" placeholder="Address Label (e.g. Home, Office)">
+          </div>
+          <div class="form-field">
+            <input type="text" id="addr-line-input" placeholder="Door No, Street Name, Area">
+          </div>
+          <div class="form-row-2">
+            <input type="text" id="addr-pincode-input" placeholder="Pincode (e.g. 600001)" maxlength="6">
+            <button type="button" class="gps-btn" style="height:38px;" onclick="ProfilePage.detectGpsLocation('addr-loc-input')">📍 Get GPS</button>
+          </div>
+          <div class="form-field">
+            <input type="text" id="addr-loc-input" placeholder="Maps Location link">
+          </div>
+          <button class="modal-action-btn" style="margin-top:8px;" onclick="ProfilePage.addNewAddress()">Save Address</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Refer And Earn -->
+  <div id="modal-refer-earn" class="sia-modal-overlay">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>🎁</span>
+          <h3>Refer & Earn Rewards</h3>
+        </div>
+        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-refer-earn')">✕</button>
+      </div>
+      <div class="sia-modal-body">
+        <div class="refer-invite-box">
+          <div class="gift-icon-bubble">🎉</div>
+          <h4>Invite Friends & Earn 10% OFF</h4>
+          <p>Share your referral link with friends. When they book a test with your code, you automatically get an exclusive 10% OFF discount coupon for your cart!</p>
+          
+          <div class="referral-code-pill">
+            <span>YOUR REFERRAL CODE:</span>
+            <strong id="user-refer-code">SC7010</strong>
+          </div>
+
+          <button class="whatsapp-share-btn" onclick="ProfilePage.shareReferralWhatsApp()">
+            <span>💬</span> Share Referral via WhatsApp
+          </button>
+        </div>
+
+        <div class="earned-rewards-section" style="margin-top: 18px;">
+          <h5 class="reward-section-title">🎁 Your Earned 10% Coupons:</h5>
+          <div id="earned-coupons-container" class="earned-coupons-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 5: General Info -->
+  <div id="modal-general-info" class="sia-modal-overlay">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>ℹ️</span>
+          <h3>About Selfcare Diagnostics</h3>
+        </div>
+        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-general-info')">✕</button>
+      </div>
+      <div class="sia-modal-body">
+        <div class="general-info-card">
+          <h4>🧪 NABL Accredited Protocols</h4>
+          <p>Selfcare Diagnostics provides certified clinical testing standards ensuring 100% precise pathology results across Chennai.</p>
+        </div>
+        <div class="general-info-card">
+          <h4>🛵 Doorstep Sample Pickup</h4>
+          <p>Certified phlebotomists follow barcoded and temperature-controlled cold-chain protocols for sample integrity.</p>
+        </div>
+        <div class="general-info-card">
+          <h4>⚡ Smart Digital Reports</h4>
+          <p>Reports delivered directly to your device and WhatsApp within 24 hours of sample verification.</p>
+        </div>
+        <div class="general-info-card">
+          <h4>🏢 Diagnostic Center</h4>
+          <p>Chennai, Tamil Nadu, India.<br>Open Monday to Sunday: 7:00 AM – 9:00 PM</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 6: Support Desk -->
+  <div id="modal-support-desk" class="sia-modal-overlay">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>🎧</span>
+          <h3>Selfcare Support Desk</h3>
+        </div>
+        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-support-desk')">✕</button>
+      </div>
+      <div class="sia-modal-body">
+        <p style="font-size:12px; color:#536E66; line-height:1.4; margin-bottom:12px;">
+          Have questions about your test preparation, doorstep collection, or reports? Reach out directly:
+        </p>
+
+        <a href="tel:+917010174890" class="support-channel-card">
+          <div class="channel-icon">📞</div>
+          <div class="channel-info">
+            <strong>Phone Call Support</strong>
+            <span>+91 7010174890</span>
+          </div>
+          <span class="channel-arrow">›</span>
+        </a>
+
+        <a href="https://wa.me/917010174890?text=Hi%20Selfcare%20Diagnostics,%20I%20need%20assistance" target="_blank" class="support-channel-card whatsapp-channel">
+          <div class="channel-icon">💬</div>
+          <div class="channel-info">
+            <strong>WhatsApp Live Chat</strong>
+            <span>Instant Chat with Support</span>
+          </div>
+          <span class="channel-arrow">›</span>
+        </a>
+
+        <a href="mailto:selfcaremedicals@gmail.com?subject=Selfcare%20Diagnostic%20Inquiry" class="support-channel-card email-channel">
+          <div class="channel-icon">✉️</div>
+          <div class="channel-info">
+            <strong>Email Support</strong>
+            <span>selfcaremedicals@gmail.com</span>
+          </div>
+          <span class="channel-arrow">›</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5-Tab Fixed Bottom Navigation -->
+  <nav class="bottom-nav">
+    <a href="customer.html" class="nav-item">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="reports.html" class="nav-item">
+      <span class="nav-icon">📑</span>
+      <span class="nav-label">Reports</span>
+    </a>
+    <a href="bookings.html" class="nav-item">
+      <span class="nav-icon">📍</span>
+      <span class="nav-label">Track Booking</span>
+    </a>
+    <a href="profile.html" class="nav-item active">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">My Account</span>
+    </a>
+    <a href="cart.html" class="nav-item">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">Cart</span>
+      <span class="cart-badge" style="display:none;">0</span>
+    </a>
+  </nav>
+
+  <!-- Core JavaScript Scripts -->
+  <script src="assets/js/config.js?v=6.0.0"></script>
+  <script src="assets/js/utils.js?v=6.0.0"></script>
+  <script src="assets/js/api.js?v=6.0.0"></script>
+  <script src="assets/js/offline-db.js?v=6.0.0"></script>
+  <script src="assets/js/offline-sync.js?v=6.0.0"></script>
+  <script src="assets/js/auth.js?v=6.0.0"></script>
+  <script src="assets/js/app.js?v=6.0.0"></script>
+  <script src="assets/js/profile.js?v=6.0.0"></script>
+</body>
+</html>

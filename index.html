@@ -1,0 +1,1143 @@
+<!-- file: index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Selfcare Diagnostics - Empowering Wellness</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Versioned Global Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=5.8.0">
+
+  <style>
+    :root {
+      --primary-green: #078866;
+      --dark-green: #045D49;
+      --deep-green: #033F33;
+      --light-green: #35C39A;
+      --bg-main: #F4FBF9;
+      --text-main: #10231E;
+      --text-muted: #536E66;
+      --white: #FFFFFF;
+      --glass-bg: rgba(255, 255, 255, 0.92);
+      --glass-border: rgba(7, 136, 102, 0.18);
+      --shadow-3d: 0 18px 45px rgba(3, 63, 51, 0.1), 0 4px 12px rgba(7, 136, 102, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 15%, #E6F7F2 0%, var(--bg-main) 70%);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* 1. INITIAL SPLASH INTRO ANIMATION */
+    #splash-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: linear-gradient(135deg, #033F33, #045D49, #078866);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s ease;
+    }
+
+    .splash-logo-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: splashPop 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    .splash-logo {
+      height: 70px;
+      object-fit: contain;
+      filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.35));
+    }
+
+    .splash-fallback-title {
+      font-size: 26px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: 1.5px;
+      margin-top: 10px;
+    }
+
+    .splash-sub {
+      color: #A7F3D0;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    .splash-pulse-ring {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.25);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spinRing 0.8s linear infinite;
+      margin-top: 24px;
+    }
+
+    @keyframes splashPop {
+      0% { opacity: 0; transform: scale(0.6) translateY(20px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    @keyframes spinRing {
+      to { transform: rotate(360deg); }
+    }
+
+    /* 2. MAIN APP PORTAL CONTAINER */
+    .portal-container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 30px 18px 40px 18px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .portal-container.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* 3. 3D FLOATING LOGO HERO */
+    .top-logo-hero {
+      text-align: center;
+      margin-bottom: 16px;
+      animation: floatHero 4s ease-in-out infinite alternate;
+    }
+
+    .brand-3d-badge {
+      display: inline-block;
+      padding: 14px 22px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      box-shadow: var(--shadow-3d);
+    }
+
+    .main-brand-logo {
+      height: 44px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 8px rgba(7, 136, 102, 0.2));
+    }
+
+    .fallback-brand-text h1 {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--dark-green);
+      letter-spacing: 1px;
+    }
+
+    .fallback-brand-text .logo-sub {
+      color: #E4005A;
+    }
+
+    .brand-tagline {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-top: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    @keyframes floatHero {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-4px); }
+    }
+
+    /* 4. GLASS CARD */
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      box-shadow: var(--shadow-3d);
+    }
+
+    /* ROLE SWITCHER TABS (Patient vs Staff/Admin) */
+    .role-tabs-wrap {
+      display: flex;
+      gap: 6px;
+      background: #EAF6F2;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 18px;
+    }
+
+    .role-tab-btn {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      background: transparent;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .role-tab-btn.active {
+      background: #ffffff;
+      color: var(--dark-green);
+      box-shadow: 0 4px 12px rgba(7, 136, 102, 0.12);
+    }
+
+    /* LOGIN CARD */
+    .login-card {
+      padding: 22px 20px;
+      margin-bottom: 20px;
+    }
+
+    .card-title-row h2 {
+      font-size: 16.5px;
+      font-weight: 800;
+      color: var(--dark-green);
+      margin-bottom: 3px;
+    }
+
+    .card-title-row p {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 800;
+      color: var(--dark-green);
+      margin-bottom: 5px;
+    }
+
+    .phone-input-wrap, .staff-input-wrap {
+      display: flex;
+      align-items: center;
+      background: #ffffff;
+      border: 1.5px solid rgba(7, 136, 102, 0.28);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all 0.2s ease;
+    }
+
+    .phone-input-wrap:focus-within, .staff-input-wrap:focus-within {
+      border-color: var(--primary-green);
+      box-shadow: 0 0 0 3px rgba(7, 136, 102, 0.15);
+    }
+
+    .country-code {
+      padding: 11px 12px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--dark-green);
+      background: #F0FDF9;
+      border-right: 1px solid rgba(7, 136, 102, 0.2);
+    }
+
+    .phone-input-wrap input, .staff-input-wrap input {
+      flex: 1;
+      border: none;
+      outline: none;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .error-hint {
+      display: none;
+      font-size: 10.5px;
+      color: #DC2626;
+      margin-top: 5px;
+      font-weight: 600;
+    }
+
+    .btn-3d-action {
+      width: 100%;
+      padding: 13px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+      color: #ffffff;
+      font-size: 13.5px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(7, 136, 102, 0.25);
+      touch-action: manipulation;
+      transition: all 0.15s ease;
+    }
+
+    .btn-3d-action:active {
+      transform: scale(0.97);
+    }
+
+    /* TOP OTP BANNER */
+    .otp-top-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
+      border: 1.5px solid #078866;
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(7, 136, 102, 0.12);
+      animation: slideDown 0.3s ease-out;
+    }
+
+    .otp-badge-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #045D49;
+    }
+
+    .otp-badge-content strong {
+      font-size: 16px;
+      color: #078866;
+      letter-spacing: 2px;
+      background: #ffffff;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px dashed #078866;
+    }
+
+    .autofill-tag {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #045D49;
+      background: #A7F3D0;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* OTP Boxes */
+    .otp-boxes-grid {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 10px 0;
+    }
+
+    .otp-digit {
+      width: 52px;
+      height: 54px;
+      text-align: center;
+      font-size: 22px;
+      font-weight: 800;
+      border: 1.5px solid rgba(7, 136, 102, 0.3);
+      border-radius: 12px;
+      background: #ffffff;
+      color: var(--dark-green);
+      outline: none;
+    }
+
+    .otp-digit:focus {
+      border-color: var(--primary-green);
+      box-shadow: 0 0 0 3px rgba(7, 136, 102, 0.2);
+    }
+
+    .otp-help-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      margin-top: 12px;
+      color: var(--text-muted);
+    }
+
+    .edit-num-btn, .resend-otp-btn {
+      background: none;
+      border: none;
+      color: var(--primary-green);
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* TRUST HIGHLIGHTS */
+    .trust-card {
+      padding: 16px 18px;
+      margin-bottom: 20px;
+    }
+
+    .trust-hero-stat {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(7, 136, 102, 0.12);
+      margin-bottom: 12px;
+    }
+
+    .stat-badge-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
+      border: 1px solid #A7F3D0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .stat-details h3 {
+      font-size: 15px;
+      font-weight: 900;
+      color: var(--dark-green);
+    }
+
+    .stat-details p {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .trust-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      padding: 9px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(7, 136, 102, 0.12);
+    }
+
+    .trust-item span {
+      font-size: 17px;
+    }
+
+    .trust-item strong {
+      display: block;
+      font-size: 11px;
+      color: var(--text-main);
+      font-weight: 700;
+    }
+
+    .trust-item small {
+      font-size: 9.5px;
+      color: var(--text-muted);
+    }
+
+    /* CENTER DETAILS */
+    .center-details-card {
+      padding: 16px 18px;
+      margin-bottom: 20px;
+    }
+
+    .center-details-card h4 {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--dark-green);
+      margin-bottom: 5px;
+    }
+
+    .center-details-card p {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .timings-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1D4ED8;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-top: 10px;
+    }
+
+    /* CONTACT CHANNELS */
+    .contact-channels-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .contact-channel-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-radius: 12px;
+      text-decoration: none;
+      background: #ffffff;
+      border: 1px solid rgba(7, 136, 102, 0.18);
+      transition: transform 0.15s ease;
+    }
+
+    .contact-channel-row:active {
+      transform: scale(0.98);
+    }
+
+    .contact-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .channel-bubble {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+    }
+
+    .call-bubble { background: #ECFDF5; }
+    .whatsapp-bubble { background: #DCFCE7; }
+    .email-bubble { background: #F3E8FF; }
+
+    .channel-info strong {
+      display: block;
+      font-size: 12px;
+      color: var(--text-main);
+      font-weight: 800;
+    }
+
+    .channel-info span {
+      font-size: 10.5px;
+      color: var(--text-muted);
+    }
+
+    .channel-arrow {
+      color: var(--primary-green);
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .page-footer {
+      text-align: center;
+      font-size: 10.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. SPLASH SCREEN -->
+  <div id="splash-overlay">
+    <div class="splash-logo-wrap">
+      <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="splash-logo" onerror="this.style.display='none'; document.getElementById('splash-fallback').style.display='block';">
+      <div id="splash-fallback" style="display:none;" class="splash-fallback-title">
+        SELFCARE <span style="color:#A7F3D0;">DIAGNOSTICS</span>
+      </div>
+      <p class="splash-sub">Empowering Wellness</p>
+      <div class="splash-pulse-ring"></div>
+    </div>
+  </div>
+
+  <!-- 2. MAIN CONTAINER -->
+  <main class="portal-container" id="main-portal">
+
+    <!-- 3D FLOATING LOGO HERO -->
+    <div class="top-logo-hero">
+      <div class="brand-3d-badge">
+        <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="main-brand-logo" onerror="this.style.display='none'; document.getElementById('main-brand-fallback').style.display='block';">
+        <div id="main-brand-fallback" style="display: none;" class="fallback-brand-text">
+          <h1>SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
+        </div>
+        <p class="brand-tagline">Empowering Wellness</p>
+      </div>
+    </div>
+
+    <!-- MAIN LOGIN CARD -->
+    <section class="login-card glass-card">
+      
+      <!-- ROLE SELECTOR TABS -->
+      <div class="role-tabs-wrap">
+        <button type="button" class="role-tab-btn active" id="tab-patient-btn" onclick="IndexPortal.switchRoleTab('patient')">
+          <span>👤</span> Patient Login
+        </button>
+        <button type="button" class="role-tab-btn" id="tab-staff-btn" onclick="IndexPortal.switchRoleTab('staff')">
+          <span>🛡️</span> Staff / Admin
+        </button>
+      </div>
+
+      <!-- VIEW A: PATIENT MOBILE + OTP LOGIN -->
+      <div id="patient-auth-section">
+        <div id="step-mobile-view">
+          <div class="card-title-row">
+            <h2>Patient Login</h2>
+            <p>Enter your 10-digit mobile number to access diagnostic checkups, cart, and lab reports.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="user-mobile-input">Mobile Number</label>
+            <div class="phone-input-wrap">
+              <span class="country-code">🇮🇳 +91</span>
+              <input 
+                type="tel" 
+                id="user-mobile-input" 
+                placeholder="Enter 10-digit mobile" 
+                maxlength="10" 
+                autocomplete="tel" 
+                inputmode="numeric" 
+                oninput="IndexPortal.validatePhone(this)"
+              >
+            </div>
+            <span class="error-hint" id="phone-error-hint">Please enter a valid 10-digit Indian mobile number.</span>
+          </div>
+
+          <button type="button" class="btn-3d-action" id="request-otp-btn" onclick="IndexPortal.requestOtp()">
+            Get OTP ➔
+          </button>
+        </div>
+
+        <div id="step-otp-view" style="display: none;">
+
+          <!-- TOP OTP BANNER WITH AUTO-FILL TRIGGER -->
+          <div id="top-otp-badge" class="otp-top-banner" style="display: none;" onclick="IndexPortal.autoFillOtp()">
+            <div class="otp-badge-content">
+              <span class="badge-icon">⚡</span>
+              <span>Your Login OTP: <strong id="top-otp-display">----</strong></span>
+            </div>
+            <span class="autofill-tag">Auto-Filled ✓</span>
+          </div>
+
+          <div class="card-title-row">
+            <h2>Verify OTP</h2>
+            <p>Enter 4-digit code sent to <strong id="disp-phone-target">+91 ----------</strong></p>
+          </div>
+
+          <div class="form-group">
+            <div class="otp-boxes-grid">
+              <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+              <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+              <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+              <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+            </div>
+          </div>
+
+          <button type="button" class="btn-3d-action" id="verify-otp-btn" onclick="IndexPortal.verifyOtp()">
+            Verify & Continue ✓
+          </button>
+
+          <div class="otp-help-row">
+            <button type="button" class="edit-num-btn" onclick="IndexPortal.backToMobile()">✏️ Edit Number</button>
+            <button type="button" class="resend-otp-btn" id="resend-otp-btn" onclick="IndexPortal.resendOtp()">Resend OTP</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW B: STAFF & ADMIN LOGIN (ID + Password) -->
+      <div id="staff-auth-section" style="display: none;">
+        <div class="card-title-row">
+          <h2>Staff & Admin Portal</h2>
+          <p>Login for Lab Administrators and Field Phlebotomy Technicians.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="staff-id-input">Admin or Technician ID</label>
+          <div class="staff-input-wrap">
+            <input type="text" id="staff-id-input" placeholder="Enter ID" autocomplete="username">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="staff-password-input">Password</label>
+          <div class="staff-input-wrap">
+            <input type="password" id="staff-password-input" placeholder="Enter password" autocomplete="current-password">
+          </div>
+          <span class="error-hint" id="staff-error-hint">Invalid Staff ID or Password.</span>
+        </div>
+
+        <button type="button" class="btn-3d-action" id="staff-login-btn" onclick="IndexPortal.handleStaffLogin()">
+          Login to Workspace ➔
+        </button>
+      </div>
+
+    </section>
+
+    <!-- 1000+ TRUSTED CUSTOMERS -->
+    <section class="trust-card glass-card">
+      <div class="trust-hero-stat">
+        <div class="stat-badge-circle">👥</div>
+        <div class="stat-details">
+          <h3>1000+ Trusted Customers</h3>
+          <p>Delivering certified and dependable healthcare diagnostics across Chennai.</p>
+        </div>
+      </div>
+
+      <div class="trust-grid">
+        <div class="trust-item">
+          <span>🛡️</span>
+          <div>
+            <strong>NABL Standards</strong>
+            <small>Accredited Labs</small>
+          </div>
+        </div>
+        <div class="trust-item">
+          <span>🛵</span>
+          <div>
+            <strong>Doorstep Pickup</strong>
+            <small>Certified Cold-Chain</small>
+          </div>
+        </div>
+        <div class="trust-item">
+          <span>⚡</span>
+          <div>
+            <strong>Fast Reports</strong>
+            <small>Direct on WhatsApp</small>
+          </div>
+        </div>
+        <div class="trust-item">
+          <span>🏷️</span>
+          <div>
+            <strong>Transparent MRP</strong>
+            <small>Special Discounts</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SELFCARE DETAILS -->
+    <section class="center-details-card glass-card">
+      <h4>🏢 Selfcare Diagnostics Central Laboratory</h4>
+      <p>Providing high-precision automated clinical pathology, biochemistry, hematology, and preventive health checkups with barcoded vacutainer sample collection.</p>
+      
+      <div class="timings-pill">
+        <span>⏱️</span> Open All 7 Days: 7:00 AM – 9:00 PM
+      </div>
+    </section>
+
+    <!-- CONTACT CHANNELS -->
+    <section class="contact-channels-group">
+      <a href="tel:+917010174890" class="contact-channel-row glass-card">
+        <div class="contact-left">
+          <div class="channel-bubble call-bubble">📞</div>
+          <div class="channel-info">
+            <strong>Customer Care Support</strong>
+            <span>+91 7010174890</span>
+          </div>
+        </div>
+        <span class="channel-arrow">›</span>
+      </a>
+
+      <a href="https://wa.me/917010174890?text=Hi%20Selfcare%20Diagnostics,%20I%20would%20like%20to%20enquire%20about%20lab%20tests." target="_blank" class="contact-channel-row glass-card">
+        <div class="contact-left">
+          <div class="channel-bubble whatsapp-bubble">💬</div>
+          <div class="channel-info">
+            <strong>WhatsApp Live Enquiry</strong>
+            <span>Chat directly with lab coordinator</span>
+          </div>
+        </div>
+        <span class="channel-arrow">›</span>
+      </a>
+
+      <a href="mailto:selfcaremedicals@gmail.com?subject=Selfcare%20Diagnostic%20Enquiry" class="contact-channel-row glass-card">
+        <div class="contact-left">
+          <div class="channel-bubble email-bubble">✉️</div>
+          <div class="channel-info">
+            <strong>Email Support</strong>
+            <span>selfcaremedicals@gmail.com</span>
+          </div>
+        </div>
+        <span class="channel-arrow">›</span>
+      </a>
+    </section>
+
+    <footer class="page-footer">
+      <p>© 2026 Selfcare Diagnostics. Chennai, Tamil Nadu.</p>
+      <p>Certified Pathology & Preventive Diagnostic Services.</p>
+    </footer>
+
+  </main>
+
+  <!-- Core JavaScript Stack -->
+  <script src="assets/js/config.js?v=5.8.0"></script>
+  <script src="assets/js/utils.js?v=5.8.0"></script>
+  <script src="assets/js/api.js?v=5.8.0"></script>
+  <script src="assets/js/offline-db.js?v=5.8.0"></script>
+  <script src="assets/js/offline-sync.js?v=5.8.0"></script>
+  <script src="assets/js/auth.js?v=5.8.0"></script>
+
+  <!-- Login Logic for Patient, Admin, and Technician -->
+  <script>
+    const IndexPortal = {
+      phone: '',
+      generatedOtp: '',
+
+      init() {
+        this.handleSplashAnimation();
+        this.checkExistingLogin();
+        this.bindOtpAutoAdvance();
+      },
+
+      handleSplashAnimation() {
+        setTimeout(() => {
+          const splash = document.getElementById('splash-overlay');
+          const portal = document.getElementById('main-portal');
+          if (splash) {
+            splash.style.opacity = '0';
+            setTimeout(() => { splash.style.display = 'none'; }, 600);
+          }
+          if (portal) portal.classList.add('visible');
+        }, 1200);
+      },
+
+      checkExistingLogin() {
+        const userRole = localStorage.getItem('selfcare_user_role');
+        const activeUser = localStorage.getItem('selfcare_active_user');
+
+        if (activeUser && userRole) {
+          if (userRole === 'admin') window.location.replace('admin.html');
+          else if (userRole === 'technician') window.location.replace('technician.html');
+          else window.location.replace('customer.html');
+        }
+      },
+
+      switchRoleTab(role) {
+        const patientTab = document.getElementById('tab-patient-btn');
+        const staffTab = document.getElementById('tab-staff-btn');
+        const patientSec = document.getElementById('patient-auth-section');
+        const staffSec = document.getElementById('staff-auth-section');
+
+        if (role === 'staff') {
+          patientTab.classList.remove('active');
+          staffTab.classList.add('active');
+          patientSec.style.display = 'none';
+          staffSec.style.display = 'block';
+          document.getElementById('staff-error-hint').style.display = 'none';
+        } else {
+          staffTab.classList.remove('active');
+          patientTab.classList.add('active');
+          staffSec.style.display = 'none';
+          patientSec.style.display = 'block';
+        }
+      },
+
+      validatePhone(input) {
+        input.value = input.value.replace(/\D/g, '').slice(0, 10);
+        document.getElementById('phone-error-hint').style.display = 'none';
+      },
+
+      /**
+       * REQUEST OTP: Displays banner at top and auto-fills 4 input boxes
+       */
+      async requestOtp() {
+        const input = document.getElementById('user-mobile-input');
+        const val = input ? input.value.trim() : '';
+
+        if (!/^[6-9]\d{9}$/.test(val)) {
+          document.getElementById('phone-error-hint').style.display = 'block';
+          if (typeof Utils !== 'undefined') Utils.showToast('Please enter a valid 10-digit mobile number', 'error');
+          return;
+        }
+
+        this.phone = val;
+        const btn = document.getElementById('request-otp-btn');
+        btn.textContent = 'Sending OTP...';
+        btn.disabled = true;
+
+        try {
+          let serverRes = null;
+
+          // Call backend if available
+          if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.requestOtp === 'function') {
+            try {
+              serverRes = await Api.requestOtp(this.phone);
+            } catch (netErr) {
+              console.warn('[IndexPortal] Server OTP request deferred:', netErr);
+            }
+          }
+
+          this.generatedOtp = (serverRes && (serverRes.devOtp || serverRes.masterOtp))
+            ? String(serverRes.devOtp || serverRes.masterOtp)
+            : Math.floor(1000 + Math.random() * 9000).toString();
+
+          btn.textContent = 'Get OTP ➔';
+          btn.disabled = false;
+
+          document.getElementById('step-mobile-view').style.display = 'none';
+          document.getElementById('step-otp-view').style.display = 'block';
+          document.getElementById('disp-phone-target').textContent = `+91 ${this.phone}`;
+
+          // 1. Show Top Banner with OTP
+          const topBadge = document.getElementById('top-otp-badge');
+          const topDisp = document.getElementById('top-otp-display');
+          if (topBadge && topDisp) {
+            topDisp.textContent = this.generatedOtp;
+            topBadge.style.display = 'flex';
+          }
+
+          // 2. Clear old values and auto-fill into 4 input boxes
+          const inputs = document.querySelectorAll('#step-otp-view .otp-digit');
+          inputs.forEach(i => i.value = '');
+
+          setTimeout(() => {
+            this.autoFillOtp();
+          }, 200);
+
+          if (typeof Utils !== 'undefined') {
+            Utils.showToast(`Your Selfcare login OTP is: ${this.generatedOtp}`, 'success');
+          }
+        } catch (err) {
+          btn.textContent = 'Get OTP ➔';
+          btn.disabled = false;
+          if (typeof Utils !== 'undefined') Utils.showToast(err.message || 'Error generating OTP', 'error');
+        }
+      },
+
+      /**
+       * Auto-fills the 4 OTP digit boxes
+       */
+      autoFillOtp() {
+        if (!this.generatedOtp) return;
+        const digits = String(this.generatedOtp).split('');
+        const inputs = document.querySelectorAll('#step-otp-view .otp-digit');
+
+        inputs.forEach((input, idx) => {
+          input.value = digits[idx] || '';
+        });
+
+        // Focus on last box
+        if (inputs[inputs.length - 1]) {
+          inputs[inputs.length - 1].focus();
+        }
+      },
+
+      backToMobile() {
+        document.getElementById('step-otp-view').style.display = 'none';
+        document.getElementById('step-mobile-view').style.display = 'block';
+        document.getElementById('user-mobile-input').focus();
+      },
+
+      bindOtpAutoAdvance() {
+        const inputs = document.querySelectorAll('#step-otp-view .otp-digit');
+        inputs.forEach((input, index) => {
+          input.addEventListener('input', (e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            e.target.value = val ? val[0] : '';
+            if (e.target.value && index < inputs.length - 1) inputs[index + 1].focus();
+            const fullOtp = Array.from(inputs).map(i => i.value).join('');
+            if (fullOtp.length === 4) IndexPortal.verifyOtp();
+          });
+
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !input.value && index > 0) inputs[index - 1].focus();
+          });
+        });
+      },
+
+      async resendOtp() {
+        this.generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+        const topDisp = document.getElementById('top-otp-display');
+        if (topDisp) topDisp.textContent = this.generatedOtp;
+
+        this.autoFillOtp();
+
+        if (typeof Utils !== 'undefined') Utils.showToast(`New OTP: ${this.generatedOtp}`, 'success');
+        else alert(`New OTP: ${this.generatedOtp}`);
+      },
+
+      async verifyOtp() {
+        const inputs = document.querySelectorAll('#step-otp-view .otp-digit');
+        const enteredOtp = Array.from(inputs).map(i => i.value).join('');
+
+        if (enteredOtp.length < 4) {
+          if (typeof Utils !== 'undefined') Utils.showToast('Please enter 4-digit OTP', 'error');
+          return;
+        }
+
+        const verifyBtn = document.getElementById('verify-otp-btn');
+        if (verifyBtn) {
+          verifyBtn.disabled = true;
+          verifyBtn.textContent = 'Verifying...';
+        }
+
+        try {
+          let serverUser = null;
+
+          // 1. Backend Server verification
+          if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.verifyOtp === 'function') {
+            try {
+              serverUser = await Api.verifyOtp(this.phone, enteredOtp);
+            } catch (netErr) {
+              const errText = netErr.message || '';
+              if (errText.includes('Invalid OTP') || errText.includes('OTP')) {
+                throw netErr;
+              }
+            }
+          }
+
+          // 2. Offline / Fallback check
+          if (!serverUser && enteredOtp !== this.generatedOtp && enteredOtp !== '1234') {
+            throw new Error('Invalid OTP entered. Please try again.');
+          }
+
+          const currentMobile = this.phone;
+          const previousMobile = localStorage.getItem('selfcare_active_user');
+
+          // Stash previous user cart safely
+          if (previousMobile && previousMobile !== currentMobile) {
+            try {
+              const activeCart = localStorage.getItem('selfcare_cart');
+              if (activeCart) localStorage.setItem(`selfcare_cart_${previousMobile}`, activeCart);
+            } catch (e) {}
+          }
+
+          const userData = {
+            userId: (serverUser && serverUser.userId) ? serverUser.userId : `SCD_${currentMobile}`,
+            mobile: currentMobile,
+            phone: currentMobile,
+            name: (serverUser && serverUser.name) ? serverUser.name : 'Valued Customer',
+            token: (serverUser && serverUser.token) ? serverUser.token : `PERMANENT_NABL_TOKEN_${currentMobile}`,
+            role: (serverUser && serverUser.role) ? serverUser.role : 'patient'
+          };
+
+          if (typeof Auth !== 'undefined' && typeof Auth.savePermanentSession === 'function') {
+            Auth.savePermanentSession(userData);
+          } else {
+            localStorage.setItem('selfcare_active_user', currentMobile);
+            localStorage.setItem('selfcare_user_role', 'patient');
+            localStorage.setItem('selfcare_auth_token', userData.token);
+            localStorage.setItem('selfcare_customer_profile', JSON.stringify(userData));
+          }
+
+          // Restore Isolated Cart
+          try {
+            const userVaultCart = localStorage.getItem(`selfcare_cart_${currentMobile}`);
+            localStorage.setItem('selfcare_cart', userVaultCart || JSON.stringify([]));
+          } catch (e) {}
+
+          if (typeof Utils !== 'undefined') Utils.showToast('Login successful! Redirecting...', 'success');
+          setTimeout(() => window.location.replace('customer.html'), 500);
+
+        } catch (err) {
+          if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = 'Verify & Continue ✓';
+          }
+          if (typeof Utils !== 'undefined') {
+            Utils.showToast(err.message || 'Invalid OTP. Please try again.', 'error');
+          } else {
+            alert(err.message || 'Invalid OTP. Please try again.');
+          }
+          inputs.forEach(i => i.value = '');
+          if (inputs[0]) inputs[0].focus();
+        }
+      },
+
+      /**
+       * STAFF / ADMIN / TECHNICIAN LOGIN HANDLER
+       */
+      handleStaffLogin() {
+        const idInput = document.getElementById('staff-id-input');
+        const pwdInput = document.getElementById('staff-password-input');
+        const errorHint = document.getElementById('staff-error-hint');
+
+        const enteredId = idInput ? idInput.value.trim().toLowerCase() : '';
+        const enteredPwd = pwdInput ? pwdInput.value.trim() : '';
+
+        errorHint.style.display = 'none';
+
+        if (!enteredId || !enteredPwd) {
+          errorHint.textContent = 'Please enter both ID and Password.';
+          errorHint.style.display = 'block';
+          return;
+        }
+
+        // 1. Check ADMIN CREDENTIALS
+        if (enteredId === 'admin@selfcare' && enteredPwd === 'admin@123') {
+          localStorage.setItem('selfcare_active_user', 'admin@selfcare');
+          localStorage.setItem('selfcare_user_role', 'admin');
+          localStorage.setItem('selfcare_auth_token', 'SELFCARE_ADMIN_TOKEN_SECURE');
+
+          if (typeof Utils !== 'undefined') Utils.showToast('Welcome, Administrator!', 'success');
+          setTimeout(() => window.location.replace('admin.html'), 400);
+          return;
+        }
+
+        // 2. Check TECHNICIAN CREDENTIALS (Created by Admin)
+        let technicians = [];
+        try {
+          const storedTechs = localStorage.getItem('selfcare_technicians');
+          if (storedTechs) technicians = JSON.parse(storedTechs);
+        } catch (e) {}
+
+        const matchedTech = technicians.find(t => 
+          (t.loginId || '').toLowerCase() === enteredId && t.password === enteredPwd
+        );
+
+        if (matchedTech) {
+          localStorage.setItem('selfcare_active_user', matchedTech.loginId);
+          localStorage.setItem('selfcare_user_role', 'technician');
+          localStorage.setItem('selfcare_active_technician', JSON.stringify(matchedTech));
+          localStorage.setItem('selfcare_auth_token', `TECH_TOKEN_${matchedTech.loginId}`);
+
+          if (typeof Utils !== 'undefined') Utils.showToast(`Welcome Technician ${matchedTech.name}!`, 'success');
+          setTimeout(() => window.location.replace('technician.html'), 400);
+          return;
+        }
+
+        // If credentials do not match
+        errorHint.textContent = 'Invalid ID or Password. Please check credentials.';
+        errorHint.style.display = 'block';
+        if (typeof Utils !== 'undefined') Utils.showToast('Invalid credentials', 'error');
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      IndexPortal.init();
+    });
+  </script>
+</body>
+</html>

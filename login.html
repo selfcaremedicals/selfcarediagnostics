@@ -1,0 +1,144 @@
+<!-- file: login.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Login - Selfcare Diagnostics</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Versioned Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/login.css?v=5.8.0">
+</head>
+<body>
+
+  <!-- Floating App Header with Brand Logo -->
+  <header class="app-header glass-card">
+    <div class="header-left">
+      <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="header-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="fallback-logo" style="display:none;">
+        <h1 class="logo-text">SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
+        <p class="tagline">Empowering Wellness</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="secure-badge-pill">🔒 Permanent Login</span>
+    </div>
+  </header>
+
+  <!-- Main Login Container -->
+  <main class="login-container">
+
+    <!-- Hero Branding Banner -->
+    <div class="login-hero-card glass-card animate-fade">
+      <div class="hero-icon-bubble">🧪</div>
+      <h2>Welcome to Selfcare</h2>
+      <p>Enter your 10-digit mobile number to access test bookings, saved carts, and verified NABL lab reports.</p>
+    </div>
+
+    <!-- STEP 1: MOBILE NUMBER INPUT VIEW -->
+    <section id="view-mobile-step" class="auth-card glass-card animate-fade">
+      <div class="card-head">
+        <h3>Patient Login</h3>
+        <p>One-Time Password (OTP) will be sent via SMS</p>
+      </div>
+
+      <div class="form-group">
+        <label for="mobile-number-input">Mobile Number</label>
+        <div class="phone-input-wrap">
+          <span class="country-code">🇮🇳 +91</span>
+          <input 
+            type="tel" 
+            id="mobile-number-input" 
+            placeholder="Enter 10-digit mobile" 
+            maxlength="10" 
+            autocomplete="tel" 
+            inputmode="numeric"
+            pattern="[0-9]*"
+            oninput="LoginPage.validateMobileInput(this)"
+          >
+        </div>
+        <span class="input-hint" id="mobile-error-hint" style="display: none;">Please enter a valid 10-digit Indian mobile number.</span>
+      </div>
+
+      <button type="button" class="login-action-btn" id="send-otp-btn" onclick="LoginPage.requestOtp()">
+        Get OTP ➔
+      </button>
+
+      <!-- Trust Badges -->
+      <div class="auth-trust-features">
+        <div class="trust-feat">
+          <span>🛡️</span>
+          <small>Never Logs Out Automatically</small>
+        </div>
+        <div class="trust-feat">
+          <span>🛒</span>
+          <small>Permanent Isolated Cart</small>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: OTP VERIFICATION VIEW -->
+    <section id="view-otp-step" class="auth-card glass-card animate-fade" style="display: none;">
+
+      <!-- TOP OTP DISPLAY BANNER -->
+      <div id="top-otp-badge" class="otp-top-banner" style="display: none;" onclick="LoginPage.autoFillOtp()">
+        <div class="otp-badge-content">
+          <span class="badge-icon">⚡</span>
+          <span>Your Login OTP: <strong id="top-otp-display">----</strong></span>
+        </div>
+        <span class="autofill-tag">Auto-Filled ✓</span>
+      </div>
+
+      <div class="card-head">
+        <h3>Verify OTP</h3>
+        <p>Enter the 4-digit verification code sent to <strong id="disp-entered-mobile">+91 ----------</strong></p>
+        <button type="button" class="change-mobile-link" onclick="LoginPage.goBackToMobileStep()">✏️ Edit Number</button>
+      </div>
+
+      <div class="form-group">
+        <label>4-Digit Verification Code</label>
+        <div class="otp-boxes-grid" id="otp-inputs-container">
+          <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+          <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+          <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+          <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+        </div>
+      </div>
+
+      <button type="button" class="login-action-btn" id="verify-otp-btn" onclick="LoginPage.verifyOtp()">
+        Verify & Continue ✓
+      </button>
+
+      <div class="resend-timer-row">
+        <span id="resend-countdown-text">Resend OTP in <strong>30s</strong></span>
+        <button type="button" id="resend-otp-btn" class="resend-btn" style="display:none;" onclick="LoginPage.resendOtp()">
+          Resend OTP
+        </button>
+      </div>
+    </section>
+
+    <!-- Bottom Safety Guarantee Note -->
+    <div class="login-footer-guarantee">
+      <span>🛡️ 100% Secure • NABL Accredited Diagnostic Center • Chennai</span>
+    </div>
+
+  </main>
+
+  <!-- Core JavaScript Scripts Matching Architecture -->
+  <script src="assets/js/config.js?v=5.8.0"></script>
+  <script src="assets/js/utils.js?v=5.8.0"></script>
+  <script src="assets/js/api.js?v=5.8.0"></script>
+  <script src="assets/js/offline-db.js?v=5.8.0"></script>
+  <script src="assets/js/offline-sync.js?v=5.8.0"></script>
+  <script src="assets/js/auth.js?v=5.8.0"></script>
+  <script src="assets/js/login.js?v=5.8.0"></script>
+</body>
+</html>
