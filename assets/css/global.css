@@ -1,0 +1,73 @@
+/**
+ * Selfcare Diagnostics - Global CSS
+ * Defines core design tokens, color variables, typography, and base layout rules.
+ */
+
+:root {
+  --primary-green: #078866;
+  --dark-green: #045D49;
+  --deep-green: #033F33;
+  --light-green: #35C39A;
+  --primary-pink: #E4005A;
+  --bg-color: #F5FBF9;
+  --text-main: #10231E;
+  --text-muted: #5A736B;
+  --white: #FFFFFF;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(7, 136, 102, 0.15);
+  --shadow-subtle: 0 8px 32px rgba(7, 136, 102, 0.08);
+  --shadow-hover: 0 12px 40px rgba(7, 136, 102, 0.15);
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 8px;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button, input {
+  font-family: inherit;
+  border: none;
+  outline: none;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade {
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--light-green);
+  border-radius: 10px;
+}
