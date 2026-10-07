@@ -60,14 +60,14 @@ const CartPage = {
       code: 'SELFCARE10',
       title: 'Flat 10% Laboratory Discount',
       discountPercent: 10,
-      validUntil: '2026-12-31',
+      validUntil: '2026-10-05',
       description: 'Valid on all preventive panels and blood tests'
     },
     {
       code: 'HEALTH2026',
       title: 'New Year Health Saver',
       discountPercent: 10,
-      validUntil: '2026-10-31',
+      validUntil: '2026-10-05',
       description: 'Special seasonal checkup savings'
     }
   ],
