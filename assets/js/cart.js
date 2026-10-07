@@ -72,6 +72,38 @@ const CartPage = {
     }
   ],
 
+  // Dynamic Age Calculator from DOB or Direct Age
+  calculateAge(dobOrAge) {
+    if (!dobOrAge) return '';
+    const cleanStr = String(dobOrAge).trim();
+    if (!cleanStr) return '';
+
+    // Direct numeric age check (e.g., 25, "25")
+    const num = Number(cleanStr);
+    if (!isNaN(num) && num > 0 && num < 125) {
+      return String(Math.floor(num));
+    }
+
+    // Date parsing check
+    let birthDate = new Date(cleanStr);
+    if (isNaN(birthDate.getTime()) && /^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(cleanStr)) {
+      const parts = cleanStr.split(/[/-]/);
+      birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    }
+
+    if (isNaN(birthDate.getTime())) {
+      return '';
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return (age >= 0 && age < 125) ? String(age) : '';
+  },
+
   async init() {
     try {
       this.detectAddonBookingMode();
@@ -945,10 +977,30 @@ const CartPage = {
   },
 
   loadPatientAndAddressData() {
-    const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-    const primaryMobile = user.mobile || localStorage.getItem('selfcare_active_user') || '7010174890';
-    const primaryName = user.name || 'Valued Customer';
+    let user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
+    const primaryMobile = user.mobile || user.phone || localStorage.getItem('selfcare_active_user') || '7010174890';
+
+    // Local Storage Profile Fallback check
+    try {
+      if (!user || Object.keys(user).length === 0 || !user.name) {
+        const storedUser = localStorage.getItem(`selfcare_profile_${primaryMobile}`) ||
+                           localStorage.getItem(`selfcare_user_${primaryMobile}`) ||
+                           localStorage.getItem('selfcare_profile') ||
+                           localStorage.getItem('selfcare_user') ||
+                           localStorage.getItem('user');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          user = { ...parsed, ...user };
+        }
+      }
+    } catch (e) {}
+
+    const primaryName = user.name || user.fullName || user.userName || 'Valued Customer';
     const primaryEmail = user.email || '';
+
+    // Calculate age from profile (age, Age, dob, DOB, dateOfBirth, birthDate)
+    const selfAgeRaw = user.age || user.Age || user.dob || user.DOB || user.dateOfBirth || user.DateOfBirth || user.birthDate || '';
+    const calculatedSelfAge = this.calculateAge(selfAgeRaw);
 
     const selfPatient = {
       id: 'SELF',
@@ -956,31 +1008,36 @@ const CartPage = {
       relation: 'Self',
       mobile: primaryMobile,
       email: primaryEmail,
-      age: user.age || '28',
-      gender: user.gender || 'Male',
-      address: user.address || 'Chennai, Tamil Nadu',
-      location: user.location || 'Not set'
+      age: calculatedSelfAge, // Dynamic age without hardcoded 28
+      gender: user.gender || user.Gender || 'Male',
+      address: user.address || user.Address || 'Chennai, Tamil Nadu',
+      location: user.location || user.Location || 'Not set'
     };
 
     let famList = [];
     try {
-      let rawFam = localStorage.getItem(`selfcare_family_${primaryMobile}`) || localStorage.getItem('selfcare_family_members');
+      let rawFam = localStorage.getItem(`selfcare_family_${primaryMobile}`) || 
+                   localStorage.getItem('selfcare_family_members') || 
+                   localStorage.getItem('family_members');
       if (rawFam) famList = JSON.parse(rawFam);
     } catch (e) {}
 
     this.familyMembers = [
       selfPatient,
-      ...famList.map(m => ({
-        id: m.id || `FAM_${Date.now()}_${Math.random()}`,
-        name: m.name || 'Member',
-        relation: m.relation || 'Family',
-        mobile: m.mobile || '',
-        email: m.email || '',
-        age: m.age || '',
-        gender: m.gender || '',
-        address: m.address || '',
-        location: m.location || ''
-      }))
+      ...famList.map(m => {
+        const mAgeRaw = m.age || m.Age || m.dob || m.DOB || m.dateOfBirth || m.DateOfBirth || m.birthDate || '';
+        return {
+          id: m.id || m.MemberID || `FAM_${Date.now()}_${Math.random()}`,
+          name: m.name || m.Name || 'Member',
+          relation: m.relation || m.Relation || 'Family',
+          mobile: m.mobile || m.Mobile || '',
+          email: m.email || m.Email || '',
+          age: this.calculateAge(mAgeRaw),
+          gender: m.gender || m.Gender || '',
+          address: m.address || m.Address || '',
+          location: m.location || m.Location || ''
+        };
+      })
     ];
 
     if (this.isAddonMode && this.addonBooking) {
@@ -991,13 +1048,15 @@ const CartPage = {
       this.selectedPatientEmail = b.patientEmail || '';
       this.selectedPatientRelation = b.relation || 'Self';
       this.selectedPatientId = b.patientId || 'SELF';
+      this.selectedPatientAge = this.calculateAge(b.patientAge || b.age || calculatedSelfAge);
+      this.selectedPatientGender = b.patientGender || b.gender || selfPatient.gender;
       this.currentPickupAddress = b.address || selfPatient.address;
       this.currentPickupLocation = b.location?.link || b.location || 'Not set';
       this.collectionType = b.collectionType || 'home';
     } else {
       this.syncPrimaryPatientDetails();
-      this.currentPickupAddress = user.address || 'Chennai, Tamil Nadu';
-      this.currentPickupLocation = user.location || 'Not set';
+      this.currentPickupAddress = user.address || user.Address || 'Chennai, Tamil Nadu';
+      this.currentPickupLocation = user.location || user.Location || 'Not set';
     }
 
     this.renderSelectedPatientCard();
@@ -1267,9 +1326,15 @@ const CartPage = {
         multiListEl.style.display = 'block';
         multiListEl.innerHTML = selectedMembers.map((m, i) => {
           const mCount = this.cart.filter(item => item.patientId === m.id).length;
+          const mAgeText = m.age ? `${m.age} Yrs` : '';
+          const mGenderText = m.gender || '';
+          const mMeta = [mAgeText, mGenderText].filter(Boolean).join(' • ');
           return `
-            <div style="font-size:10px; font-weight:700; color:#1E293B; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:3px 7px; margin-bottom:3px; display:flex; justify-content:space-between;">
-              <span>${i + 1}. ${m.name} (${m.relation || 'Member'})</span>
+            <div style="font-size:10px; font-weight:700; color:#1E293B; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:3px 7px; margin-bottom:3px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <span>${i + 1}. ${m.name} (${m.relation || 'Member'})</span>
+                ${mMeta ? `<span style="font-size:9px; color:#64748B; margin-left:6px;">(${mMeta})</span>` : ''}
+              </div>
               <span style="color:#078866; font-weight:800;">${mCount} Tests</span>
             </div>
           `;
@@ -1281,9 +1346,16 @@ const CartPage = {
 
     if (mobileEl) mobileEl.textContent = `+91 ${this.selectedPatientPhone}`;
     if (ageGenderEl) {
-      ageGenderEl.textContent = selectedMembers.length > 1
-        ? `${selectedMembers.length} Patients Configured`
-        : `${this.selectedPatientAge ? this.selectedPatientAge + ' Yrs' : 'Age not set'} • ${this.selectedPatientGender || 'Not set'}`;
+      if (selectedMembers.length > 1) {
+        ageGenderEl.textContent = `${selectedMembers.length} Patients Configured`;
+      } else {
+        const singleMember = selectedMembers[0] || {};
+        const ageVal = singleMember.age || this.selectedPatientAge;
+        const genderVal = singleMember.gender || this.selectedPatientGender;
+        const ageText = ageVal ? `${ageVal} Yrs` : 'Age not set';
+        const genderText = genderVal || 'Not set';
+        ageGenderEl.textContent = `${ageText} • ${genderText}`;
+      }
     }
     if (collectionEl) {
       collectionEl.textContent = this.isAddonMode ? 'Doorstep Pickup (Clubbed ₹0)' : (this.collectionType === 'lab' ? 'Direct Lab Walk-in (₹0)' : `Doorstep Pickup (${this.doorstepCharge === 0 ? 'FREE ₹0' : '₹' + this.doorstepCharge})`);
@@ -1337,8 +1409,7 @@ const CartPage = {
 
     const defaultPatientId = (selectedMembers[0] && selectedMembers[0].id) || 'SELF';
 
-    // MULTI-PATIENT PARTITION ENGINE:
-    // Split newItems into distinct patient groups with dedicated sub-booking IDs
+    // MULTI-PATIENT PARTITION ENGINE
     const patientBookingsData = [];
 
     selectedMembers.forEach((member, idx) => {
@@ -1347,10 +1418,8 @@ const CartPage = {
 
       const mSubtotal = memberItems.reduce((sum, it) => sum + Number(it.price || it.OfferPrice || 0), 0);
       const mDiscount = subtotalNew > 0 ? Math.round((mSubtotal / subtotalNew) * couponDiscount) : 0;
-      // Single home collection visit fee assigned to primary patient only
       const mDoorstep = (idx === 0) ? doorstepCharge : 0;
       const mFinal = Math.max(0, mSubtotal - mDiscount + mDoorstep);
-      // Dedicated Booking ID per patient (e.g., SCDBOOK100001-1 for Self, SCDBOOK100001-2 for Jazeerah)
       const mBookingId = isMulti ? `${baseBookingId}-${idx + 1}` : baseBookingId;
 
       patientBookingsData.push({
@@ -1358,6 +1427,8 @@ const CartPage = {
         baseBookingId: baseBookingId,
         patientId: member.id,
         patientName: member.name,
+        patientAge: member.age || '',
+        patientGender: member.gender || '',
         patientPhone: member.mobile || this.selectedPatientPhone,
         patientEmail: member.email || this.selectedPatientEmail || '',
         relation: member.relation || (idx === 0 ? 'Self' : 'Member'),
@@ -1391,6 +1462,8 @@ const CartPage = {
         baseBookingId: baseBookingId,
         patientId: this.selectedPatientId,
         patientName: this.selectedPatientName,
+        patientAge: this.selectedPatientAge || '',
+        patientGender: this.selectedPatientGender || '',
         patientPhone: this.selectedPatientPhone,
         patientEmail: this.selectedPatientEmail || '',
         relation: this.selectedPatientRelation || 'Self',
@@ -1422,7 +1495,6 @@ const CartPage = {
       try {
         const createdIds = [];
 
-        // Save each patient's booking separately in Google Sheets and Local Database
         for (const pData of patientBookingsData) {
           const payload = {
             ...pData,
@@ -1465,7 +1537,6 @@ const CartPage = {
         throw new Error('API client method createPendingUPIBooking is not available.');
       }
 
-      // Single checkout UPI intent payload for the combined total
       const pendingPayload = {
         bookingId: baseBookingId,
         patientId: this.selectedPatientId,
@@ -1630,7 +1701,6 @@ const CartPage = {
       }
     } catch (err) {}
 
-    // Register each patient's individual booking in Google Sheets and Local Database
     const pList = booking.patientBookingsData || [];
     for (const pData of pList) {
       const payload = {
@@ -1671,8 +1741,9 @@ const CartPage = {
 
     patientBookingsData.forEach((pData, idx) => {
       totalAmount += Number(pData.finalAmount || 0);
+      const ageGenderText = [pData.patientAge ? `${pData.patientAge} Yrs` : '', pData.patientGender].filter(Boolean).join(' • ');
       patientDetailsBlocks += `
-👤 *Patient ${idx + 1}: ${pData.patientName} (${pData.relation || 'Member'})*
+👤 *Patient ${idx + 1}: ${pData.patientName} (${pData.relation || 'Member'})${ageGenderText ? ` - ${ageGenderText}` : ''}*
 📋 *Booking ID:* ${pData.bookingId}
 📞 *Mobile:* +91 ${pData.patientPhone}
 🧪 *Booked Tests:*
