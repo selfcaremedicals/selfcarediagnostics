@@ -1,11 +1,12 @@
 /* file: assets/js/auth.js */
 /**
- * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.3.0
+ * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.4.0
  * Features:
  * - Synchronized with LoginPage & IndexPortal keys
  * - Multi-tenant user isolation support
  * - 0ms Synchronous local-first session verification
  * - Secure OTP verification (Strict server validation guard)
+ * - Complete Profile Fields Preservation (Age, Gender, DOB, BloodGroup, Email)
  * - No session expiration, No auto-logout
  */
 
@@ -56,6 +57,9 @@ const Auth = {
 
       const activeMobile = localStorage.getItem(this.ACTIVE_USER_KEY);
       if (activeMobile) {
+        const userVault = localStorage.getItem(`selfcare_profile_${activeMobile}`);
+        if (userVault) return JSON.parse(userVault);
+
         return {
           userId: `SCD_${activeMobile}`,
           mobile: activeMobile,
@@ -91,15 +95,29 @@ const Auth = {
 
     if (!cleanMobile) return false;
 
+    // Existing profile data-vai preserve seigiradhu (Wipe-out aagividaamal thadukkirom)
+    let existingProfile = {};
+    try {
+      const stored = localStorage.getItem(this.PROFILE_KEY) || localStorage.getItem(`selfcare_profile_${cleanMobile}`);
+      if (stored) existingProfile = JSON.parse(stored);
+    } catch (e) {}
+
     const permanentUser = {
-      userId: userData.userId || `SCD_${cleanMobile}`,
+      ...existingProfile,
+      ...userData,
+      userId: userData.userId || existingProfile.userId || `SCD_${cleanMobile}`,
       mobile: cleanMobile,
       phone: cleanMobile,
-      name: userData.name || 'Valued Customer',
-      role: userData.role || 'patient',
-      address: userData.address || '',
-      location: userData.location || '',
-      verifiedAt: userData.verifiedAt || new Date().toISOString(),
+      name: userData.name || existingProfile.name || 'Valued Customer',
+      age: userData.age || userData.Age || existingProfile.age || existingProfile.Age || '',
+      dob: userData.dob || userData.DOB || userData.dateOfBirth || existingProfile.dob || existingProfile.dateOfBirth || '',
+      gender: userData.gender || userData.Gender || existingProfile.gender || 'Male',
+      bloodGroup: userData.bloodGroup || userData.BloodGroup || existingProfile.bloodGroup || 'O+',
+      email: userData.email || userData.Email || existingProfile.email || '',
+      role: userData.role || existingProfile.role || 'patient',
+      address: userData.address || userData.Address || existingProfile.address || '',
+      location: userData.location || userData.Location || existingProfile.location || '',
+      verifiedAt: userData.verifiedAt || existingProfile.verifiedAt || new Date().toISOString(),
       isPermanent: true
     };
 
@@ -109,7 +127,7 @@ const Auth = {
       localStorage.setItem(this.ACTIVE_USER_KEY, cleanMobile);
       localStorage.setItem(this.PROFILE_KEY, serialized);
       localStorage.setItem(`selfcare_profile_${cleanMobile}`, serialized);
-      localStorage.setItem(this.TOKEN_KEY, userData.token || `PERMANENT_NABL_TOKEN_${cleanMobile}`);
+      localStorage.setItem(this.TOKEN_KEY, userData.token || existingProfile.token || `PERMANENT_NABL_TOKEN_${cleanMobile}`);
       localStorage.setItem(this.ROLE_KEY, permanentUser.role);
 
       // Legacy keys for backward compatibility
@@ -186,6 +204,8 @@ const Auth = {
         userId: (serverUser && serverUser.userId) ? serverUser.userId : `SCD_${cleanMobile}`,
         mobile: cleanMobile,
         name: (serverUser && serverUser.name) ? serverUser.name : 'Valued Customer',
+        age: (serverUser && (serverUser.age || serverUser.Age)) ? String(serverUser.age || serverUser.Age) : '',
+        gender: (serverUser && (serverUser.gender || serverUser.Gender)) ? (serverUser.gender || serverUser.Gender) : 'Male',
         token: (serverUser && serverUser.token) ? serverUser.token : `PERMANENT_NABL_TOKEN_${cleanMobile}`,
         role: (serverUser && serverUser.role) ? serverUser.role : 'patient'
       };

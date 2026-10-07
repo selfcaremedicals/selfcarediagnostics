@@ -1,12 +1,11 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v6.2.0 (Clean Production Edition)
+ * Selfcare Diagnostics - My Account Controller v6.4.0 (Zero-Lag 0ms Instant Edition)
  * Features:
- * - Live Google Sheets Sync for both Profile and FamilyMembers table.
- * - Displays Member Cards: Name, Relation, Age, and Individual Mobile Number.
- * - Edit & Remove functionality per family/friend member with Google Sheets deletion.
- * - Dedicated Mobile mapping for Cart isolation.
- * - Testing mock/demo buttons completely removed for production fidelity.
+ * - 0ms Instant Local-First Render: Shows profile instantly with zero waiting time.
+ * - Non-blocking background Google Sheets synchronization.
+ * - Auto-resolves Age from Date of Birth or direct Age values.
+ * - Full multi-tenant isolation support.
  */
 
 const ProfilePage = {
@@ -17,10 +16,21 @@ const ProfilePage = {
 
   async init() {
     try {
-      this.updateCartBadgeUI();
+      // 1. INSTANT 0ms RENDER (Network call kaaga wait pannaadhu)
       this.loadAccountData();
+      this.updateCartBadgeUI();
       this.checkReferralBadges();
-      await this.syncLiveCloudProfile();
+
+      // Loading overlay irundhaal athai udanadiyaaga hide seigiradhu
+      const loader = document.getElementById('profile-loading-overlay') || document.getElementById('page-loader');
+      if (loader) loader.style.display = 'none';
+
+      // 2. NON-BLOCKING BACKGROUND SYNC (UI-ai block pannaamal background-la run aagum)
+      if (navigator.onLine) {
+        setTimeout(() => {
+          this.syncLiveCloudProfile().catch(e => console.warn('[Profile] Background sync notice:', e));
+        }, 150);
+      }
     } catch (err) {
       console.error('ProfilePage init error:', err);
     }
@@ -32,6 +42,33 @@ const ProfilePage = {
     } else {
       alert(message);
     }
+  },
+
+  calculateAge(dobOrAge) {
+    if (!dobOrAge) return '';
+    const cleanStr = String(dobOrAge).trim();
+    if (!cleanStr) return '';
+
+    const num = Number(cleanStr);
+    if (!isNaN(num) && num > 0 && num < 125) {
+      return String(Math.floor(num));
+    }
+
+    let birthDate = new Date(cleanStr);
+    if (isNaN(birthDate.getTime()) && /^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(cleanStr)) {
+      const parts = cleanStr.split(/[/-]/);
+      birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    }
+
+    if (isNaN(birthDate.getTime())) return '';
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return (age >= 0 && age < 125) ? String(age) : '';
   },
 
   loadAccountData() {
@@ -47,20 +84,22 @@ const ProfilePage = {
 
     const storedUser = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
 
+    const rawAge = storedUser.age || storedUser.Age || vaultProfile.age || vaultProfile.Age || storedUser.dob || vaultProfile.dob || '';
+
     this.currentUser = {
       name: storedUser.name || vaultProfile.name || 'Valued Customer',
       mobile: activeMobile || storedUser.mobile || vaultProfile.mobile || '7010174890',
       email: storedUser.email || vaultProfile.email || '',
-      age: storedUser.age || vaultProfile.age || '',
-      gender: storedUser.gender || vaultProfile.gender || 'Male',
-      bloodGroup: storedUser.bloodGroup || vaultProfile.bloodGroup || 'O+',
-      address: storedUser.address || vaultProfile.address || '',
-      location: storedUser.location || vaultProfile.location || ''
+      age: this.calculateAge(rawAge),
+      gender: storedUser.gender || storedUser.Gender || vaultProfile.gender || vaultProfile.Gender || 'Male',
+      bloodGroup: storedUser.bloodGroup || storedUser.BloodGroup || vaultProfile.bloodGroup || vaultProfile.BloodGroup || 'O+',
+      address: storedUser.address || storedUser.Address || vaultProfile.address || '',
+      location: storedUser.location || storedUser.Location || vaultProfile.location || ''
     };
 
     const currentMobile = this.currentUser.mobile;
 
-    // Load Family Members
+    // Load Family Members instantly
     try {
       let savedFam = null;
       if (currentMobile) {
@@ -69,12 +108,23 @@ const ProfilePage = {
       if (!savedFam) {
         savedFam = localStorage.getItem('selfcare_family_members');
       }
-      this.familyMembers = savedFam ? JSON.parse(savedFam) : [];
+      const parsedFam = savedFam ? JSON.parse(savedFam) : [];
+      this.familyMembers = parsedFam.map(m => ({
+        id: m.id || m.MemberID || m.memberId,
+        name: m.name || m.Name || 'Member',
+        relation: m.relation || m.Relation || 'Relative',
+        mobile: m.mobile || m.Mobile || '',
+        age: this.calculateAge(m.age || m.Age),
+        gender: m.gender || m.Gender || '',
+        bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
+        address: m.address || m.Address || '',
+        location: m.location || m.Location || ''
+      }));
     } catch (e) {
       this.familyMembers = [];
     }
 
-    // Load Addresses
+    // Load Addresses instantly
     try {
       const savedAddr = localStorage.getItem('selfcare_saved_addresses');
       this.addresses = savedAddr ? JSON.parse(savedAddr) : [
@@ -90,7 +140,7 @@ const ProfilePage = {
       this.addresses = [];
     }
 
-    // Load Referral Coupons
+    // Load Referral Coupons instantly
     try {
       const savedCoupons = localStorage.getItem('selfcare_referral_coupons');
       this.referralCoupons = savedCoupons ? JSON.parse(savedCoupons) : [];
@@ -98,8 +148,10 @@ const ProfilePage = {
       this.referralCoupons = [];
     }
 
+    // Instant DOM Render
     this.renderSelfProfile();
     this.populateFormInputs();
+    this.renderFamilyCards();
   },
 
   async syncLiveCloudProfile() {
@@ -116,16 +168,17 @@ const ProfilePage = {
 
       if (res && res.status === 'success' && res.profile) {
         const p = res.profile;
+        const incomingAge = p.age ?? p.Age ?? p.dob ?? p.DOB;
 
         this.currentUser = {
           ...this.currentUser,
-          name: p.name || this.currentUser.name,
-          age: (p.age !== undefined && p.age !== null && p.age !== '') ? String(p.age) : this.currentUser.age,
-          gender: p.gender || this.currentUser.gender,
-          bloodGroup: p.bloodGroup || this.currentUser.bloodGroup,
-          email: p.email || this.currentUser.email,
-          address: p.address || this.currentUser.address,
-          location: p.location || this.currentUser.location
+          name: p.name || p.Name || this.currentUser.name,
+          age: (incomingAge !== undefined && incomingAge !== null && incomingAge !== '') ? this.calculateAge(incomingAge) : this.currentUser.age,
+          gender: p.gender || p.Gender || this.currentUser.gender,
+          bloodGroup: p.bloodGroup || p.BloodGroup || this.currentUser.bloodGroup,
+          email: p.email || p.Email || this.currentUser.email,
+          address: p.address || p.Address || this.currentUser.address,
+          location: p.location || p.Location || this.currentUser.location
         };
 
         const serialized = JSON.stringify(this.currentUser);
@@ -137,9 +190,18 @@ const ProfilePage = {
           Auth.savePermanentSession(this.currentUser);
         }
 
-        // Hydrate Family Members from Google Sheets
         if (res.familyMembers && Array.isArray(res.familyMembers)) {
-          this.familyMembers = res.familyMembers;
+          this.familyMembers = res.familyMembers.map(m => ({
+            id: m.id || m.MemberID || m.memberId || `FAM_${Date.now()}`,
+            name: m.name || m.Name || 'Member',
+            relation: m.relation || m.Relation || 'Relative',
+            mobile: m.mobile || m.Mobile || '',
+            age: this.calculateAge(m.age || m.Age),
+            gender: m.gender || m.Gender || '',
+            bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
+            address: m.address || m.Address || '',
+            location: m.location || m.Location || ''
+          }));
           localStorage.setItem(`selfcare_family_${activeMobile}`, JSON.stringify(this.familyMembers));
           localStorage.setItem('selfcare_family_members', JSON.stringify(this.familyMembers));
           this.renderFamilyCards();
@@ -151,11 +213,12 @@ const ProfilePage = {
           this.checkReferralBadges();
         }
 
+        // Silent DOM refresh without flickering
         this.renderSelfProfile();
         this.populateFormInputs();
       }
     } catch (err) {
-      console.warn('[Profile] Cloud sync notice:', err);
+      console.warn('[Profile] Background sync notice:', err);
     }
   },
 
@@ -172,7 +235,6 @@ const ProfilePage = {
     }
   },
 
-  // 1. MY PROFILE
   openMyProfileModal() {
     this.renderSelfProfile();
     this.populateFormInputs();
@@ -248,7 +310,7 @@ const ProfilePage = {
     const name = document.getElementById('self-edit-name').value.trim();
     const mobile = document.getElementById('self-edit-mobile').value.replace(/\D/g, '').slice(-10);
     const bloodGroup = document.getElementById('self-edit-blood').value;
-    const age = document.getElementById('self-edit-age').value.trim();
+    const rawAge = document.getElementById('self-edit-age').value.trim();
     const gender = document.getElementById('self-edit-gender').value;
     const email = document.getElementById('self-edit-email').value.trim();
     const address = document.getElementById('self-edit-address').value.trim();
@@ -259,6 +321,7 @@ const ProfilePage = {
       return;
     }
 
+    const calculatedAge = this.calculateAge(rawAge);
     const activeMobile = mobile || (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
 
     this.currentUser = {
@@ -266,7 +329,7 @@ const ProfilePage = {
       name,
       mobile: activeMobile,
       bloodGroup,
-      age: age || '',
+      age: calculatedAge,
       gender,
       email,
       address,
@@ -308,7 +371,6 @@ const ProfilePage = {
     this.safeShowToast('Profile updated successfully!', 'success');
   },
 
-  // 2. FAMILY MEMBERS: RENDER, SAVE & DELETE
   openFamilyMembersModal() {
     this.renderFamilyCards();
     this.closeMemberForm();
@@ -446,7 +508,7 @@ const ProfilePage = {
     const name = document.getElementById('family-name-input').value.trim();
     const relation = document.getElementById('family-relation-select').value;
     const bloodGroup = document.getElementById('family-blood-select').value;
-    const age = document.getElementById('family-age-input').value.trim();
+    const rawAge = document.getElementById('family-age-input').value.trim();
     const gender = document.getElementById('family-gender-select').value;
     const mobile = document.getElementById('family-mobile-input').value.replace(/\D/g, '').slice(-10);
     const email = document.getElementById('family-email-input').value.trim();
@@ -466,6 +528,7 @@ const ProfilePage = {
 
     const currentMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user') || '7010174890';
     const finalMemberId = editId || `FAM_${Date.now()}`;
+    const calculatedAge = this.calculateAge(rawAge);
 
     const memberPayload = {
       id: finalMemberId,
@@ -476,7 +539,7 @@ const ProfilePage = {
       name,
       relation,
       bloodGroup,
-      age: age || '30',
+      age: calculatedAge,
       gender,
       mobile,
       email,
@@ -491,18 +554,15 @@ const ProfilePage = {
       this.familyMembers.push(memberPayload);
     }
 
-    // 1. Instant Local Storage Persistence
     const serialized = JSON.stringify(this.familyMembers);
     localStorage.setItem('selfcare_family_members', serialized);
     if (currentMobile) {
       localStorage.setItem(`selfcare_family_${currentMobile}`, serialized);
     }
 
-    // 2. Direct Sync to Google Sheets FamilyMembers Table
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
       try {
         await Api.request('saveFamilyMember', memberPayload, false);
-        console.log('[Family] Synced to Google Sheet FamilyMembers successfully.');
       } catch (err) {
         console.warn('[Family] Sheet save warning:', err);
       }
@@ -510,7 +570,7 @@ const ProfilePage = {
 
     this.renderFamilyCards();
     this.closeMemberForm();
-    this.safeShowToast(`${name} details saved & synced to Google Sheets!`, 'success');
+    this.safeShowToast(`${name} details saved & synced!`, 'success');
   },
 
   async deleteFamilyMember(id) {
@@ -530,7 +590,6 @@ const ProfilePage = {
       localStorage.setItem(`selfcare_family_${currentMobile}`, serialized);
     }
 
-    // Delete in Google Sheets FamilyMembers Table
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
       try {
         await Api.request('deleteFamilyMember', {
@@ -538,7 +597,6 @@ const ProfilePage = {
           memberId: id,
           primaryMobile: currentMobile
         }, false);
-        console.log('[Family] Deleted from Google Sheet.');
       } catch (err) {
         console.warn('[Family] Sheet delete warning:', err);
       }
@@ -548,7 +606,6 @@ const ProfilePage = {
     this.safeShowToast(`${memberName} removed.`, 'info');
   },
 
-  // 3. ADDRESSES
   openAddressesModal() {
     this.renderAddressesList();
     this.openModal('modal-addresses');
@@ -609,7 +666,6 @@ const ProfilePage = {
     this.safeShowToast('Address removed', 'info');
   },
 
-  // 4. REFER AND EARN
   openReferEarnModal() {
     const userMobile = this.currentUser && this.currentUser.mobile ? this.currentUser.mobile : '7010174890';
     const referCode = `SC${userMobile.slice(-4)}`;
@@ -664,7 +720,6 @@ const ProfilePage = {
     window.open(`https://wa.me/917010174890?text=${encodeURIComponent(msg)}`, '_blank');
   },
 
-  // 5. GENERAL INFO, LOGOUT & SUPPORT
   openGeneralInfoModal() {
     this.openModal('modal-general-info');
   },
@@ -757,7 +812,6 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof window !== 'undefined') {
   window.ProfilePage = ProfilePage;
 }
-
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ProfilePage;
 }
