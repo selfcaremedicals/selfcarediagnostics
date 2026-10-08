@@ -444,13 +444,13 @@ const TestsPage = {
       const host = window.location.hostname;
       const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '' || window.location.protocol === 'file:';
       if (isLocal) {
-        return 'https://heartbeats1435-coder.github.io/Selfcare-Diagnostics-app';
+        return 'https://selfcaremedicals.github.io/selfcarediagnostics';
       }
       const pathname = window.location.pathname;
       const basePath = pathname.substring(0, pathname.lastIndexOf('/'));
       return `${window.location.origin}${basePath}`;
     }
-    return 'https://heartbeats1435-coder.github.io/Selfcare-Diagnostics-app';
+    return 'https://selfcaremedicals.github.io/selfcarediagnostics';
   },
 
   async copyToClipboard(text) {
