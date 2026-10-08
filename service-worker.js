@@ -1,16 +1,16 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v7.0.0 (Zero-Glitch Edition)
+ * Selfcare Diagnostics - Service Worker v7.1.0 (Zero-Glitch Edition)
  * Features:
  * - Relative Path Precache Engine (100% GitHub Pages & Custom Domain Compatible)
- * - Versioned Cache Invalidation (v7.0.0 Clean Slate Purge)
+ * - Versioned Cache Invalidation (v7.1.0 Clean Slate Purge)
  * - True Offline Fallback for Single-Page & HTML Navigation
  * - Network-First for HTML Documents & Versioned Assets (?v=...)
  * - Stale-While-Revalidate for Static Images & Stylesheets
  * - Instant Client Claim & Zero-Lag Activation
  */
 
-const CACHE_NAME = 'selfcare-cache-v7.0.0';
+const CACHE_NAME = 'selfcare-cache-v7.1.0';
 
 // Relative paths guaranteed to resolve across GitHub Pages sub-directories and custom roots
 const ASSETS_TO_CACHE = [
@@ -62,7 +62,7 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing version 7.0.0...');
+  console.log('[Selfcare SW] Installing version 7.1.0...');
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       // Individual resilient fetch prevents any single missing asset from failing installation
@@ -82,7 +82,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating version 7.0.0...');
+  console.log('[Selfcare SW] Activating version 7.1.0...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -94,7 +94,7 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      console.log('[Selfcare SW] Claimed clients for v7.0.0');
+      console.log('[Selfcare SW] Claimed clients for v7.1.0');
       return self.clients.claim();
     })
   );
