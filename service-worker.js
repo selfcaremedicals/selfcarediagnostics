@@ -1,18 +1,17 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v7.1.0 (Zero-Glitch Edition)
+ * Selfcare Diagnostics - Service Worker v8.0.0 (Zero-Cache Auto-Update Engine)
  * Features:
- * - Relative Path Precache Engine (100% GitHub Pages & Custom Domain Compatible)
- * - Versioned Cache Invalidation (v7.1.0 Clean Slate Purge)
- * - True Offline Fallback for Single-Page & HTML Navigation
- * - Network-First for HTML Documents & Versioned Assets (?v=...)
- * - Stale-While-Revalidate for Static Images & Stylesheets
- * - Instant Client Claim & Zero-Lag Activation
+ * - Direct SKIP_WAITING Message Listener: Responds instantly to app.js update triggers.
+ * - HTTP Cache-Busting Network Fetch: Forces { cache: 'no-cache' } for HTML & scripts so Chrome never serves stale disk files.
+ * - Versioned Cache Invalidation: v8.0.0 clean slate automatic cache purge on activation.
+ * - Instant Client Claim & Zero-Lag Activation across all browser tabs.
+ * - Relative Path Precache Engine (100% custom domain & root compatible).
  */
 
-const CACHE_NAME = 'selfcare-cache-v7.1.0';
+const CACHE_NAME = 'selfcare-cache-v8.0.1';
 
-// Relative paths guaranteed to resolve across GitHub Pages sub-directories and custom roots
+// Precache list for core application shell
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -61,14 +60,17 @@ const ASSETS_TO_CACHE = [
   './assets/images/icon-512.png'
 ];
 
+// 1. INSTALL EVENT - Precache and Auto Skip-Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing version 7.1.0...');
+  console.log('[Selfcare SW] Installing auto-updating version 8.0.0...');
+  self.skipWaiting(); // Puthu worker udanadiyaga wait pannamal activate aagum
+
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Individual resilient fetch prevents any single missing asset from failing installation
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
-          const response = await fetch(url);
+          // cache: 'no-cache' ensures fresh files are pulled from server during installation
+          const response = await fetch(url, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
           }
@@ -77,43 +79,53 @@ self.addEventListener('install', (event) => {
         }
       });
       await Promise.all(cachePromises);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
+// 2. MESSAGE EVENT - Listens to SKIP_WAITING from app.js
+self.addEventListener('message', (event) => {
+  if (event.data && (event.data.type === 'SKIP_WAITING' || event.data.action === 'skipWaiting')) {
+    console.log('[Selfcare SW] SKIP_WAITING signal received, activating immediately...');
+    self.skipWaiting();
+  }
+});
+
+// 3. ACTIVATE EVENT - Purges old caches (v7.1.0 and older) and claims all open tabs
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating version 7.1.0...');
+  console.log('[Selfcare SW] Activating version 8.0.0 and purging obsolete caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('[Selfcare SW] Deleting obsolete cache:', cacheName);
+            console.log('[Selfcare SW] Deleting old locked cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     }).then(() => {
-      console.log('[Selfcare SW] Claimed clients for v7.1.0');
+      console.log('[Selfcare SW] Claiming clients for v8.0.0...');
       return self.clients.claim();
     })
   );
 });
 
+// 4. FETCH EVENT - Network-First for HTML/Scripts with Chrome HTTP Cache Bypass
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // 1. Cross-origin மற்றும் non-GET requests bypass
+  // Cross-origin and non-GET requests bypass
   if (url.origin !== location.origin || event.request.method !== 'GET') {
     return;
   }
 
-  // 2. Google Apps Script Web App API calls dynamic-ஆக செல்ல வேண்டும்
+  // Google Apps Script API calls must always bypass service worker
   if (url.pathname.includes('/exec') || url.pathname.includes('/api/')) {
     return;
   }
 
-  // 3. Localhost Development bypass
+  // Localhost Development bypass
   const isLocalDev = Boolean(
     url.hostname === 'localhost' ||
     url.hostname === '127.0.0.1' ||
@@ -128,10 +140,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 4. HTML Documents - Network-First Strategy with Multi-tier Offline Fallback
+  // HTML Documents - Strictly Network-First with cache: 'no-cache'
   if (event.request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-cache' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
@@ -142,11 +154,9 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(async () => {
-          // Exact route match
           const cachedDirect = await caches.match(event.request, { ignoreSearch: true });
           if (cachedDirect) return cachedDirect;
 
-          // Relative route fallback chain
           const indexFallback = await caches.match('./index.html');
           if (indexFallback) return indexFallback;
 
@@ -159,12 +169,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 5. Versioned Assets (?v=...) - Network-First Strategy
+  // Versioned Assets (?v=...) - Strictly Network-First
   const hasVersionQuery = url.searchParams.has('v');
-
   if (hasVersionQuery) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-cache' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
@@ -181,7 +190,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 6. Stale-While-Revalidate for Other Static Assets (Images, Icons, Fonts)
+  // Static Assets (Images, Icons, Fonts) - Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
