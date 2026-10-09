@@ -9,7 +9,7 @@
  * - Relative Path Precache Engine (100% custom domain & root compatible).
  */
 
-const CACHE_NAME = 'selfcare-cache-v8.0.1';
+const CACHE_NAME = 'selfcare-cache-v8.0.2';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
