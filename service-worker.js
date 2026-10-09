@@ -1,10 +1,10 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v8.0.0 (Zero-Cache Auto-Update Engine)
+ * Selfcare Diagnostics - Service Worker v8.0.2 (Zero-Cache Auto-Update Engine)
  * Features:
  * - Direct SKIP_WAITING Message Listener: Responds instantly to app.js update triggers.
  * - HTTP Cache-Busting Network Fetch: Forces { cache: 'no-cache' } for HTML & scripts so Chrome never serves stale disk files.
- * - Versioned Cache Invalidation: v8.0.0 clean slate automatic cache purge on activation.
+ * - Versioned Cache Invalidation: v8.0.2 clean slate automatic cache purge on activation.
  * - Instant Client Claim & Zero-Lag Activation across all browser tabs.
  * - Relative Path Precache Engine (100% custom domain & root compatible).
  */
