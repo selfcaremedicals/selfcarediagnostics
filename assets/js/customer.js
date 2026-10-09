@@ -1,9 +1,9 @@
 /* file: assets/js/customer.js */
 /**
- * Selfcare Diagnostics - Customer Dashboard JS v8.7.0
+ * Selfcare Diagnostics - Customer Dashboard JS v8.8.0
  * Features:
  * 1. Smart Auth Deep-Linking: Redirects non-logged-in users to Login first, then auto-restores package modal.
- * 2. Mobile Web Share API (navigator.share) with clean clipboard fallback.
+ * 2. Mobile Web Share API with App-Style Box Card UI & Detailed Parameters below the box.
  * 3. Dedicated Share button on every Test and Package card.
  * 4. Safe ID-based Cart Toggle & Dynamic Conflict Validation.
  */
@@ -40,7 +40,7 @@ const CustomerDashboard = {
 
   async init() {
     try {
-      // 1. புதிய பயனரை கண்டறிந்து Login-க்கு அனுப்புகிறது:
+      // 1. Pudhiya payanarai kandarindhu Login-kku anuppugiradhu:
       if (typeof Auth !== 'undefined' && !Auth.isLoggedIn()) {
         const urlParams = new URLSearchParams(window.location.search);
         const hasDeepLink = urlParams.has('package') || urlParams.has('pkg') || urlParams.has('test');
@@ -480,28 +480,57 @@ const CustomerDashboard = {
     const rawId = pkg.PackageID || pkg.PackageCode || pkg.id || 'PKG';
     const pkgId = String(rawId).trim();
     const pkgName = pkg.PackageName || pkg.name || 'Health Package';
+    const pkgCode = pkg.PackageCode || 'PKG';
     const price = Number(pkg.OfferPrice || pkg.price || pkg.MRP || 0);
+    const mrp = Number(pkg.MRP || 0);
     const priceFormatted = (typeof Utils !== 'undefined' && Utils.formatCurrency)
       ? Utils.formatCurrency(price)
       : (`₹${price}`);
+    const mrpFormatted = (mrp > price && typeof Utils !== 'undefined' && Utils.formatCurrency)
+      ? Utils.formatCurrency(mrp)
+      : (mrp > price ? `₹${mrp}` : '');
 
-    let testCountText = '';
-    const numCount = Number(pkg.TestsCount || pkg.ParametersCount);
-    if (!isNaN(numCount) && numCount > 0) {
-      testCountText = `${numCount} Tests`;
-    } else {
-      const items = this.extractParametersList(pkg.Parameters || pkg.Description);
-      if (items && items.length > 0) {
-        testCountText = `${items.length} Tests`;
-      } else {
-        testCountText = this.getPackageParameterCount(pkg);
-      }
+    const paramBadgeText = this.getPackageParameterCount(pkg);
+    const fastingInfo = this.getFastingDetails(pkg);
+    const paramItems = this.extractParametersList(pkg.Parameters || pkg.Description);
+
+    let priceLine = `💵 *Offer Price: ${priceFormatted}*`;
+    if (mrpFormatted) {
+      priceLine += ` ~(${mrpFormatted})~`;
+    }
+
+    // App Box UI Maadhiri WhatsApp Unicode Frame
+    const boxCard = [
+      '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
+      '  🌿 *SELFCARE DIAGNOSTICS*',
+      '  ───────────────────────────',
+      `  📦 *${pkgName.toUpperCase()}*`,
+      `  🏷️ ${pkgCode} • ${fastingInfo.isFasting ? '⚠️ Fasting' : '✅ Non-Fasting'}`,
+      `  🧪 *${paramBadgeText} Included*`,
+      `  ${priceLine}`,
+      '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛'
+    ].join('\n');
+
+    // Box-kku keela Details & Parameters List
+    let detailsSection = '';
+    if (paramItems && paramItems.length > 0) {
+      const displayLimit = 25;
+      const listItems = paramItems.slice(0, displayLimit).map((item, idx) => `  ${idx + 1}. ${item}`);
+      const remaining = paramItems.length - displayLimit;
+      const moreText = remaining > 0 ? `\n  ➕ ... matrum innum ${remaining} parameters` : '';
+      
+      detailsSection = `\n📋 *Included Parameters & Tests:*\n${listItems.join('\n')}${moreText}\n`;
+    }
+
+    let fastingSection = '';
+    if (fastingInfo.isFasting && fastingInfo.durationText) {
+      fastingSection = `\n⚠️ *Preparation:* ${fastingInfo.durationText}\n`;
     }
 
     const baseUrl = this.getBaseAppUrl();
     const shareUrl = `${baseUrl}/index.html?package=${encodeURIComponent(pkgId)}`;
     const shareTitle = `💚 SELFCARE DIAGNOSTICS - ${pkgName}`;
-    const shareBody = `💚 SELFCARE DIAGNOSTICS\n\nPackage: ${pkgName}\n${testCountText}\nOffer Price: ${priceFormatted}\n\n📍 Home Sample Collection Available\n⚡ Fast Reports\n🏠 24/7 Home Collection\n\nView Package:`;
+    const shareBody = `${boxCard}\n${detailsSection}${fastingSection}\n📍 *Home Sample Collection Available*\n⚡ *Fast Reports*\n🏠 *24/7 Home Collection*\n\n🔗 *View Package & Book:*`;
 
     this.executeShare(shareTitle, shareBody, shareUrl);
   },
@@ -539,16 +568,36 @@ const CustomerDashboard = {
 
     const rawId = test.TestID || test.TestCode || test.id || 'TEST';
     const testId = String(rawId).trim();
+    const testCode = test.TestCode || 'TEST';
     const testName = test.TestName || test.name || 'Diagnostic Test';
     const price = Number(test.OfferPrice || test.price || test.MRP || 0);
+    const mrp = Number(test.MRP || 0);
     const priceFormatted = (typeof Utils !== 'undefined' && Utils.formatCurrency)
       ? Utils.formatCurrency(price)
       : (`₹${price}`);
+    const mrpFormatted = (mrp > price && typeof Utils !== 'undefined' && Utils.formatCurrency)
+      ? Utils.formatCurrency(mrp)
+      : (mrp > price ? `₹${mrp}` : '');
+
+    let priceLine = `💵 *Price: ${priceFormatted}*`;
+    if (mrpFormatted) {
+      priceLine += ` ~(${mrpFormatted})~`;
+    }
+
+    const boxCard = [
+      '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
+      '  🌿 *SELFCARE DIAGNOSTICS*',
+      '  ───────────────────────────',
+      `  🧪 *${testName.toUpperCase()}*`,
+      `  📌 Code: ${testCode}`,
+      `  ${priceLine}`,
+      '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛'
+    ].join('\n');
 
     const baseUrl = this.getBaseAppUrl();
     const shareUrl = `${baseUrl}/index.html?test=${encodeURIComponent(testId)}`;
     const shareTitle = `🧪 SELFCARE DIAGNOSTICS - ${testName}`;
-    const shareBody = `🧪 SELFCARE DIAGNOSTICS\n\nTest: ${testName}\nPrice: ${priceFormatted}\n\n📍 Home Sample Collection Available\n⚡ Fast Reports\n🏠 24/7 Home Collection\n\nView Test:`;
+    const shareBody = `${boxCard}\n\n📍 *Home Sample Collection Available*\n⚡ *Fast Reports*\n🏠 *24/7 Home Collection*\n\n🔗 *View Test & Book:*`;
 
     this.executeShare(shareTitle, shareBody, shareUrl);
   },
@@ -1346,11 +1395,10 @@ const CustomerDashboard = {
     }
   },
 
-    setupAutoSlideCarousel() {
+  setupAutoSlideCarousel() {
     const track = document.getElementById('singleSliderTrack');
     if (!track) return;
 
-    // ஏற்கெனவே ஓடிக்கொண்டிருக்கும் பழைய டைமரை கிளியர் செய்கிறது (Interval Stacking தடுக்கும்)
     if (this.sliderIntervalId) {
       clearInterval(this.sliderIntervalId);
       this.sliderIntervalId = null;
@@ -1360,18 +1408,16 @@ const CustomerDashboard = {
     const totalSlides = track.children.length;
     if (totalSlides <= 1) return;
 
-    // ஸ்லைடர் தொடங்கும் பங்க்ஷன் (5 Seconds - Smooth & Slow Movement)
     const startSliding = () => {
       if (this.sliderIntervalId) clearInterval(this.sliderIntervalId);
       this.sliderIntervalId = setInterval(() => {
         currentSlide = (currentSlide + 1) % totalSlides;
         track.style.transform = `translateX(-${currentSlide * 100}%)`;
-      }, 5000); // 5 வினாடிகள் ரிலாக்ஸாகப் படிக்க ஏற்ற டைமிங்
+      }, 5000);
     };
 
     startSliding();
 
-    // யூசர் விளம்பரத்தை விரலால் தொடும்போதோ அல்லது மவுஸ் வைக்கும்போதோ ஸ்லைடிங்கை தற்காலிகமாக நிறுத்தும்
     const sliderBox = track.closest('.single-slider-box');
     if (sliderBox) {
       sliderBox.addEventListener('mouseenter', () => clearInterval(this.sliderIntervalId));
@@ -1380,7 +1426,6 @@ const CustomerDashboard = {
       sliderBox.addEventListener('touchend', () => startSliding(), { passive: true });
     }
   },
-
 
   setupEventListeners() {
     window.addEventListener('pageshow', () => {
