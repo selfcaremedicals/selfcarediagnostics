@@ -1,12 +1,17 @@
 /* file: assets/js/app.js */
 /**
- * Selfcare Diagnostics - Main Application Controller (app.js) v4.0.0 (Zero-Lag Engine)
+ * Selfcare Diagnostics - Main Application Controller (app.js) v4.1.0 (Auto-Update Engine)
  * Features:
  * - Instant synchronous 0ms local-first session restoration.
  * - Multi-tenant vault-aware cart isolation (selfcare_cart_${activeUser}).
  * - Multi-Patient context detection & isolated dynamic ConflictValidator.
  * - Allows multiple family members to independently order same tests without false blocks.
  * - Non-blocking IndexedDB & smart dev Service Worker bypass.
+ * - ZERO-CACHE AUTO-UPDATE ENGINE:
+ *   1. Forces updateViaCache: 'none' (Browser will never cache service-worker.js).
+ *   2. Automatic skipWaiting signal dispatch when new update is installed.
+ *   3. Instant seamless auto-reload on new version arrival without manual cache clearing.
+ *   4. Periodic & visibility-change update triggers.
  */
 
 const App = {
@@ -14,7 +19,7 @@ const App = {
 
   async init() {
     try {
-      console.log('[Selfcare App] Initializing v4.0.0 (Zero-Lag Engine)...');
+      console.log('[Selfcare App] Initializing v4.1.0 (Auto-Update Engine)...');
       
       // 1. Instant Synchronous User Session Check (0ms lag)
       if (typeof Auth !== 'undefined' && Auth.getUser) {
@@ -32,7 +37,7 @@ const App = {
         OfflineDB.init().catch(err => console.warn('[Selfcare App] OfflineDB init background notice:', err));
       }
 
-      // 4. Smart Service Worker registration (Dev mode bypass / Production cache)
+      // 4. Smart Service Worker registration (Zero-Cache Auto-Update Engine)
       this.handleServiceWorker();
 
       // 5. Non-blocking Background catalogue synchronization
@@ -136,8 +141,9 @@ const App = {
   },
 
   /**
-   * SMART SERVICE WORKER HANDLER:
-   * Localhost/preview-ல் கேச் லாக் ஆகாமல் unregister செய்து preview தரும்.
+   * ZERO-CACHE AUTO-UPDATE SERVICE WORKER HANDLER:
+   * - updateViaCache: 'none' -> Browser eppothume server-idam direct-ah fresh file check seiyum.
+   * - Auto skipWaiting trigger -> User manual clear cache seiya thevaiyillai.
    */
   handleServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
@@ -167,26 +173,51 @@ const App = {
       return;
     }
 
-    navigator.serviceWorker.register('service-worker.js').then((registration) => {
+    // Production: updateViaCache: 'none' forces browser to bypass HTTP cache for service-worker.js
+    navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).then((registration) => {
+      // 1. Instant check on page load
       registration.update();
+
+      // 2. Already waiting service worker irundhal udanadiyaga activate seigirom
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING', action: 'skipWaiting' });
+      }
+
+      // 3. Pudhiya version download aagum pothu auto-activate & reload logic
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('[Selfcare App] New service worker version available.');
+              console.log('[Selfcare App] New update detected! Activating seamlessly...');
+              newWorker.postMessage({ type: 'SKIP_WAITING', action: 'skipWaiting' });
             }
           });
         }
       });
+
+      // 4. App open-il irukkumpothe thirumba focus aanaal background-il update check seiyum
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          registration.update().catch(() => {});
+        }
+      });
+
+      // 5. Periodic 15 minutes background check
+      setInterval(() => {
+        registration.update().catch(() => {});
+      }, 15 * 60 * 1000);
+
     }).catch((err) => {
       console.warn('[Selfcare App] Service Worker registration notice:', err);
     });
 
+    // Pudhiya Service Worker controller eduthavudan oru murai mattum seamless reload
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!refreshing) {
         refreshing = true;
+        console.log('[Selfcare App] Reloading with latest version...');
         window.location.reload();
       }
     });

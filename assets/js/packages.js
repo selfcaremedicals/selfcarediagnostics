@@ -1,6 +1,6 @@
 /* file: assets/js/packages.js */
 /**
- * Selfcare Diagnostics - Health Packages Page JS v6.2.0
+ * Selfcare Diagnostics - Health Packages Page JS v6.3.0
  * Features:
  * 1. Multi-Patient Isolated Conflict Validation.
  * 2. Target Patient Context Detection via URL & sessionStorage (targetPatientId).
@@ -11,6 +11,7 @@
  * 7. Safe ID-based Cart Toggle & Voice Search.
  * 8. Search State Persistence during Background Offline Sync.
  * 9. Native Web Share API (navigator.share) with App Box Card Frame & Detailed Parameters.
+ * 10. Clean Base URL Engine (Zero URL Duplication Bug).
  */
 
 const PackagesPage = {
@@ -455,7 +456,7 @@ const PackagesPage = {
       const duration = match ? match[0] : '10 - 12 Hours';
       return {
         isFasting: true,
-        badgeText: '⚠ Fasting Required',
+        badgeText: '⚠️ Fasting Required',
         cardText: 'Fasting',
         durationText: `${duration} overnight fasting is required (Water is permitted).`
       };
@@ -469,18 +470,22 @@ const PackagesPage = {
     }
   },
 
+  /**
+   * Returns clean root URL without trailing slash or specific file path
+   */
   getBaseAppUrl() {
     if (typeof window !== 'undefined' && window.location) {
       const host = window.location.hostname;
       const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '' || window.location.protocol === 'file:';
       if (isLocal) {
-        return 'https://selfcarediagnostics.in/packages.html';
+        return 'https://selfcarediagnostics.in';
       }
       const pathname = window.location.pathname;
       const basePath = pathname.substring(0, pathname.lastIndexOf('/'));
-      return `${window.location.origin}${basePath}`;
+      const fullOrigin = `${window.location.origin}${basePath}`;
+      return fullOrigin.replace(/\/+$/, '');
     }
-    return 'https://selfcarediagnostics.in/packages.html';
+    return 'https://selfcarediagnostics.in';
   },
 
   async copyToClipboard(text) {
@@ -975,7 +980,7 @@ const PackagesPage = {
 
   async checkUrlForPackageDetail() {
     const urlParams = new URLSearchParams(window.location.search);
-    const packageId = urlParams.get('id');
+    const packageId = urlParams.get('id') || urlParams.get('package') || urlParams.get('pkg');
     if (packageId) {
       setTimeout(() => this.showPackageDetails(packageId), 500);
     }

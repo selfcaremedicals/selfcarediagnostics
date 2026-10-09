@@ -1,11 +1,12 @@
 /* file: assets/js/customer.js */
 /**
- * Selfcare Diagnostics - Customer Dashboard JS v8.8.0
+ * Selfcare Diagnostics - Customer Dashboard JS v8.9.0
  * Features:
  * 1. Smart Auth Deep-Linking: Redirects non-logged-in users to Login first, then auto-restores package modal.
  * 2. Mobile Web Share API with App-Style Box Card UI & Detailed Parameters below the box.
  * 3. Dedicated Share button on every Test and Package card.
  * 4. Safe ID-based Cart Toggle & Dynamic Conflict Validation.
+ * 5. Clean Base URL Engine (Zero URL Duplication Bug).
  */
 
 const CustomerDashboard = {
@@ -377,20 +378,24 @@ const CustomerDashboard = {
     }
   },
 
+  /**
+   * Clean base URL returning root domain without sub-paths or trailing slash
+   */
   getBaseAppUrl() {
     if (typeof window !== 'undefined' && window.location) {
       const host = window.location.hostname;
       const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '' || window.location.protocol === 'file:';
       
       if (isLocal) {
-        return 'https://selfcarediagnostics.in/packages.html';
+        return 'https://selfcarediagnostics.in';
       }
 
       const pathname = window.location.pathname;
       const basePath = pathname.substring(0, pathname.lastIndexOf('/'));
-      return `${window.location.origin}${basePath}`;
+      const fullOrigin = `${window.location.origin}${basePath}`;
+      return fullOrigin.replace(/\/+$/, '');
     }
-    return 'https://selfcarediagnostics.in/packages.html';
+    return 'https://selfcarediagnostics.in';
   },
 
   async copyToClipboard(text) {
