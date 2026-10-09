@@ -1,5 +1,6 @@
+/* file: assets/js/tests.js */
 /**
- * Selfcare Diagnostics - Tests Page JS (Zero-Fail Edition) v6.2.0
+ * Selfcare Diagnostics - Tests Page JS (Zero-Fail Edition) v6.3.0
  * Features:
  * 1. Multi-Patient Isolated Conflict Validation.
  * 2. Target Patient Context Detection via URL & sessionStorage (targetPatientId).
@@ -11,7 +12,8 @@
  * 8. Natural Language Symptom Search Engine (Full 40 Symptoms Mapping).
  * 9. Fly-to-Cart Animation & 3D detail modal.
  * 10. Smooth 5s Auto-Slider with Touch/Hover Pause & Interval Leak Protection.
- * 11. Native Web Share API (navigator.share) with clean clipboard fallback for Tests.
+ * 11. Native Web Share API with App Box Card Frame & Detailed Parameters List.
+ * 12. Direct Production Domain (selfcarediagnostics.in) Deep Linking.
  */
 
 const TestsPage = {
@@ -425,7 +427,7 @@ const TestsPage = {
       const duration = match ? match[0] : '10 - 12 Hours';
       return {
         isFasting: true,
-        badgeText: '⚠️️ Fasting Required',
+        badgeText: '⚠️ Fasting Required',
         cardText: 'Fasting',
         durationText: `${duration} overnight fasting is required (Water is permitted).`
       };
@@ -444,13 +446,13 @@ const TestsPage = {
       const host = window.location.hostname;
       const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '' || window.location.protocol === 'file:';
       if (isLocal) {
-        return 'https://selfcaremedicals.github.io/selfcarediagnostics';
+        return 'https://selfcarediagnostics.in/tests.html';
       }
       const pathname = window.location.pathname;
       const basePath = pathname.substring(0, pathname.lastIndexOf('/'));
       return `${window.location.origin}${basePath}`;
     }
-    return 'https://selfcaremedicals.github.io/selfcarediagnostics';
+    return 'https://selfcarediagnostics.in/tests.html';
   },
 
   async copyToClipboard(text) {
@@ -537,16 +539,72 @@ const TestsPage = {
 
     const rawId = test.TestID || test.TestCode || test.id || 'TEST';
     const testId = String(rawId).trim();
+    const testCode = test.TestCode || 'TEST';
     const testName = test.TestName || test.name || 'Diagnostic Test';
     const price = Number(test.OfferPrice || test.price || test.MRP || 0);
+    const mrp = Number(test.MRP || 0);
     const priceFormatted = (typeof Utils !== 'undefined' && Utils.formatCurrency)
       ? Utils.formatCurrency(price)
       : (`₹${price}`);
+    const mrpFormatted = (mrp > price && typeof Utils !== 'undefined' && Utils.formatCurrency)
+      ? Utils.formatCurrency(mrp)
+      : (mrp > price ? `₹${mrp}` : '');
+
+    const paramBadgeText = this.getTestParameterCount(test);
+    const fastingInfo = this.getFastingDetails(test);
+
+    // CBC அல்லது மற்ற Tests-கான parameters list
+    const rawParams = test.Parameters || test.Description;
+    let paramItems = [];
+    if (testCode === 'T0001' || (typeof rawParams === 'string' && rawParams.trim().toLowerCase() === 'cbc')) {
+      paramItems = [
+        "Hemoglobin (Hb)", "Total WBC Count (TLC)", "Neutrophils", "Lymphocytes",
+        "Monocytes", "Eosinophils", "Basophils", "Absolute Neutrophil Count (ANC)",
+        "Absolute Lymphocyte Count (ALC)", "Absolute Monocyte Count (AMC)", "Absolute Eosinophil Count (AEC)",
+        "Absolute Basophil Count (ABC)", "RBC Count", "Hematocrit / PCV", "MCV", "MCH", "MCHC",
+        "RDW-CV", "RDW-SD", "Platelet Count", "MPV", "PDW", "PCT", "P-LCR"
+      ];
+    } else {
+      paramItems = this.extractParametersList(rawParams);
+    }
+
+    let priceLine = `💵 *Price: ${priceFormatted}*`;
+    if (mrpFormatted) {
+      priceLine += ` ~(${mrpFormatted})~`;
+    }
+
+    // App Box UI Maadhiri WhatsApp Unicode Frame
+    const boxCard = [
+      '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
+      '  🌿 *SELFCARE DIAGNOSTICS*',
+      '  ───────────────────────────',
+      `  🧪 *${testName.toUpperCase()}*`,
+      `  🏷️ ${testCode} • ${fastingInfo.isFasting ? '⚠️ Fasting' : '✅ Non-Fasting'}`,
+      `  🔬 *${paramBadgeText} Included*`,
+      `  ${priceLine}`,
+      '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛'
+    ].join('\n');
+
+    // Box-kku keela Details & Parameters List
+    let detailsSection = '';
+    if (paramItems && paramItems.length > 0) {
+      const displayLimit = 25;
+      const listItems = paramItems.slice(0, displayLimit).map((item, idx) => `  ${idx + 1}. ${item}`);
+      const remaining = paramItems.length - displayLimit;
+      const moreText = remaining > 0 ? `\n  ➕ ... matrum innum ${remaining} parameters` : '';
+      
+      detailsSection = `\n📋 *Included Parameters:*\n${listItems.join('\n')}${moreText}\n`;
+    }
+
+    let fastingSection = '';
+    if (fastingInfo.isFasting && fastingInfo.durationText) {
+      fastingSection = `\n⚠️ *Preparation:* ${fastingInfo.durationText}\n`;
+    }
 
     const baseUrl = this.getBaseAppUrl();
-    const shareUrl = `${baseUrl}/index.html?test=${encodeURIComponent(testId)}`;
+    const shareUrl = `${baseUrl}/tests.html?id=${encodeURIComponent(testId)}`;
     const shareTitle = `🧪 SELFCARE DIAGNOSTICS - ${testName}`;
-    const shareBody = `🧪 SELFCARE DIAGNOSTICS\n\nTest: ${testName}\nPrice: ${priceFormatted}\n\n📍 Home Sample Collection Available\n⚡ Fast Reports\n🏠 24/7 Home Collection\n\nView Test:`;
+    const shareBody = `${boxCard}\n${detailsSection}${fastingSection}\n📍 *Home Sample Collection Available*\n⚡ *Fast Reports*\n🏠 *24/7 Home Collection*\n\n🔗 *View Test & Book:*`;
 
     this.executeShare(shareTitle, shareBody, shareUrl);
   },
@@ -938,7 +996,7 @@ const TestsPage = {
 
   async checkUrlForTestDetail() {
     const urlParams = new URLSearchParams(window.location.search);
-    const testId = urlParams.get('id');
+    const testId = urlParams.get('id') || urlParams.get('test') || urlParams.get('testId');
     if (testId) {
       setTimeout(() => this.showTestDetails(testId), 500);
     }

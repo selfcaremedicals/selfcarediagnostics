@@ -383,14 +383,14 @@ const CustomerDashboard = {
       const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '' || window.location.protocol === 'file:';
       
       if (isLocal) {
-        return 'https://selfcaremedicals.github.io/selfcarediagnostics';
+        return 'https://selfcarediagnostics.in/packages.html';
       }
 
       const pathname = window.location.pathname;
       const basePath = pathname.substring(0, pathname.lastIndexOf('/'));
       return `${window.location.origin}${basePath}`;
     }
-    return 'https://selfcaremedicals.github.io/selfcarediagnostics';
+    return 'https://selfcarediagnostics.in/packages.html';
   },
 
   async copyToClipboard(text) {

@@ -1,5 +1,6 @@
+/* file: assets/js/packages.js */
 /**
- * Selfcare Diagnostics - Health Packages Page JS v6.1.0
+ * Selfcare Diagnostics - Health Packages Page JS v6.2.0
  * Features:
  * 1. Multi-Patient Isolated Conflict Validation.
  * 2. Target Patient Context Detection via URL & sessionStorage (targetPatientId).
@@ -9,7 +10,7 @@
  * 6. Dynamic Category Selection Bar.
  * 7. Safe ID-based Cart Toggle & Voice Search.
  * 8. Search State Persistence during Background Offline Sync.
- * 9. Native Web Share API (navigator.share) with clean clipboard fallback for Packages.
+ * 9. Native Web Share API (navigator.share) with App Box Card Frame & Detailed Parameters.
  */
 
 const PackagesPage = {
@@ -473,13 +474,13 @@ const PackagesPage = {
       const host = window.location.hostname;
       const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '' || window.location.protocol === 'file:';
       if (isLocal) {
-        return 'https://selfcaremedicals.github.io/selfcarediagnostics';
+        return 'https://selfcarediagnostics.in/packages.html';
       }
       const pathname = window.location.pathname;
       const basePath = pathname.substring(0, pathname.lastIndexOf('/'));
       return `${window.location.origin}${basePath}`;
     }
-    return 'https://selfcaremedicals.github.io/selfcarediagnostics';
+    return 'https://selfcarediagnostics.in/packages.html';
   },
 
   async copyToClipboard(text) {
@@ -567,28 +568,57 @@ const PackagesPage = {
     const rawId = pkg.PackageID || pkg.PackageCode || pkg.id || 'PKG';
     const pkgId = String(rawId).trim();
     const pkgName = pkg.PackageName || pkg.name || 'Health Package';
+    const pkgCode = pkg.PackageCode || 'PKG';
     const price = Number(pkg.OfferPrice || pkg.price || pkg.MRP || 0);
+    const mrp = Number(pkg.MRP || 0);
     const priceFormatted = (typeof Utils !== 'undefined' && Utils.formatCurrency)
       ? Utils.formatCurrency(price)
       : (`₹${price}`);
+    const mrpFormatted = (mrp > price && typeof Utils !== 'undefined' && Utils.formatCurrency)
+      ? Utils.formatCurrency(mrp)
+      : (mrp > price ? `₹${mrp}` : '');
 
-    let testCountText = '';
-    const numCount = Number(pkg.TestsCount || pkg.ParametersCount);
-    if (!isNaN(numCount) && numCount > 0) {
-      testCountText = `${numCount} Tests`;
-    } else {
-      const items = this.extractParametersList(pkg.Parameters || pkg.Description);
-      if (items && items.length > 0) {
-        testCountText = `${items.length} Tests`;
-      } else {
-        testCountText = this.getPackageParameterCount(pkg);
-      }
+    const paramBadgeText = this.getPackageParameterCount(pkg);
+    const fastingInfo = this.getFastingDetails(pkg);
+    const paramItems = this.extractParametersList(pkg.Parameters || pkg.Description);
+
+    let priceLine = `💵 *Offer Price: ${priceFormatted}*`;
+    if (mrpFormatted) {
+      priceLine += ` ~(${mrpFormatted})~`;
+    }
+
+    // App Box UI Maadhiri WhatsApp Unicode Frame
+    const boxCard = [
+      '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
+      '  🌿 *SELFCARE DIAGNOSTICS*',
+      '  ───────────────────────────',
+      `  📦 *${pkgName.toUpperCase()}*`,
+      `  🏷️ ${pkgCode} • ${fastingInfo.isFasting ? '⚠️ Fasting' : '✅ Non-Fasting'}`,
+      `  🧪 *${paramBadgeText} Included*`,
+      `  ${priceLine}`,
+      '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛'
+    ].join('\n');
+
+    // Box-kku keela Details & Parameters List
+    let detailsSection = '';
+    if (paramItems && paramItems.length > 0) {
+      const displayLimit = 25;
+      const listItems = paramItems.slice(0, displayLimit).map((item, idx) => `  ${idx + 1}. ${item}`);
+      const remaining = paramItems.length - displayLimit;
+      const moreText = remaining > 0 ? `\n  ➕ ... matrum innum ${remaining} parameters` : '';
+      
+      detailsSection = `\n📋 *Included Parameters & Tests:*\n${listItems.join('\n')}${moreText}\n`;
+    }
+
+    let fastingSection = '';
+    if (fastingInfo.isFasting && fastingInfo.durationText) {
+      fastingSection = `\n⚠️ *Preparation:* ${fastingInfo.durationText}\n`;
     }
 
     const baseUrl = this.getBaseAppUrl();
     const shareUrl = `${baseUrl}/index.html?package=${encodeURIComponent(pkgId)}`;
     const shareTitle = `💚 SELFCARE DIAGNOSTICS - ${pkgName}`;
-    const shareBody = `💚 SELFCARE DIAGNOSTICS\n\nPackage: ${pkgName}\n${testCountText}\nOffer Price: ${priceFormatted}\n\n📍 Home Sample Collection Available\n⚡ Fast Reports\n🏠 24/7 Home Collection\n\nView Package:`;
+    const shareBody = `${boxCard}\n${detailsSection}${fastingSection}\n📍 *Home Sample Collection Available*\n⚡ *Fast Reports*\n🏠 *24/7 Home Collection*\n\n🔗 *View Package & Book:*`;
 
     this.executeShare(shareTitle, shareBody, shareUrl);
   },
