@@ -1,20 +1,13 @@
 /* file: assets/js/cart.js */
 /**
- * Selfcare Diagnostics - Slide-by-Slide Wizard Engine v9.2.0 (Cashfree Production Integrated)
- * Status: FULL UPDATED PRODUCTION VERSION
- *
+ * Selfcare Diagnostics - Slide-by-Slide Wizard Engine v9.3.0
  * Features:
- * 1. Multi-Patient Backend Auto-Split: Generates dedicated unique Booking IDs 
- *    per family member (e.g. SCDBOOK100001-1 for Self, SCDBOOK100001-2 for Jazeerah) 
- *    in both Google Sheets Backend and Local Database.
- * 2. Unified Single-Click Checkout: User pays once (Cashfree Online / Cash), but backend stores individual records.
- * 3. Slide 1 has both Cart Items & Patient Selection engine.
- * 4. Slide 2 has Collection Address & Appointment Schedule slots with Mobile Editing.
- * 5. Unified 3D Patient Card with dedicated + Add Tests / + Add Packages buttons.
- * 6. Dynamic Conflict Validation during Test Reassignment.
- * 7. Multi-Patient Verification Modal & Grouped WhatsApp Booking Summary.
- * 8. Official Cashfree Production (LIVE) Hosted Checkout + Server-Side Verification.
- * 9. Hardened RFC 3986 Clean Return URL (Guaranteed zero bracket/array contamination).
+ * 1. Direct Checkout: No intermediate confirmation popups, launches Cashfree/Cash directly.
+ * 2. Direct Bookings Page Redirect: 100% bypasses WhatsApp and routes straight to bookings.html tracker.
+ * 3. Multi-Patient Backend Auto-Split: Generates dedicated unique Booking IDs per family member.
+ * 4. Unified Single-Click Checkout: User pays once, backend confirms and stores individual records.
+ * 5. Strict Server-Side Verification: Cashfree payment is verified server-side before booking confirmation.
+ * 6. Add-on Engine & Dynamic Conflict Validator preserved without changes.
  */
 
 const CartPage = {
@@ -37,7 +30,7 @@ const CartPage = {
   selectedTimeSlot: '',
 
   selectedPaymentMode: null,
-  collectionType: 'home', // Defaults to 'home' so doorstep fee/free threshold calculates right on Slide 1
+  collectionType: 'home',
   appliedCoupon: null,
   couponDiscountAmount: 0,
   onlineDiscountAmount: 0,
@@ -76,19 +69,16 @@ const CartPage = {
     }
   ],
 
-  // Dynamic Age Calculator from DOB or Direct Age
   calculateAge(dobOrAge) {
     if (!dobOrAge) return '';
     const cleanStr = String(dobOrAge).trim();
     if (!cleanStr) return '';
 
-    // Direct numeric age check (e.g., 25, "25")
     const num = Number(cleanStr);
     if (!isNaN(num) && num > 0 && num < 125) {
       return String(Math.floor(num));
     }
 
-    // Date parsing check
     let birthDate = new Date(cleanStr);
     if (isNaN(birthDate.getTime()) && /^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(cleanStr)) {
       const parts = cleanStr.split(/[/-]/);
@@ -125,7 +115,6 @@ const CartPage = {
         ? (urlParams.get('cf_order_id') || urlParams.get('order_id') || urlParams.get('cashfreeOrderId'))
         : null;
 
-      // Preload Cashfree JS SDK in background for instant checkout launch
       if (typeof Api !== 'undefined' && typeof Api.loadCashfreeSDK === 'function' && navigator.onLine) {
         Api.loadCashfreeSDK().catch(() => {});
       }
@@ -144,7 +133,6 @@ const CartPage = {
         this.goToSlide(1, true);
       }
 
-      // If customer returned via Cashfree Return URL redirect, verify payment on server immediately
       if (cfOrderIdFromUrl) {
         await this.handleCashfreeReturnRedirect(cfOrderIdFromUrl);
       }
@@ -161,9 +149,6 @@ const CartPage = {
     }
   },
 
-  // ==========================================================
-  // WIZARD STATE PERSISTENCE HELPERS
-  // ==========================================================
   restorePersistedWizardState() {
     if (this.isAddonMode) return;
 
@@ -226,9 +211,6 @@ const CartPage = {
     } catch (e) {}
   },
 
-  // ==========================================================
-  // INDIVIDUAL PATIENT NAVIGATION HELPER
-  // ==========================================================
   navigateToAddItems(patientId, type) {
     const targetId = patientId || this.selectedPatientId || 'SELF';
     sessionStorage.setItem('selfcare_target_patient_id', targetId);
@@ -238,9 +220,6 @@ const CartPage = {
     window.location.href = `${targetUrl}?patientId=${encodeURIComponent(targetId)}`;
   },
 
-  // ==========================================================
-  // SLIDE-BY-SLIDE WIZARD NAVIGATION
-  // ==========================================================
   goToSlide(slideIndex, force = false) {
     if (slideIndex < 1 || slideIndex > this.totalSlides) return;
 
@@ -372,6 +351,9 @@ const CartPage = {
     }
   },
 
+  /**
+   * Slide 4-il confirm seithavudan popup illamal direct-ah checkout pogum
+   */
   handleFloatingActionButton() {
     if (this.currentSlide === 1) {
       if (!this.cart || this.cart.length === 0) {
@@ -404,13 +386,11 @@ const CartPage = {
         this.safeShowToast('Please select Home Pickup or Lab Walk-in', 'error');
         return;
       }
-      this.openPatientConfirmModal();
+      // Popup ethuvum open seiyamaal direct checkout
+      this.handleProceedToCheckout();
     }
   },
 
-  // ==========================================================
-  // SLIDE 4: COLLECTION TYPE & THRESHOLD CHARGE LOGIC
-  // ==========================================================
   selectCollectionType(type, persist = true) {
     if (this.isAddonMode) {
       this.safeShowToast('Collection mode is locked to existing booking appointment', 'info');
@@ -465,7 +445,6 @@ const CartPage = {
       }, 0);
     }
 
-    // Orders ₹500 or above -> 100% FREE DOORSTEP PICKUP
     if (total >= 500) {
       return 0;
     }
@@ -602,9 +581,6 @@ const CartPage = {
     this.updateCouponBannerUI();
   },
 
-  // ==========================================================
-  // MULTI-PATIENT SELECTION ENGINE (SLIDE 1)
-  // ==========================================================
   syncPrimaryPatientDetails() {
     if (!this.selectedPatientIds || this.selectedPatientIds.length === 0) {
       this.selectedPatientIds = ['SELF'];
@@ -742,9 +718,6 @@ const CartPage = {
     }).join('');
   },
 
-  // ==========================================================
-  // SLIDE 3: PAYMENT MODE & COUPONS
-  // ==========================================================
   selectPaymentMode(mode, persist = true) {
     this.selectedPaymentMode = mode;
     if (persist) {
@@ -765,9 +738,6 @@ const CartPage = {
     this.updateBottomControlBarUI();
   },
 
-  // ==========================================================
-  // SLIDE 1: UNIFIED PATIENT-WISE GROUPED CART RENDERING
-  // ==========================================================
   assignItemPatient(itemIndex, targetPatientId) {
     if (itemIndex >= 0 && itemIndex < this.cart.length) {
       const targetItem = this.cart[itemIndex];
@@ -885,7 +855,6 @@ const CartPage = {
             `;
           }).join('')}
 
-          <!-- Dedicated Per-Patient Action Buttons -->
           <div class="patient-card-actions-row">
             <button type="button" class="patient-action-btn add-test-sub-btn"
               onclick="CartPage.navigateToAddItems('${member.id}', 'tests')">
@@ -903,9 +872,6 @@ const CartPage = {
     container.innerHTML = groupedHtml;
   },
 
-  // ==========================================================
-  // CORE HELPER INITIALIZERS & DATA LOADING
-  // ==========================================================
   detectAddonBookingMode() {
     const urlParams = (typeof window !== 'undefined') ? new URLSearchParams(window.location.search) : null;
     const urlAddonId = urlParams ? urlParams.get('addonBookingId') : null;
@@ -1000,7 +966,6 @@ const CartPage = {
     let user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
     const primaryMobile = user.mobile || user.phone || localStorage.getItem('selfcare_active_user') || '7010174890';
 
-    // Local Storage Profile Fallback check
     try {
       if (!user || Object.keys(user).length === 0 || !user.name) {
         const storedUser = localStorage.getItem(`selfcare_profile_${primaryMobile}`) ||
@@ -1018,7 +983,6 @@ const CartPage = {
     const primaryName = user.name || user.fullName || user.userName || 'Valued Customer';
     const primaryEmail = user.email || '';
 
-    // Calculate age from profile (age, Age, dob, DOB, dateOfBirth, birthDate)
     const selfAgeRaw = user.age || user.Age || user.dob || user.DOB || user.dateOfBirth || user.DateOfBirth || user.birthDate || '';
     const calculatedSelfAge = this.calculateAge(selfAgeRaw);
 
@@ -1266,9 +1230,11 @@ const CartPage = {
   },
 
   // ==========================================================
-  // PATIENT VERIFICATION CHECKPOINT POPUP FLOW
+  // DIRECT CHECKOUT (NO INTERMEDIATE CONFIRMATION POPUPS)
   // ==========================================================
-  openPatientConfirmModal() {
+  async handleProceedToCheckout() {
+    if (this.isProcessingCheckout) return;
+
     if (!navigator.onLine) {
       this.safeShowToast('Internet connection required to proceed with booking.', 'error');
       return;
@@ -1288,7 +1254,7 @@ const CartPage = {
     }
 
     if (!this.selectedPatientIds || this.selectedPatientIds.length === 0) {
-      this.safeShowToast('Please select at least one patient for sample pickup', 'error');
+      this.safeShowToast('Please select at least one family member', 'error');
       this.goToSlide(1);
       return;
     }
@@ -1306,102 +1272,23 @@ const CartPage = {
     }
 
     if (!this.selectedTimeSlot) {
-      this.safeShowToast('Please select a valid 30-minute collection slot', 'error');
+      this.safeShowToast('Please select a 30-minute collection time slot', 'error');
       if (!this.isAddonMode) this.goToSlide(2);
       return;
     }
 
     if (!this.collectionType) {
-      this.safeShowToast('Please select collection mode (Home Pickup or Lab Walk-in)', 'error');
+      this.safeShowToast('Please select Home Pickup or Lab Walk-in', 'error');
       this.goToSlide(4);
       return;
     }
 
-    const selectedMembers = this.familyMembers.filter(m => this.selectedPatientIds.includes(m.id));
-
-    const nameEl = document.getElementById('verify-patient-name');
-    const relationEl = document.getElementById('verify-patient-relation');
-    const multiListEl = document.getElementById('verify-patient-multi-list');
-    const mobileEl = document.getElementById('verify-patient-mobile');
-    const ageGenderEl = document.getElementById('verify-patient-age-gender');
-    const collectionEl = document.getElementById('verify-patient-collection');
-    const slotEl = document.getElementById('verify-patient-slot');
-    const totalEl = document.getElementById('verify-total-amount');
-
-    const totalPayableEl = document.getElementById('bill-final-payable');
-    const currentPayable = totalPayableEl ? totalPayableEl.textContent : '₹0';
-
-    if (nameEl) {
-      nameEl.textContent = selectedMembers.length > 1 
-        ? `${selectedMembers[0].name} + ${selectedMembers.length - 1} Member(s)` 
-        : this.selectedPatientName;
-    }
-
-    if (relationEl) {
-      relationEl.textContent = this.isAddonMode ? `Add-on: ${this.addonBooking.bookingId}` : (selectedMembers.length > 1 ? `${selectedMembers.length} Members` : (this.selectedPatientRelation || 'Self'));
-    }
-
-    if (multiListEl) {
-      if (selectedMembers.length > 1) {
-        multiListEl.style.display = 'block';
-        multiListEl.innerHTML = selectedMembers.map((m, i) => {
-          const mCount = this.cart.filter(item => item.patientId === m.id).length;
-          const mAgeText = m.age ? `${m.age} Yrs` : '';
-          const mGenderText = m.gender || '';
-          const mMeta = [mAgeText, mGenderText].filter(Boolean).join(' • ');
-          return `
-            <div style="font-size:10px; font-weight:700; color:#1E293B; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:3px 7px; margin-bottom:3px; display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <span>${i + 1}. ${m.name} (${m.relation || 'Member'})</span>
-                ${mMeta ? `<span style="font-size:9px; color:#64748B; margin-left:6px;">(${mMeta})</span>` : ''}
-              </div>
-              <span style="color:#078866; font-weight:800;">${mCount} Tests</span>
-            </div>
-          `;
-        }).join('');
-      } else {
-        multiListEl.style.display = 'none';
-      }
-    }
-
-    if (mobileEl) mobileEl.textContent = `+91 ${this.selectedPatientPhone}`;
-    if (ageGenderEl) {
-      if (selectedMembers.length > 1) {
-        ageGenderEl.textContent = `${selectedMembers.length} Patients Configured`;
-      } else {
-        const singleMember = selectedMembers[0] || {};
-        const ageVal = singleMember.age || this.selectedPatientAge;
-        const genderVal = singleMember.gender || this.selectedPatientGender;
-        const ageText = ageVal ? `${ageVal} Yrs` : 'Age not set';
-        const genderText = genderVal || 'Not set';
-        ageGenderEl.textContent = `${ageText} • ${genderText}`;
-      }
-    }
-    if (collectionEl) {
-      collectionEl.textContent = this.isAddonMode ? 'Doorstep Pickup (Clubbed ₹0)' : (this.collectionType === 'lab' ? 'Direct Lab Walk-in (₹0)' : `Doorstep Pickup (${this.doorstepCharge === 0 ? 'FREE ₹0' : '₹' + this.doorstepCharge})`);
-    }
-    if (slotEl) slotEl.textContent = `${this.selectedSlotDay} (${this.selectedTimeSlot})`;
-    if (totalEl) totalEl.textContent = currentPayable;
-
-    this.openModal('modal-confirm-patient');
-  },
-
-  confirmPatientAndProceed() {
-    this.closeModal('modal-confirm-patient');
-    this.handleProceedToCheckout();
-  },
-
-  // ==========================================================
-  // CASHFREE PRODUCTION CHECKOUT / CASH CHECKOUT WITH MULTI-PATIENT SPLIT
-  // ==========================================================
-  async handleProceedToCheckout() {
-    if (this.isProcessingCheckout) return;
     this.isProcessingCheckout = true;
 
     const confirmBtn = document.getElementById('floating-action-btn');
     if (confirmBtn) {
       confirmBtn.disabled = true;
-      confirmBtn.textContent = this.selectedPaymentMode === 'online' ? 'Initializing Payment...' : 'Confirming...';
+      confirmBtn.textContent = this.selectedPaymentMode === 'online' ? 'Initializing Payment...' : 'Confirming Booking...';
     }
 
     const newItems = this.cart.filter(i => !i.isExistingBookingItem);
@@ -1429,7 +1316,6 @@ const CartPage = {
 
     const defaultPatientId = (selectedMembers[0] && selectedMembers[0].id) || 'SELF';
 
-    // MULTI-PATIENT PARTITION ENGINE
     const patientBookingsData = [];
 
     selectedMembers.forEach((member, idx) => {
@@ -1475,7 +1361,6 @@ const CartPage = {
       });
     });
 
-    // Fallback: If no partitioned items matched, bundle all under primary
     if (patientBookingsData.length === 0) {
       patientBookingsData.push({
         bookingId: baseBookingId,
@@ -1511,7 +1396,7 @@ const CartPage = {
     }
 
     // ==========================================================
-    // PATHWAY A: CASH ON VISIT (PRESERVED)
+    // PATHWAY A: CASH ON COLLECTION
     // ==========================================================
     if (this.selectedPaymentMode === 'cash') {
       try {
@@ -1551,13 +1436,8 @@ const CartPage = {
         }
 
         this.saveBookedSlot(collectionDateStr, this.selectedTimeSlot);
-        this.finalizeConfirmedMultiBooking(patientBookingsData, 'Cash on Sample Collection');
-        this.safeShowToast(
-          this.isAddonMode 
-            ? `Tests added to Booking ${baseBookingId}!` 
-            : `Bookings (${createdIds.join(', ')}) confirmed!`, 
-          'success'
-        );
+        this.safeShowToast('Booking confirmed successfully!', 'success');
+        this.finalizeConfirmedMultiBooking(patientBookingsData);
       } catch (err) {
         console.error('Cash booking creation failed:', err);
         this.safeShowToast(err.message || 'Failed to confirm booking. Please try again.', 'error');
@@ -1568,14 +1448,13 @@ const CartPage = {
     }
 
     // ==========================================================
-    // PATHWAY B: CASHFREE PRODUCTION (LIVE) HOSTED CHECKOUT
+    // PATHWAY B: CASHFREE PRODUCTION (LIVE) CHECKOUT
     // ==========================================================
     try {
       if (typeof Api === 'undefined' || typeof Api.createCashfreeOrder !== 'function') {
         throw new Error('Cashfree payment service (Api.createCashfreeOrder) is not available.');
       }
 
-      // Hardened Canonical Base Return URL without query parameter or bracket wrappers
       const cleanCanonicalReturnBase = 'https://selfcarediagnostics.in/cart.html';
 
       const orderPayload = {
@@ -1641,7 +1520,6 @@ const CartPage = {
 
       const serializedPending = JSON.stringify(this.currentPendingBooking);
       sessionStorage.setItem('selfcare_active_cf_txn', serializedPending);
-      sessionStorage.setItem('selfcare_active_upi_txn', serializedPending);
 
       if (confirmBtn) {
         confirmBtn.textContent = 'Opening Cashfree Checkout...';
@@ -1649,17 +1527,16 @@ const CartPage = {
 
       this.intentLaunchTime = Date.now();
 
-      // Open Official Cashfree Hosted Checkout Modal
       const checkoutResult = await Api.openCashfreeCheckout(cfOrderRes.paymentSessionId, {
         sdkMode: cfOrderRes.sdkMode || 'production',
         redirectTarget: '_modal'
       });
 
       if (checkoutResult && checkoutResult.error) {
-        console.warn('Cashfree modal closed or returned notice:', checkoutResult.error);
+        console.warn('Cashfree checkout notice:', checkoutResult.error);
       }
 
-      // Always verify payment status on the backend after checkout closes or completes
+      // Check payment status on the backend automatically
       await this.verifyAndFinalizeCashfreePayment(
         this.currentPendingBooking.cashfreeOrderId,
         this.currentPendingBooking.bookingId
@@ -1672,20 +1549,16 @@ const CartPage = {
     }
   },
 
-  /**
-   * Handles browser return when Cashfree redirects back with ?cf_order_id=...
-   */
   async handleCashfreeReturnRedirect(cfOrderIdFromUrl) {
     if (!cfOrderIdFromUrl) return;
 
     try {
-      const saved = sessionStorage.getItem('selfcare_active_cf_txn') || sessionStorage.getItem('selfcare_active_upi_txn');
+      const saved = sessionStorage.getItem('selfcare_active_cf_txn');
       if (saved) {
         this.currentPendingBooking = JSON.parse(saved);
       }
     } catch (e) {}
 
-    // Clean cf_order_id from address bar so refreshing doesn't re-trigger
     if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
       const cleanUrl = new URL(window.location.href);
       cleanUrl.searchParams.delete('cf_order_id');
@@ -1699,8 +1572,8 @@ const CartPage = {
   },
 
   /**
-   * Mandatory Server-Side Cashfree Payment Verification.
-   * Only confirms the booking and opens WhatsApp if the backend verifies PAID status with Cashfree.
+   * Cashfree Server verification logic.
+   * If success -> directly forwards to bookings.html without opening any popup or WhatsApp!
    */
   async verifyAndFinalizeCashfreePayment(cashfreeOrderId, bookingId = '') {
     if (this.isVerifyingPayment) return;
@@ -1713,14 +1586,14 @@ const CartPage = {
     }
 
     try {
-      const targetOrderId = cashfreeOrderId || (this.currentPendingBooking && (this.currentPendingBooking.cashfreeOrderId || this.currentPendingBooking.paymentReference));
+      const targetOrderId = cashfreeOrderId || (this.currentPendingBooking && this.currentPendingBooking.cashfreeOrderId);
       const targetBookingId = bookingId || (this.currentPendingBooking && this.currentPendingBooking.bookingId) || '';
 
       if (!targetOrderId) {
         throw new Error('Missing Cashfree Order ID for payment verification.');
       }
 
-      this.safeShowToast('Verifying payment status with Cashfree server...', 'info');
+      this.safeShowToast('Verifying payment status...', 'info');
 
       const verifyRes = await Api.verifyCashfreePayment({
         cashfreeOrderId: targetOrderId,
@@ -1728,22 +1601,17 @@ const CartPage = {
         bookingId: targetBookingId
       });
 
-      // STRICT CHECK: Only proceed if backend independently verified PAID status with Cashfree
       if (
         verifyRes &&
         verifyRes.verified === true &&
         verifyRes.paymentStatus === 'PAYMENT_SUCCESS' &&
         verifyRes.bookingStatus === 'CONFIRMED'
       ) {
-        this.closeModal('upi-payment-modal');
-        this.closeModal('upi-confirm-modal');
-
         const pending = this.currentPendingBooking || {};
         const pList = (Array.isArray(verifyRes.patientBookingsData) && verifyRes.patientBookingsData.length > 0)
           ? verifyRes.patientBookingsData
           : (pending.patientBookingsData || []);
 
-        // Persist confirmed bookings locally (Backend already updated Google Sheets atomically)
         for (const pData of pList) {
           this.persistConfirmedBookingLocally({
             ...pData,
@@ -1761,29 +1629,21 @@ const CartPage = {
           this.saveBookedSlot(pending.collectionDate, pending.timeSlot);
         }
 
-        this.safeShowToast('Payment verified! Booking confirmed.', 'success');
-        this.finalizeConfirmedMultiBooking(pList, 'Online Paid (Cashfree Verified)');
+        this.safeShowToast('Payment verified! Redirecting to bookings...', 'success');
+        this.finalizeConfirmedMultiBooking(pList);
         return;
       }
 
-      // Payment was NOT successful (Pending, Failed, User Dropped, or Expired)
-      const pStatus = (verifyRes && verifyRes.paymentStatus) ? verifyRes.paymentStatus : 'PAYMENT_PENDING';
+      // Non-success case: Toast message mattum kaattappadum (Entha pop-up-um varathu!)
       const statusMsg = (verifyRes && verifyRes.message)
         ? verifyRes.message
-        : 'Payment is not yet completed. If you already paid, tap Verify again or choose Cash.';
+        : 'Payment is still pending or not completed. You can retry or choose Cash on Collection.';
 
-      if (pStatus === 'PAYMENT_PENDING') {
-        this.handleReturnFromUPI();
-        this.safeShowToast(statusMsg, 'info');
-      } else {
-        this.closeModal('upi-payment-modal');
-        this.closeModal('upi-confirm-modal');
-        this.safeShowToast(statusMsg, 'error');
-      }
+      this.safeShowToast(statusMsg, 'info');
+
     } catch (err) {
       console.error('Server-side payment verification error:', err);
-      this.handleReturnFromUPI();
-      this.safeShowToast(err.message || 'Could not verify payment right now. Tap to re-verify.', 'error');
+      this.safeShowToast(err.message || 'Could not verify payment status right now.', 'error');
     } finally {
       this.isVerifyingPayment = false;
       this.resetCheckoutButtonState();
@@ -1793,7 +1653,7 @@ const CartPage = {
   setupUPIAppReturnListeners() {
     const handleAppFocusOrVisibility = () => {
       if (!this.currentPendingBooking) {
-        const saved = sessionStorage.getItem('selfcare_active_cf_txn') || sessionStorage.getItem('selfcare_active_upi_txn');
+        const saved = sessionStorage.getItem('selfcare_active_cf_txn');
         if (saved) {
           try { this.currentPendingBooking = JSON.parse(saved); } catch (e) {}
         }
@@ -1801,12 +1661,13 @@ const CartPage = {
 
       if (!this.currentPendingBooking) return;
 
-      const modal = document.getElementById('upi-payment-modal');
-      if (modal && modal.style.display === 'flex') {
-        const timeElapsed = Date.now() - this.intentLaunchTime;
-        if (timeElapsed > 2500) {
-          this.handleReturnFromUPI();
-        }
+      const timeElapsed = Date.now() - this.intentLaunchTime;
+      // App thirumbi focus aanaal background-il server-idam verify seiyum (Popup open aagathu)
+      if (timeElapsed > 3000 && !this.isVerifyingPayment) {
+        this.verifyAndFinalizeCashfreePayment(
+          this.currentPendingBooking.cashfreeOrderId,
+          this.currentPendingBooking.bookingId
+        );
       }
     };
 
@@ -1817,162 +1678,28 @@ const CartPage = {
     window.addEventListener('focus', handleAppFocusOrVisibility);
   },
 
-  handleReturnFromUPI() {
-    if (!this.currentPendingBooking) {
-      const saved = sessionStorage.getItem('selfcare_active_cf_txn') || sessionStorage.getItem('selfcare_active_upi_txn');
-      if (saved) {
-        try { this.currentPendingBooking = JSON.parse(saved); } catch (e) {}
-      }
-    }
-
-    if (!this.currentPendingBooking) return;
-
-    this.closeModal('upi-payment-modal');
-
-    const amtEl = document.getElementById('upi-confirm-amt-text');
-    const bookIdEl = document.getElementById('upi-confirm-book-id');
-    const payRefEl = document.getElementById('upi-confirm-pay-ref');
-
-    if (amtEl) amtEl.textContent = Utils.formatCurrency(this.currentPendingBooking.finalAmount);
-    if (bookIdEl) bookIdEl.textContent = this.currentPendingBooking.bookingId;
-    if (payRefEl) payRefEl.textContent = this.currentPendingBooking.cashfreeOrderId || this.currentPendingBooking.paymentReference;
-
-    this.openModal('upi-confirm-modal');
-  },
-
   /**
-   * Triggered when user clicks "I Have Paid / Verify Payment" in #upi-confirm-modal.
-   * Strictly calls server-side Cashfree verification instead of trusting client confirmation.
+   * DIRECT REDIRECT TO BOOKINGS TRACKER (WhatsApp bypass)
    */
-  async confirmUserPaymentSuccess() {
-    if (!this.currentPendingBooking) {
-      const saved = sessionStorage.getItem('selfcare_active_cf_txn') || sessionStorage.getItem('selfcare_active_upi_txn');
-      if (saved) {
-        try { this.currentPendingBooking = JSON.parse(saved); } catch (e) {}
-      }
-    }
-
-    if (!this.currentPendingBooking) return;
-
-    const yesBtn = document.querySelector('#upi-confirm-modal .modal-action-btn');
-    const originalBtnHtml = yesBtn ? yesBtn.innerHTML : '';
-    if (yesBtn) {
-      yesBtn.innerHTML = '⏳ Verifying with Bank...';
-      yesBtn.style.pointerEvents = 'none';
-      yesBtn.style.opacity = '0.85';
-    }
-
-    try {
-      await this.verifyAndFinalizeCashfreePayment(
-        this.currentPendingBooking.cashfreeOrderId || this.currentPendingBooking.paymentReference,
-        this.currentPendingBooking.bookingId
-      );
-    } finally {
-      if (yesBtn) {
-        yesBtn.innerHTML = originalBtnHtml || '✅ Yes, Verify Payment';
-        yesBtn.style.pointerEvents = 'auto';
-        yesBtn.style.opacity = '1';
-      }
-    }
-  },
-
-  finalizeConfirmedMultiBooking(patientBookingsData, payModeTitle) {
-    const isLab = this.collectionType === 'lab';
-    const typeLabel = isLab 
-      ? 'Direct Lab Walk-in (FREE ₹0)' 
-      : (this.doorstepCharge === 0 ? 'Doorstep Home Pickup (FREE ₹0 - Orders ₹500+)' : `Doorstep Home Pickup (₹${this.doorstepCharge})`);
-    
-    const addressDetails = isLab 
-      ? `🏢 *Visit Center:* Selfcare Diagnostics Lab, Chennai` 
-      : `🏠 *Address:* ${this.currentPickupAddress}\n📍 *Location Link:* ${this.currentPickupLocation}`;
-
-    let totalAmount = 0;
-    let patientDetailsBlocks = '';
-
-    patientBookingsData.forEach((pData, idx) => {
-      totalAmount += Number(pData.finalAmount || 0);
-      const ageGenderText = [pData.patientAge ? `${pData.patientAge} Yrs` : '', pData.patientGender].filter(Boolean).join(' • ');
-      patientDetailsBlocks += `
-👤 *Patient ${idx + 1}: ${pData.patientName} (${pData.relation || 'Member'})${ageGenderText ? ` - ${ageGenderText}` : ''}*
-📋 *Booking ID:* ${pData.bookingId}
-📞 *Mobile:* +91 ${pData.patientPhone}
-🧪 *Booked Tests:*
-${(pData.items || []).map((it, i) => `  ${i + 1}. ${it.name} (₹${it.price})`).join('\n')}
-💰 *Payable:* ${Utils.formatCurrency(pData.finalAmount)}
-`;
-    });
-
-    const isMulti = patientBookingsData.length > 1;
-
-    const waMessage = 
-`*NEW ${isMulti ? 'FAMILY ' : ''}TEST BOOKING - SELFCARE DIAGNOSTICS* 🧪
-━━━━━━━━━━━━━━━━━━━━
-💳 *Payment Mode:* ${payModeTitle}
-🏥 *Collection Mode:* ${typeLabel}
-${addressDetails}
-⏱ *Appointment Slot:* ${this.selectedSlotDay} (${this.selectedTimeSlot})
-━━━━━━━━━━━━━━━━━━━━
-${patientDetailsBlocks.trim()}
-━━━━━━━━━━━━━━━━━━━━
-🏷️ *Coupon:* ${this.appliedCoupon || 'None'}
-💰 *Grand Total:* ${Utils.formatCurrency(totalAmount)}
-━━━━━━━━━━━━━━━━━━━━
-_${isLab ? 'Direct walk-in counter booking.' : 'Please assign phlebotomist with required sample vials for doorstep pickup.'}_`;
-
+  finalizeConfirmedMultiBooking(patientBookingsData) {
     this.clearPersistedWizardState();
     this.cart = [];
     this.saveCartState();
     this.renderCartUI();
     this.updateCartBadgeUI();
 
-    const waUrl = `https://wa.me/917010174890?text=${encodeURIComponent(waMessage)}`;
-    window.location.href = waUrl;
-  },
+    const targetBookingId = (patientBookingsData && patientBookingsData[0] && patientBookingsData[0].bookingId)
+      ? patientBookingsData[0].bookingId
+      : '';
 
-  async confirmUserPaymentFailed() {
-    if (!this.currentPendingBooking) {
-      this.closeModal('upi-confirm-modal');
-      return;
-    }
-
-    const booking = this.currentPendingBooking;
-    const orderId = booking.cashfreeOrderId || booking.paymentReference;
-
-    try {
-      // Check with server first in case payment actually succeeded before marking cancelled
-      if (typeof Api !== 'undefined' && typeof Api.verifyCashfreePayment === 'function' && orderId) {
-        const checkRes = await Api.verifyCashfreePayment({
-          cashfreeOrderId: orderId,
-          paymentReference: orderId,
-          bookingId: booking.bookingId
-        }).catch(() => null);
-
-        if (checkRes && checkRes.verified === true && checkRes.paymentStatus === 'PAYMENT_SUCCESS') {
-          this.closeModal('upi-confirm-modal');
-          await this.verifyAndFinalizeCashfreePayment(orderId, booking.bookingId);
-          return;
-        }
+    // Direct Bookings Tracking Page Redirection
+    setTimeout(() => {
+      if (targetBookingId) {
+        window.location.href = `bookings.html?id=${encodeURIComponent(targetBookingId)}`;
+      } else {
+        window.location.href = 'bookings.html';
       }
-
-      if (typeof Api !== 'undefined' && Api.updateUPIPaymentStatus) {
-        Api.updateUPIPaymentStatus({
-          bookingId: booking.bookingId,
-          paymentReference: orderId,
-          paymentStatus: 'PAYMENT_CANCELLED',
-          bookingStatus: 'PAYMENT_CANCELLED',
-          transactionId: '',
-          rawResponse: 'Customer clicked payment failed/cancelled'
-        }).catch(() => {});
-      }
-    } catch (err) {}
-
-    this.closeModal('upi-confirm-modal');
-    sessionStorage.removeItem('selfcare_active_cf_txn');
-    sessionStorage.removeItem('selfcare_active_upi_txn');
-    this.currentPendingBooking = null;
-    this.resetCheckoutButtonState();
-
-    this.safeShowToast('Payment was not completed. You can retry Online Payment or choose Cash.', 'info');
+    }, 800);
   },
 
   resetCheckoutButtonState() {
@@ -2238,6 +1965,8 @@ _${isLab ? 'Direct walk-in counter booking.' : 'Please assign phlebotomist with 
   },
 
   openModal(id) {
+    // Blocks upi-confirm-modal and modal-confirm-patient from opening
+    if (id === 'upi-confirm-modal' || id === 'modal-confirm-patient') return;
     const el = document.getElementById(id);
     if (el) el.style.display = 'flex';
   },
