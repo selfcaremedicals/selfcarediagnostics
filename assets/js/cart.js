@@ -1,7 +1,7 @@
 /* file: assets/js/cart.js */
 /**
- * Selfcare Diagnostics - Slide-by-Slide Wizard Engine v9.1.0 (Cashfree Production Integrated)
- * Status: MODIFIED FILE
+ * Selfcare Diagnostics - Slide-by-Slide Wizard Engine v9.2.0 (Cashfree Production Integrated)
+ * Status: FULL UPDATED PRODUCTION VERSION
  *
  * Features:
  * 1. Multi-Patient Backend Auto-Split: Generates dedicated unique Booking IDs 
@@ -14,6 +14,7 @@
  * 6. Dynamic Conflict Validation during Test Reassignment.
  * 7. Multi-Patient Verification Modal & Grouped WhatsApp Booking Summary.
  * 8. Official Cashfree Production (LIVE) Hosted Checkout + Server-Side Verification.
+ * 9. Hardened RFC 3986 Clean Return URL (Guaranteed zero bracket/array contamination).
  */
 
 const CartPage = {
@@ -1027,7 +1028,7 @@ const CartPage = {
       relation: 'Self',
       mobile: primaryMobile,
       email: primaryEmail,
-      age: calculatedSelfAge, // Dynamic age without hardcoded 28
+      age: calculatedSelfAge,
       gender: user.gender || user.Gender || 'Male',
       address: user.address || user.Address || 'Chennai, Tamil Nadu',
       location: user.location || user.Location || 'Not set'
@@ -1574,9 +1575,8 @@ const CartPage = {
         throw new Error('Cashfree payment service (Api.createCashfreeOrder) is not available.');
       }
 
-      const returnBaseUrl = (typeof window !== 'undefined' && window.location)
-        ? `${window.location.origin}${window.location.pathname}`
-        : 'https://selfcarediagnostics.in/cart.html';
+      // Hardened Canonical Base Return URL without query parameter or bracket wrappers
+      const cleanCanonicalReturnBase = 'https://selfcarediagnostics.in/cart.html';
 
       const orderPayload = {
         bookingId: baseBookingId,
@@ -1603,7 +1603,7 @@ const CartPage = {
         doorstepCharge: doorstepCharge,
         finalAmount: finalPayable,
         couponCode: this.appliedCoupon || '',
-        returnUrl: `${returnBaseUrl}?cf_order_id={order_id}`
+        returnUrl: cleanCanonicalReturnBase
       };
 
       const cfOrderRes = await Api.createCashfreeOrder(orderPayload);
