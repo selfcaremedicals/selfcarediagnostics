@@ -1,17 +1,19 @@
 /* file: assets/js/cart.js */
 /**
- * Selfcare Diagnostics - Slide-by-Slide Wizard Engine v9.0.0
+ * Selfcare Diagnostics - Slide-by-Slide Wizard Engine v9.1.0 (Cashfree Production Integrated)
+ * Status: MODIFIED FILE
+ *
  * Features:
  * 1. Multi-Patient Backend Auto-Split: Generates dedicated unique Booking IDs 
  *    per family member (e.g. SCDBOOK100001-1 for Self, SCDBOOK100001-2 for Jazeerah) 
  *    in both Google Sheets Backend and Local Database.
- * 2. Unified Single-Click Checkout: User pays once (UPI/Cash), but backend stores individual records.
+ * 2. Unified Single-Click Checkout: User pays once (Cashfree Online / Cash), but backend stores individual records.
  * 3. Slide 1 has both Cart Items & Patient Selection engine.
  * 4. Slide 2 has Collection Address & Appointment Schedule slots with Mobile Editing.
  * 5. Unified 3D Patient Card with dedicated + Add Tests / + Add Packages buttons.
  * 6. Dynamic Conflict Validation during Test Reassignment.
  * 7. Multi-Patient Verification Modal & Grouped WhatsApp Booking Summary.
- * 8. Direct UPI Gateway + Fallback Link Integration.
+ * 8. Official Cashfree Production (LIVE) Hosted Checkout + Server-Side Verification.
  */
 
 const CartPage = {
@@ -49,8 +51,9 @@ const CartPage = {
   addonBooking: null,
   existingBookingItems: [],
 
-  // Direct UPI Intent State
+  // Cashfree & Checkout Processing State
   isProcessingCheckout: false,
+  isVerifyingPayment: false,
   currentPendingBooking: null,
   intentLaunchTime: 0,
   fallbackTimerId: null,
@@ -117,6 +120,15 @@ const CartPage = {
       this.setupUPIAppReturnListeners();
 
       const urlParams = (typeof window !== 'undefined') ? new URLSearchParams(window.location.search) : null;
+      const cfOrderIdFromUrl = urlParams
+        ? (urlParams.get('cf_order_id') || urlParams.get('order_id') || urlParams.get('cashfreeOrderId'))
+        : null;
+
+      // Preload Cashfree JS SDK in background for instant checkout launch
+      if (typeof Api !== 'undefined' && typeof Api.loadCashfreeSDK === 'function' && navigator.onLine) {
+        Api.loadCashfreeSDK().catch(() => {});
+      }
+
       const requestedSlide = urlParams ? parseInt(urlParams.get('slide'), 10) : null;
       const savedSlide = parseInt(sessionStorage.getItem('selfcare_cart_slide'), 10);
 
@@ -129,6 +141,11 @@ const CartPage = {
         this.goToSlide(savedSlide, true);
       } else {
         this.goToSlide(1, true);
+      }
+
+      // If customer returned via Cashfree Return URL redirect, verify payment on server immediately
+      if (cfOrderIdFromUrl) {
+        await this.handleCashfreeReturnRedirect(cfOrderIdFromUrl);
       }
     } catch (err) {
       console.error('CartPage init error:', err);
@@ -203,6 +220,8 @@ const CartPage = {
       sessionStorage.removeItem('selfcare_cart_slot_day');
       sessionStorage.removeItem('selfcare_cart_time_slot');
       sessionStorage.removeItem('selfcare_target_patient_id');
+      sessionStorage.removeItem('selfcare_active_cf_txn');
+      sessionStorage.removeItem('selfcare_active_upi_txn');
     } catch (e) {}
   },
 
@@ -251,7 +270,7 @@ const CartPage = {
         }
       }
       if (slideIndex > 3 && !this.selectedPaymentMode) {
-        this.safeShowToast('Please select a payment method (UPI or Cash) to proceed', 'error');
+        this.safeShowToast('Please select a payment method (Online or Cash) to proceed', 'error');
         return;
       }
     }
@@ -375,7 +394,7 @@ const CartPage = {
       this.goToSlide(3);
     } else if (this.currentSlide === 3) {
       if (!this.selectedPaymentMode) {
-        this.safeShowToast('Please select payment method (UPI or Cash)', 'error');
+        this.safeShowToast('Please select payment method (Online or Cash)', 'error');
         return;
       }
       this.goToSlide(4);
@@ -456,8 +475,8 @@ const CartPage = {
       return name.includes('PPBS') || name.includes('POST PRANDIAL') || code === 'T0009' || code === 'SCDT0009';
     };
 
-    const ppbsItems = this.cart.filter(isPPBSTest);
-    const otherItems = this.cart.filter(i => !isPPBSTest(i));
+    const ppbsItems = this.cart.filter(i => !i.isExistingBookingItem && isPPBSTest(i));
+    const otherItems = this.cart.filter(i => !i.isExistingBookingItem && !isPPBSTest(i));
 
     if (ppbsItems.length > 0 && otherItems.length > 0) return 150;
     return 100;
@@ -476,8 +495,8 @@ const CartPage = {
         const code = (item.code || item.TestCode || '').toUpperCase();
         return name.includes('PPBS') || name.includes('POST PRANDIAL') || code === 'T0009' || code === 'SCDT0009';
       };
-      const ppbsItems = this.cart.filter(isPPBSTest);
-      const otherItems = this.cart.filter(i => !isPPBSTest(i));
+      const ppbsItems = this.cart.filter(i => !i.isExistingBookingItem && isPPBSTest(i));
+      const otherItems = this.cart.filter(i => !i.isExistingBookingItem && !isPPBSTest(i));
       const charge = (ppbsItems.length > 0 && otherItems.length > 0) ? 150 : 100;
 
       badge.textContent = charge === 150 ? 'Doorstep Charge: ₹150 (Dual Visit for PPBS)' : 'Doorstep Charge: ₹100';
@@ -1372,7 +1391,7 @@ const CartPage = {
   },
 
   // ==========================================================
-  // DIRECT UPI INTENT / CASH CHECKOUT WITH MULTI-PATIENT SPLIT
+  // CASHFREE PRODUCTION CHECKOUT / CASH CHECKOUT WITH MULTI-PATIENT SPLIT
   // ==========================================================
   async handleProceedToCheckout() {
     if (this.isProcessingCheckout) return;
@@ -1381,7 +1400,7 @@ const CartPage = {
     const confirmBtn = document.getElementById('floating-action-btn');
     if (confirmBtn) {
       confirmBtn.disabled = true;
-      confirmBtn.textContent = this.selectedPaymentMode === 'online' ? 'Opening UPI...' : 'Confirming...';
+      confirmBtn.textContent = this.selectedPaymentMode === 'online' ? 'Initializing Payment...' : 'Confirming...';
     }
 
     const newItems = this.cart.filter(i => !i.isExistingBookingItem);
@@ -1420,7 +1439,7 @@ const CartPage = {
       const mDiscount = subtotalNew > 0 ? Math.round((mSubtotal / subtotalNew) * couponDiscount) : 0;
       const mDoorstep = (idx === 0) ? doorstepCharge : 0;
       const mFinal = Math.max(0, mSubtotal - mDiscount + mDoorstep);
-      const mBookingId = isMulti ? `${baseBookingId}-${idx + 1}` : baseBookingId;
+      const mBookingId = (isMulti && !this.isAddonMode) ? `${baseBookingId}-${idx + 1}` : baseBookingId;
 
       patientBookingsData.push({
         bookingId: mBookingId,
@@ -1490,7 +1509,9 @@ const CartPage = {
       });
     }
 
-    // PATHWAY A: CASH ON VISIT
+    // ==========================================================
+    // PATHWAY A: CASH ON VISIT (PRESERVED)
+    // ==========================================================
     if (this.selectedPaymentMode === 'cash') {
       try {
         const createdIds = [];
@@ -1498,23 +1519,37 @@ const CartPage = {
         for (const pData of patientBookingsData) {
           const payload = {
             ...pData,
+            isAddon: this.isAddonMode,
+            addonBookingId: this.addonBookingId,
+            targetBookingId: this.addonBookingId,
+            paymentMode: 'CASH',
             paymentStatus: 'PENDING_COLLECTION',
             bookingStatus: 'CONFIRMED'
           };
 
+          let resBookingId = pData.bookingId;
           if (typeof Api !== 'undefined' && Api.createBooking) {
-            await Api.createBooking(payload).catch(err => console.warn('Cloud write deferred:', err));
+            const cashRes = await Api.createBooking(payload).catch(err => {
+              console.warn('Cloud write deferred:', err);
+              return null;
+            });
+            if (cashRes && cashRes.bookingId) {
+              resBookingId = cashRes.bookingId;
+              pData.bookingId = resBookingId;
+            }
           }
 
           this.persistConfirmedBookingLocally({
             ...payload,
+            bookingId: resBookingId,
             currentStage: 1,
             items: pData.items
           });
 
-          createdIds.push(pData.bookingId);
+          createdIds.push(resBookingId);
         }
 
+        this.saveBookedSlot(collectionDateStr, this.selectedTimeSlot);
         this.finalizeConfirmedMultiBooking(patientBookingsData, 'Cash on Sample Collection');
         this.safeShowToast(
           this.isAddonMode 
@@ -1531,20 +1566,32 @@ const CartPage = {
       return;
     }
 
-    // PATHWAY B: DIRECT UPI INTENT
+    // ==========================================================
+    // PATHWAY B: CASHFREE PRODUCTION (LIVE) HOSTED CHECKOUT
+    // ==========================================================
     try {
-      if (typeof Api === 'undefined' || !Api.createPendingUPIBooking) {
-        throw new Error('API client method createPendingUPIBooking is not available.');
+      if (typeof Api === 'undefined' || typeof Api.createCashfreeOrder !== 'function') {
+        throw new Error('Cashfree payment service (Api.createCashfreeOrder) is not available.');
       }
 
-      const pendingPayload = {
+      const returnBaseUrl = (typeof window !== 'undefined' && window.location)
+        ? `${window.location.origin}${window.location.pathname}`
+        : 'https://selfcarediagnostics.in/cart.html';
+
+      const orderPayload = {
         bookingId: baseBookingId,
+        baseBookingId: baseBookingId,
+        isAddon: this.isAddonMode,
+        isAddonMode: this.isAddonMode,
+        addonBookingId: this.addonBookingId || '',
+        targetBookingId: this.addonBookingId || '',
         patientId: this.selectedPatientId,
-        patientName: selectedMembers.map(m => m.name).join(' & '),
+        patientName: selectedMembers.map(m => m.name).join(' & ') || this.selectedPatientName,
         patientPhone: this.selectedPatientPhone,
         patientEmail: this.selectedPatientEmail || '',
         relation: this.selectedPatientRelation || 'Self',
         items: newItems,
+        patientBookingsData: patientBookingsData,
         collectionType: this.collectionType,
         address: finalAddress,
         location: { link: finalLocation },
@@ -1555,72 +1602,190 @@ const CartPage = {
         onlineDiscount: 0,
         doorstepCharge: doorstepCharge,
         finalAmount: finalPayable,
-        couponCode: this.appliedCoupon || ''
+        couponCode: this.appliedCoupon || '',
+        returnUrl: `${returnBaseUrl}?cf_order_id={order_id}`
       };
 
-      const pendingRes = await Api.createPendingUPIBooking(pendingPayload);
+      const cfOrderRes = await Api.createCashfreeOrder(orderPayload);
 
-      if (!pendingRes || !pendingRes.bookingId || !pendingRes.paymentReference) {
-        throw new Error('Unable to initialize booking session with server.');
+      if (!cfOrderRes || !cfOrderRes.paymentSessionId || !cfOrderRes.cashfreeOrderId) {
+        throw new Error('Unable to initialize Cashfree payment session with server.');
       }
 
+      const verifiedPatientBookings = (Array.isArray(cfOrderRes.patientBookingsData) && cfOrderRes.patientBookingsData.length > 0)
+        ? cfOrderRes.patientBookingsData
+        : patientBookingsData;
+
       this.currentPendingBooking = {
-        bookingId: pendingRes.bookingId,
-        paymentReference: pendingRes.paymentReference,
-        finalAmount: pendingRes.finalAmount || finalPayable,
-        patientBookingsData: patientBookingsData,
+        bookingId: cfOrderRes.bookingId || baseBookingId,
+        bookingIds: cfOrderRes.bookingIds || verifiedPatientBookings.map(b => b.bookingId),
+        cashfreeOrderId: cfOrderRes.cashfreeOrderId,
+        paymentReference: cfOrderRes.cashfreeOrderId,
+        paymentSessionId: cfOrderRes.paymentSessionId,
+        sdkMode: cfOrderRes.sdkMode || 'production',
+        finalAmount: Number(cfOrderRes.finalAmount || finalPayable),
+        patientBookingsData: verifiedPatientBookings,
         collectionDate: collectionDateStr,
         timeSlot: this.selectedTimeSlot,
+        selectedSlotDay: this.selectedSlotDay,
         collectionType: this.collectionType,
         address: finalAddress,
         location: finalLocation,
+        doorstepCharge: Number(cfOrderRes.doorstepCharge !== undefined ? cfOrderRes.doorstepCharge : doorstepCharge),
+        appliedCoupon: this.appliedCoupon || '',
         isAddon: this.isAddonMode,
         addonBookingId: this.addonBookingId,
         newItems: newItems,
         selectedMembers: selectedMembers
       };
 
-      sessionStorage.setItem('selfcare_active_upi_txn', JSON.stringify(this.currentPendingBooking));
+      const serializedPending = JSON.stringify(this.currentPendingBooking);
+      sessionStorage.setItem('selfcare_active_cf_txn', serializedPending);
+      sessionStorage.setItem('selfcare_active_upi_txn', serializedPending);
 
-      const upiConfig = (typeof Config !== 'undefined' && Config.UPI) ? Config.UPI : {
-        MERCHANT_VPA: '0798545a0252206.bqr@kotak',
-        MERCHANT_NAME: 'Selfcare Diagnostics',
-        CURRENCY: 'INR',
-        MCC: '8099'
-      };
-
-      const pa = upiConfig.MERCHANT_VPA;
-      const pn = encodeURIComponent(upiConfig.MERCHANT_NAME);
-      const am = Number(this.currentPendingBooking.finalAmount).toFixed(2);
-      const cu = upiConfig.CURRENCY || 'INR';
-      const tr = this.currentPendingBooking.paymentReference;
-      const tn = encodeURIComponent(`Selfcare-${this.currentPendingBooking.bookingId}`);
-      const mc = upiConfig.MCC || '8099';
-
-      const upiUri = `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tr=${tr}&tn=${tn}&mc=${mc}`;
-
-      this.openModal('upi-payment-modal');
-      const bookRefEl = document.getElementById('upi-modal-book-ref');
-      const amountEl = document.getElementById('upi-modal-amount');
-      const fallbackBtn = document.getElementById('upi-direct-manual-link');
-      const fallbackContainer = document.getElementById('upi-fallback-container');
-
-      if (bookRefEl) bookRefEl.textContent = this.currentPendingBooking.bookingId;
-      if (amountEl) amountEl.textContent = Utils.formatCurrency(this.currentPendingBooking.finalAmount);
-      if (fallbackBtn) fallbackBtn.href = upiUri;
-      if (fallbackContainer) fallbackContainer.style.display = 'none';
+      if (confirmBtn) {
+        confirmBtn.textContent = 'Opening Cashfree Checkout...';
+      }
 
       this.intentLaunchTime = Date.now();
-      if (this.fallbackTimerId) clearTimeout(this.fallbackTimerId);
-      this.fallbackTimerId = setTimeout(() => {
-        if (fallbackContainer) fallbackContainer.style.display = 'block';
-      }, 3500);
 
-      window.location.href = upiUri;
+      // Open Official Cashfree Hosted Checkout Modal
+      const checkoutResult = await Api.openCashfreeCheckout(cfOrderRes.paymentSessionId, {
+        sdkMode: cfOrderRes.sdkMode || 'production',
+        redirectTarget: '_modal'
+      });
+
+      if (checkoutResult && checkoutResult.error) {
+        console.warn('Cashfree modal closed or returned notice:', checkoutResult.error);
+      }
+
+      // Always verify payment status on the backend after checkout closes or completes
+      await this.verifyAndFinalizeCashfreePayment(
+        this.currentPendingBooking.cashfreeOrderId,
+        this.currentPendingBooking.bookingId
+      );
 
     } catch (err) {
-      console.error('Direct UPI Intent failure:', err);
-      this.safeShowToast(err.message || 'Error opening UPI payment. Please try again.', 'error');
+      console.error('Cashfree checkout error:', err);
+      this.safeShowToast(err.message || 'Error initializing online payment. Please try again.', 'error');
+      this.resetCheckoutButtonState();
+    }
+  },
+
+  /**
+   * Handles browser return when Cashfree redirects back with ?cf_order_id=...
+   */
+  async handleCashfreeReturnRedirect(cfOrderIdFromUrl) {
+    if (!cfOrderIdFromUrl) return;
+
+    try {
+      const saved = sessionStorage.getItem('selfcare_active_cf_txn') || sessionStorage.getItem('selfcare_active_upi_txn');
+      if (saved) {
+        this.currentPendingBooking = JSON.parse(saved);
+      }
+    } catch (e) {}
+
+    // Clean cf_order_id from address bar so refreshing doesn't re-trigger
+    if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('cf_order_id');
+      cleanUrl.searchParams.delete('order_id');
+      cleanUrl.searchParams.delete('cashfreeOrderId');
+      window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search);
+    }
+
+    const bookingId = this.currentPendingBooking ? this.currentPendingBooking.bookingId : '';
+    await this.verifyAndFinalizeCashfreePayment(cfOrderIdFromUrl, bookingId);
+  },
+
+  /**
+   * Mandatory Server-Side Cashfree Payment Verification.
+   * Only confirms the booking and opens WhatsApp if the backend verifies PAID status with Cashfree.
+   */
+  async verifyAndFinalizeCashfreePayment(cashfreeOrderId, bookingId = '') {
+    if (this.isVerifyingPayment) return;
+    this.isVerifyingPayment = true;
+
+    const confirmBtn = document.getElementById('floating-action-btn');
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Verifying Payment...';
+    }
+
+    try {
+      const targetOrderId = cashfreeOrderId || (this.currentPendingBooking && (this.currentPendingBooking.cashfreeOrderId || this.currentPendingBooking.paymentReference));
+      const targetBookingId = bookingId || (this.currentPendingBooking && this.currentPendingBooking.bookingId) || '';
+
+      if (!targetOrderId) {
+        throw new Error('Missing Cashfree Order ID for payment verification.');
+      }
+
+      this.safeShowToast('Verifying payment status with Cashfree server...', 'info');
+
+      const verifyRes = await Api.verifyCashfreePayment({
+        cashfreeOrderId: targetOrderId,
+        paymentReference: targetOrderId,
+        bookingId: targetBookingId
+      });
+
+      // STRICT CHECK: Only proceed if backend independently verified PAID status with Cashfree
+      if (
+        verifyRes &&
+        verifyRes.verified === true &&
+        verifyRes.paymentStatus === 'PAYMENT_SUCCESS' &&
+        verifyRes.bookingStatus === 'CONFIRMED'
+      ) {
+        this.closeModal('upi-payment-modal');
+        this.closeModal('upi-confirm-modal');
+
+        const pending = this.currentPendingBooking || {};
+        const pList = (Array.isArray(verifyRes.patientBookingsData) && verifyRes.patientBookingsData.length > 0)
+          ? verifyRes.patientBookingsData
+          : (pending.patientBookingsData || []);
+
+        // Persist confirmed bookings locally (Backend already updated Google Sheets atomically)
+        for (const pData of pList) {
+          this.persistConfirmedBookingLocally({
+            ...pData,
+            paymentMode: 'ONLINE_CASHFREE',
+            paymentStatus: 'PAYMENT_SUCCESS',
+            bookingStatus: 'CONFIRMED',
+            paymentReference: targetOrderId,
+            transactionId: verifyRes.transactionId || '',
+            currentStage: 1,
+            items: pData.items || []
+          });
+        }
+
+        if (pending.collectionDate && pending.timeSlot) {
+          this.saveBookedSlot(pending.collectionDate, pending.timeSlot);
+        }
+
+        this.safeShowToast('Payment verified! Booking confirmed.', 'success');
+        this.finalizeConfirmedMultiBooking(pList, 'Online Paid (Cashfree Verified)');
+        return;
+      }
+
+      // Payment was NOT successful (Pending, Failed, User Dropped, or Expired)
+      const pStatus = (verifyRes && verifyRes.paymentStatus) ? verifyRes.paymentStatus : 'PAYMENT_PENDING';
+      const statusMsg = (verifyRes && verifyRes.message)
+        ? verifyRes.message
+        : 'Payment is not yet completed. If you already paid, tap Verify again or choose Cash.';
+
+      if (pStatus === 'PAYMENT_PENDING') {
+        this.handleReturnFromUPI();
+        this.safeShowToast(statusMsg, 'info');
+      } else {
+        this.closeModal('upi-payment-modal');
+        this.closeModal('upi-confirm-modal');
+        this.safeShowToast(statusMsg, 'error');
+      }
+    } catch (err) {
+      console.error('Server-side payment verification error:', err);
+      this.handleReturnFromUPI();
+      this.safeShowToast(err.message || 'Could not verify payment right now. Tap to re-verify.', 'error');
+    } finally {
+      this.isVerifyingPayment = false;
       this.resetCheckoutButtonState();
     }
   },
@@ -1628,7 +1793,7 @@ const CartPage = {
   setupUPIAppReturnListeners() {
     const handleAppFocusOrVisibility = () => {
       if (!this.currentPendingBooking) {
-        const saved = sessionStorage.getItem('selfcare_active_upi_txn');
+        const saved = sessionStorage.getItem('selfcare_active_cf_txn') || sessionStorage.getItem('selfcare_active_upi_txn');
         if (saved) {
           try { this.currentPendingBooking = JSON.parse(saved); } catch (e) {}
         }
@@ -1654,7 +1819,7 @@ const CartPage = {
 
   handleReturnFromUPI() {
     if (!this.currentPendingBooking) {
-      const saved = sessionStorage.getItem('selfcare_active_upi_txn');
+      const saved = sessionStorage.getItem('selfcare_active_cf_txn') || sessionStorage.getItem('selfcare_active_upi_txn');
       if (saved) {
         try { this.currentPendingBooking = JSON.parse(saved); } catch (e) {}
       }
@@ -1670,60 +1835,45 @@ const CartPage = {
 
     if (amtEl) amtEl.textContent = Utils.formatCurrency(this.currentPendingBooking.finalAmount);
     if (bookIdEl) bookIdEl.textContent = this.currentPendingBooking.bookingId;
-    if (payRefEl) payRefEl.textContent = this.currentPendingBooking.paymentReference;
+    if (payRefEl) payRefEl.textContent = this.currentPendingBooking.cashfreeOrderId || this.currentPendingBooking.paymentReference;
 
     this.openModal('upi-confirm-modal');
   },
 
+  /**
+   * Triggered when user clicks "I Have Paid / Verify Payment" in #upi-confirm-modal.
+   * Strictly calls server-side Cashfree verification instead of trusting client confirmation.
+   */
   async confirmUserPaymentSuccess() {
+    if (!this.currentPendingBooking) {
+      const saved = sessionStorage.getItem('selfcare_active_cf_txn') || sessionStorage.getItem('selfcare_active_upi_txn');
+      if (saved) {
+        try { this.currentPendingBooking = JSON.parse(saved); } catch (e) {}
+      }
+    }
+
     if (!this.currentPendingBooking) return;
 
     const yesBtn = document.querySelector('#upi-confirm-modal .modal-action-btn');
+    const originalBtnHtml = yesBtn ? yesBtn.innerHTML : '';
     if (yesBtn) {
-      yesBtn.innerHTML = '⏳ Opening WhatsApp...';
+      yesBtn.innerHTML = '⏳ Verifying with Bank...';
       yesBtn.style.pointerEvents = 'none';
       yesBtn.style.opacity = '0.85';
     }
 
-    const booking = this.currentPendingBooking;
-    const finalId = booking.isAddon ? booking.addonBookingId : booking.bookingId;
-
     try {
-      if (typeof Api !== 'undefined' && Api.updateUPIPaymentStatus) {
-        Api.updateUPIPaymentStatus({
-          bookingId: finalId,
-          paymentReference: booking.paymentReference,
-          paymentStatus: 'PAYMENT_SUCCESS',
-          bookingStatus: 'CONFIRMED',
-          transactionId: 'USER_CONFIRMED_UPI',
-          rawResponse: 'Customer confirmed payment completion inside UPI app'
-        }).catch(() => {});
+      await this.verifyAndFinalizeCashfreePayment(
+        this.currentPendingBooking.cashfreeOrderId || this.currentPendingBooking.paymentReference,
+        this.currentPendingBooking.bookingId
+      );
+    } finally {
+      if (yesBtn) {
+        yesBtn.innerHTML = originalBtnHtml || '✅ Yes, Verify Payment';
+        yesBtn.style.pointerEvents = 'auto';
+        yesBtn.style.opacity = '1';
       }
-    } catch (err) {}
-
-    const pList = booking.patientBookingsData || [];
-    for (const pData of pList) {
-      const payload = {
-        ...pData,
-        paymentStatus: 'PAYMENT_SUCCESS',
-        bookingStatus: 'CONFIRMED',
-        paymentReference: booking.paymentReference
-      };
-
-      if (typeof Api !== 'undefined' && Api.createBooking) {
-        Api.createBooking(payload).catch(err => console.warn('Child booking cloud write deferred:', err));
-      }
-
-      this.persistConfirmedBookingLocally({
-        ...payload,
-        currentStage: 1,
-        items: pData.items
-      });
     }
-
-    this.finalizeConfirmedMultiBooking(pList, 'Online UPI');
-    this.closeModal('upi-confirm-modal');
-    this.resetCheckoutButtonState();
   },
 
   finalizeConfirmedMultiBooking(patientBookingsData, payModeTitle) {
@@ -1747,7 +1897,7 @@ const CartPage = {
 📋 *Booking ID:* ${pData.bookingId}
 📞 *Mobile:* +91 ${pData.patientPhone}
 🧪 *Booked Tests:*
-${pData.items.map((it, i) => `  ${i + 1}. ${it.name} (₹${it.price})`).join('\n')}
+${(pData.items || []).map((it, i) => `  ${i + 1}. ${it.name} (₹${it.price})`).join('\n')}
 💰 *Payable:* ${Utils.formatCurrency(pData.finalAmount)}
 `;
     });
@@ -1779,18 +1929,35 @@ _${isLab ? 'Direct walk-in counter booking.' : 'Please assign phlebotomist with 
     window.location.href = waUrl;
   },
 
-  confirmUserPaymentFailed() {
+  async confirmUserPaymentFailed() {
     if (!this.currentPendingBooking) {
       this.closeModal('upi-confirm-modal');
       return;
     }
 
     const booking = this.currentPendingBooking;
+    const orderId = booking.cashfreeOrderId || booking.paymentReference;
+
     try {
+      // Check with server first in case payment actually succeeded before marking cancelled
+      if (typeof Api !== 'undefined' && typeof Api.verifyCashfreePayment === 'function' && orderId) {
+        const checkRes = await Api.verifyCashfreePayment({
+          cashfreeOrderId: orderId,
+          paymentReference: orderId,
+          bookingId: booking.bookingId
+        }).catch(() => null);
+
+        if (checkRes && checkRes.verified === true && checkRes.paymentStatus === 'PAYMENT_SUCCESS') {
+          this.closeModal('upi-confirm-modal');
+          await this.verifyAndFinalizeCashfreePayment(orderId, booking.bookingId);
+          return;
+        }
+      }
+
       if (typeof Api !== 'undefined' && Api.updateUPIPaymentStatus) {
         Api.updateUPIPaymentStatus({
           bookingId: booking.bookingId,
-          paymentReference: booking.paymentReference,
+          paymentReference: orderId,
           paymentStatus: 'PAYMENT_CANCELLED',
           bookingStatus: 'PAYMENT_CANCELLED',
           transactionId: '',
@@ -1800,10 +1967,12 @@ _${isLab ? 'Direct walk-in counter booking.' : 'Please assign phlebotomist with 
     } catch (err) {}
 
     this.closeModal('upi-confirm-modal');
+    sessionStorage.removeItem('selfcare_active_cf_txn');
     sessionStorage.removeItem('selfcare_active_upi_txn');
+    this.currentPendingBooking = null;
     this.resetCheckoutButtonState();
 
-    this.safeShowToast('Payment was not completed. You can retry UPI or choose Cash.', 'info');
+    this.safeShowToast('Payment was not completed. You can retry Online Payment or choose Cash.', 'info');
   },
 
   resetCheckoutButtonState() {

@@ -1,16 +1,20 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - API Gateway v5.0.0 (Zero-Freeze Dynamic Engine)
+ * Selfcare Diagnostics - API Gateway v5.1.0 (Zero-Freeze Dynamic Engine + Cashfree Live Gateway)
+ * Status: MODIFIED FILE
+ *
  * Features:
  * 1. Adaptive Dynamic Timeouts: Fast 8.5s fail-fast for catalogue reads (triggers instant IndexedDB fallback),
  *    and resilient 60-90s timeouts for heavy OCR and booking writes.
  * 2. Request deduplication to prevent duplicate server roundtrips.
  * 3. CORS preflight bypass for Google Apps Script Web App endpoints (text/plain payload).
- * 4. Resilient error extraction and seamless cross-platform exposure.
+ * 4. Official Cashfree PG v3 Production SDK Loader, Order Creation, Hosted Checkout & Server Verification.
+ * 5. Resilient error extraction and seamless cross-platform exposure.
  */
 
 const Api = {
   activeRequests: new Map(),
+  cashfreeSdkPromise: null,
 
   /**
    * Action-specific timeout resolver (Milliseconds)
@@ -39,6 +43,14 @@ const Api = {
 
     if (action === 'processPrescriptionOCR' || action === 'uploadPrescription') {
       return 90000; // 90 seconds for large Base64 image compression & AI OCR vision processing
+    }
+
+    if (
+      action === 'createCashfreeOrder' ||
+      action === 'verifyCashfreePayment' ||
+      action === 'getCashfreePaymentStatus'
+    ) {
+      return 45000; // 45 seconds for server-to-server Cashfree gateway communication & sheet locks
     }
 
     return 45000; // 45 seconds default for bookings, OTPs, and state modifications
@@ -228,7 +240,116 @@ const Api = {
   },
 
   // ==========================================================
-  // DIRECT UPI INTENT & PAYMENT STATUS APIS
+  // CASHFREE PRODUCTION PAYMENT GATEWAY APIS
+  // ==========================================================
+
+  /**
+   * Dynamically loads the official Cashfree JS SDK v3 if not already present on the page.
+   */
+  async loadCashfreeSDK() {
+    if (typeof window !== 'undefined' && typeof window.Cashfree === 'function') {
+      return window.Cashfree;
+    }
+
+    if (this.cashfreeSdkPromise) {
+      return this.cashfreeSdkPromise;
+    }
+
+    this.cashfreeSdkPromise = new Promise((resolve, reject) => {
+      if (typeof document === 'undefined') {
+        reject(new Error('Browser document environment is required to load Cashfree SDK.'));
+        return;
+      }
+
+      const existingScript = document.querySelector('script[src*="sdk.cashfree.com/js/v3/cashfree.js"]');
+      if (existingScript) {
+        existingScript.addEventListener('load', () => {
+          if (typeof window.Cashfree === 'function') resolve(window.Cashfree);
+          else reject(new Error('Cashfree SDK loaded but window.Cashfree is unavailable.'));
+        });
+        existingScript.addEventListener('error', () => {
+          this.cashfreeSdkPromise = null;
+          reject(new Error('Failed to load Cashfree Checkout SDK. Please check your internet connection.'));
+        });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+      script.async = true;
+      script.onload = () => {
+        if (typeof window.Cashfree === 'function') {
+          resolve(window.Cashfree);
+        } else {
+          this.cashfreeSdkPromise = null;
+          reject(new Error('Cashfree SDK initialization failed.'));
+        }
+      };
+      script.onerror = () => {
+        this.cashfreeSdkPromise = null;
+        reject(new Error('Unable to load Cashfree payment gateway script. Please check your connection.'));
+      };
+      document.head.appendChild(script);
+    });
+
+    return this.cashfreeSdkPromise;
+  },
+
+  /**
+   * 1. Create a verified Cashfree order on the Apps Script backend.
+   * @param {Object} orderPayload - Cart items, patient split details, schedule, and coupon info
+   */
+  async createCashfreeOrder(orderPayload) {
+    return this.request('createCashfreeOrder', orderPayload, false);
+  },
+
+  /**
+   * 2. Launch official Cashfree Hosted/Modal Checkout using the backend-generated payment_session_id.
+   * @param {string} paymentSessionId - Session ID returned by createCashfreeOrder
+   * @param {Object} options - Optional mode ('production' | 'sandbox') and redirectTarget ('_modal' | '_self')
+   */
+  async openCashfreeCheckout(paymentSessionId, options = {}) {
+    if (!paymentSessionId) {
+      throw new Error('Missing Cashfree paymentSessionId from server.');
+    }
+
+    const CashfreeSDK = await this.loadCashfreeSDK();
+    const mode = (options.sdkMode || options.mode || 'production').toLowerCase() === 'sandbox'
+      ? 'sandbox'
+      : 'production';
+
+    const cashfree = CashfreeSDK({ mode });
+    const checkoutOptions = {
+      paymentSessionId: paymentSessionId,
+      redirectTarget: options.redirectTarget || '_modal'
+    };
+
+    return cashfree.checkout(checkoutOptions);
+  },
+
+  /**
+   * 3. Trigger mandatory server-to-server payment verification with Cashfree after checkout.
+   * @param {Object} verificationPayload - { cashfreeOrderId, bookingId, paymentReference }
+   */
+  async verifyCashfreePayment(verificationPayload) {
+    return this.request('verifyCashfreePayment', verificationPayload, false);
+  },
+
+  /**
+   * 4. Retrieve live Cashfree payment status from the backend.
+   * @param {string} bookingId
+   * @param {string} cashfreeOrderId
+   */
+  async getCashfreePaymentStatus(bookingId, cashfreeOrderId) {
+    return this.request('getCashfreePaymentStatus', {
+      bookingId,
+      cashfreeOrderId,
+      paymentReference: cashfreeOrderId
+    }, false);
+  },
+
+  // ==========================================================
+  // LEGACY DIRECT UPI INTENT & PAYMENT STATUS APIS (PRESERVED)
   // ==========================================================
 
   async createPendingUPIBooking(pendingPayload) {

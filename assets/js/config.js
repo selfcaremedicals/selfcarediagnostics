@@ -1,14 +1,15 @@
+/* file: assets/js/config.js */
 /**
  * Selfcare Diagnostics - Frontend Configuration (config.js)
  * Defines API endpoints, versioning, database configuration, cache settings,
- * and Direct UPI Intent configuration.
+ * and Cashfree Production Gateway status constants.
  */
 
 const Config = {
-  APP_VERSION: '2.0.1',
-  CACHE_VERSION: 'selfcare-cache-v2.0.1',
+  APP_VERSION: '8.2.0',
+  CACHE_VERSION: 'selfcare-cache-v8.2.0',
   
-  // Google Apps Script Web App Deployment URL
+  // Google Apps Script Web App Deployment URL (Preserved)
   GAS_WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzM1alicIkwFVzwULAFpJwELalGwCFFOJhjnw9JGqimPz48Lt7V8llx1k6Jebv9icQBnQ/exec', 
   
   SPREADSHEET_ID: '1lswBf5iPcPnt8OGA6ZfCE1tcJyqqxTaP1e2u9UwwHOw',
@@ -18,7 +19,17 @@ const Config = {
   DB_VERSION: 1,
 
   // ==========================================================
-  // DIRECT UPI INTENT CODE (NO THIRD-PARTY PAYMENT GATEWAY)
+  // CASHFREE PRODUCTION GATEWAY PUBLIC SETTINGS (NO SECRET KEYS)
+  // ==========================================================
+  CASHFREE: {
+    SDK_URL: 'https://sdk.cashfree.com/js/v3/cashfree.js',
+    MODE: 'production',
+    CURRENCY: 'INR',
+    RETURN_URL: 'https://selfcarediagnostics.in/cart.html?cf_order_id={order_id}'
+  },
+
+  // ==========================================================
+  // LEGACY UPI FALLBACK CONFIGURATION (PRESERVED)
   // ==========================================================
   UPI: {
     MERCHANT_VPA: '0798545a0252206.bqr@kotak',
@@ -37,6 +48,7 @@ const Config = {
     SUCCESS: 'PAYMENT_SUCCESS',
     FAILED: 'PAYMENT_FAILED',
     CANCELLED: 'PAYMENT_CANCELLED',
+    EXPIRED: 'PAYMENT_EXPIRED',
     UNKNOWN: 'PAYMENT_UNKNOWN',
     VERIFICATION_PENDING: 'PAYMENT_VERIFICATION_PENDING'
   },
@@ -47,6 +59,7 @@ const Config = {
     CONFIRMED: 'CONFIRMED',
     PAYMENT_FAILED: 'PAYMENT_FAILED',
     PAYMENT_CANCELLED: 'PAYMENT_CANCELLED',
+    PAYMENT_EXPIRED: 'PAYMENT_EXPIRED',
     PAYMENT_VERIFICATION_PENDING: 'PAYMENT_VERIFICATION_PENDING'
   }
 };
