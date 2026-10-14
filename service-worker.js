@@ -1,15 +1,15 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v8.2.0 (Zero-Cache Auto-Update Engine + Cashfree Ready)
+ * Selfcare Diagnostics - Service Worker v8.2.1 (Zero-Cache Auto-Update Engine + Cashfree Ready)
  * Features:
  * - Direct SKIP_WAITING Message Listener: Responds instantly to app.js update triggers.
  * - HTTP Cache-Busting Network Fetch: Forces { cache: 'no-cache' } for HTML & scripts so Chrome never serves stale disk files.
- * - Versioned Cache Invalidation: v8.2.0 clean slate automatic cache purge on activation.
+ * - Versioned Cache Invalidation: v8.2.1 clean slate automatic cache purge on activation.
  * - Instant Client Claim & Zero-Lag Activation across all browser tabs.
  * - Relative Path Precache Engine (100% custom domain & root compatible).
  */
 
-const CACHE_NAME = 'selfcare-cache-v8.2.0';
+const CACHE_NAME = 'selfcare-cache-v8.2.1';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -62,7 +62,7 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache and Auto Skip-Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing auto-updating version 8.2.0...');
+  console.log('[Selfcare SW] Installing auto-updating version 8.2.1...');
   self.skipWaiting(); // Puthu worker udanadiyaga wait pannamal activate aagum
 
   event.waitUntil(
@@ -91,9 +91,9 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// 3. ACTIVATE EVENT - Purges old caches (v8.0.1 and older) and claims all open tabs
+// 3. ACTIVATE EVENT - Purges old caches (v8.2.0 and older) and claims all open tabs
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating version 8.2.0 and purging obsolete caches...');
+  console.log('[Selfcare SW] Activating version 8.2.1 and purging obsolete caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -105,7 +105,7 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      console.log('[Selfcare SW] Claiming clients for v8.2.0...');
+      console.log('[Selfcare SW] Claiming clients for v8.2.1...');
       return self.clients.claim();
     })
   );
