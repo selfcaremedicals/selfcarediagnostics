@@ -215,7 +215,7 @@
         <div class="slide-header">
           <span class="slide-badge">Step 3 of 4</span>
           <h2>Payment & Offers</h2>
-          <p class="slide-subtext">Select payment mode and save extra with coupons</p>
+          <p class="slide-subtext">Select payment mode and save extra with coupons or referral codes</p>
         </div>
 
         <!-- Payment Mode Card Group -->
@@ -276,9 +276,13 @@
           </div>
 
           <div id="coupon-input-box" class="coupon-input-glass-group">
-            <input type="text" id="coupon-code-input" placeholder="Enter coupon code (e.g. HEALTH2026)">
+            <input type="text" id="coupon-code-input" placeholder="Enter coupon or friend's referral code (e.g. SC4890)">
             <button type="button" class="apply-coupon-btn-3d" onclick="CartPage.applyCouponManually()">Apply</button>
           </div>
+
+          <p id="referral-coupon-helper-note" style="font-size: 10.5px; color: #536E66; margin-top: 6px; line-height: 1.35;">
+            💡 Friend's referral code requires a minimum test order of <strong>₹500</strong>. Earned referral bonus coupons (10%–100% OFF) are applicable strictly for <strong>Primary Account Holder (Self)</strong>.
+          </p>
         </div>
       </section>
 
@@ -562,6 +566,6 @@
   <script src="assets/js/offline-sync.js?v=6.3.0"></script>
   <script src="assets/js/auth.js?v=6.3.0"></script>
   <script src="assets/js/app.js?v=6.3.0"></script>
-  <script src="assets/js/cart.js?v=8.2.0"></script>
+  <script src="assets/js/cart.js?v=9.4.0"></script>
 </body>
 </html>

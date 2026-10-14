@@ -1,15 +1,15 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v8.3.0 (Zero-Cache Auto-Update Engine + Direct Booking Flow)
+ * Selfcare Diagnostics - Service Worker v8.4.0 (Zero-Cache Auto-Update Engine + Direct Booking Flow)
  * Features:
  * - Direct SKIP_WAITING Message Listener: Responds instantly to app.js update triggers.
- * - Cache Version Bump to v8.3.0: Automatically purges v8.2.0 and older cached cart.js/api.js files.
+ * - Cache Version Bump to v8.4.0: Automatically purges v8.3.0 and older cached files.
  * - HTTP Cache-Busting Network Fetch: Forces { cache: 'no-cache' } for HTML & scripts so Chrome never serves stale disk files.
  * - Instant Client Claim & Zero-Lag Activation across all browser tabs.
  * - Relative Path Precache Engine (100% custom domain & root compatible).
  */
 
-const CACHE_NAME = 'selfcare-cache-v8.3.0';
+const CACHE_NAME = 'selfcare-cache-v8.4.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -62,14 +62,13 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache and Auto Skip-Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing auto-updating version 8.3.0...');
-  self.skipWaiting(); // Puthu worker udanadiyaga wait pannamal activate aagum
+  console.log('[Selfcare SW] Installing auto-updating version 8.4.0...');
+  self.skipWaiting();
 
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
-          // cache: 'no-cache' ensures fresh files are pulled from server during installation
           const response = await fetch(url, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
@@ -91,9 +90,9 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// 3. ACTIVATE EVENT - Purges old caches (v8.2.0 and older) and claims all open tabs
+// 3. ACTIVATE EVENT - Purges old caches (v8.3.0 and older) and claims all open tabs
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating version 8.3.0 and purging obsolete caches...');
+  console.log('[Selfcare SW] Activating version 8.4.0 and purging obsolete caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -105,7 +104,7 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      console.log('[Selfcare SW] Claiming clients for v8.3.0...');
+      console.log('[Selfcare SW] Claiming clients for v8.4.0...');
       return self.clients.claim();
     })
   );
@@ -115,17 +114,14 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Cross-origin (including Cashfree SDK/APIs) and non-GET requests bypass
   if (url.origin !== location.origin || event.request.method !== 'GET') {
     return;
   }
 
-  // Google Apps Script API calls must always bypass service worker
   if (url.pathname.includes('/exec') || url.pathname.includes('/api/')) {
     return;
   }
 
-  // Localhost Development bypass
   const isLocalDev = Boolean(
     url.hostname === 'localhost' ||
     url.hostname === '127.0.0.1' ||
@@ -140,7 +136,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML Documents & Core JS/CSS Scripts - Strictly Network-First with cache: 'no-cache'
   if (
     event.request.destination === 'document' ||
     event.request.destination === 'script' ||
@@ -181,7 +176,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Versioned Assets (?v=...) - Strictly Network-First
   const hasVersionQuery = url.searchParams.has('v');
   if (hasVersionQuery) {
     event.respondWith(
@@ -202,7 +196,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static Assets (Images, Icons, Fonts) - Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {

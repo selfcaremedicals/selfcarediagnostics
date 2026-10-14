@@ -1,0 +1,269 @@
+================================================================================
+SELFCARE DIAGNOSTICS — CASHFREE PRODUCTION (LIVE) PAYMENT GATEWAY SETUP GUIDE
+Website: https://selfcarediagnostics.in
+Architecture: Google Apps Script Backend + Google Sheets DB + PWA Frontend
+================================================================================
+
+--------------------------------------------------------------------------------
+1. FILE MANIFEST (NEW VS MODIFIED FILES)
+--------------------------------------------------------------------------------
+Backend (Google Apps Script):
+  1. cashfree.gs              — [NEW]      Cashfree PG v3 Live Order, Amount Validator,
+                                           Server Verification, Webhook & Ledger Engine.
+  2. code.gs                  — [MODIFIED] Added routing for createCashfreeOrder,
+                                           verifyCashfreePayment, getCashfreePaymentStatus,
+                                           and cashfreeWebhook while preserving all existing actions.
+  3. bookings.gs              — [MODIFIED] Secured online payment status updates, added
+                                           server-only Cashfree confirmation & multi-patient
+                                           / add-on idempotency guards.
+
+Frontend (Website / GitHub Pages):
+  4. assets/js/api.js         — [MODIFIED] Added loadCashfreeSDK, createCashfreeOrder,
+                                           openCashfreeCheckout, verifyCashfreePayment,
+                                           and getCashfreePaymentStatus.
+  5. assets/js/cart.js        — [MODIFIED] Integrated Cashfree Hosted Checkout modal,
+                                           redirect return handler, and mandatory server-side
+                                           verification before booking confirmation & WhatsApp.
+
+Documentation:
+  6. CASHFREE_LIVE_SETUP.txt  — [NEW]      This complete deployment, security, testing,
+                                           and rollback guide.
+
+Unchanged Core Files (Preserved as-is):
+  - cart.gs, auth.gs, tests.gs, packages.gs, profile.gs, reports.gs, admin.gs,
+    ai-assistant.gs, assets/js/bookings.js, config.js, cart.html, etc.
+
+--------------------------------------------------------------------------------
+2. PAYMENT FLOW DIAGRAM
+--------------------------------------------------------------------------------
+Customer selects tests/packages
+  → Existing booking and scheduling logic (Slide 1 to Slide 4 in cart.js)
+  → Apps Script validates the booking amount (Tests/Packages sheets, Coupons, Doorstep fee)
+  → Cashfree order creation (POST https://api.cashfree.com/pg/orders)
+  → Google Sheets records pending payment (CashfreeOrders sheet & Bookings sheet)
+  → Cashfree Hosted Checkout (Official Cashfree JS v3 SDK Modal / Redirect)
+  → Customer completes payment (UPI / Card / NetBanking)
+  → Backend verifies payment with Cashfree (GET /pg/orders/{order_id} & /payments)
+  → Backend checks status (PAID), amount, currency (INR), and order ID
+  → Google Sheets updates payment status (PAYMENT_SUCCESS & CONFIRMED)
+  → Existing booking confirmation and WhatsApp flow
+
+* SECURITY RULE: If verification fails, is cancelled, or remains pending, the
+  booking is NEVER marked as CONFIRMED or PAYMENT_SUCCESS.
+
+--------------------------------------------------------------------------------
+3. STEP-BY-STEP BACKUP PROCEDURE (DO THIS FIRST)
+--------------------------------------------------------------------------------
+Before making any changes:
+
+A. Backup Website Files (Frontend):
+   1. Copy your existing `assets/js/api.js` and `assets/js/cart.js` into a backup
+      folder (e.g., `backup_pre_cashfree/api.js` and `backup_pre_cashfree/cart.js`),
+      or create a Git commit/branch in your repository.
+
+B. Backup Google Apps Script Code:
+   1. Open your Google Apps Script project.
+   2. Copy the current contents of `code.gs` and `bookings.gs` and save them locally
+      as `code.gs.bak` and `bookings.gs.bak`.
+
+C. Backup Google Sheets Database:
+   1. Open your Google Spreadsheet (`1lswBf5iPcPnt8OGA6ZfCE1tcJyqqxTaP1e2u9UwwHOw`).
+   2. Click File > Make a copy (e.g., "Selfcare_DB_Backup_Pre_Cashfree").
+   3. Do NOT change the original Spreadsheet ID.
+
+--------------------------------------------------------------------------------
+4. HOW TO ADD & UPDATE GOOGLE APPS SCRIPT FILES
+--------------------------------------------------------------------------------
+1. Open your existing Google Apps Script project connected to Selfcare Diagnostics.
+2. Add "cashfree.gs" (NEW):
+   - In the left sidebar ("Files"), click the `+` icon > Select "Script".
+   - Name the file `cashfree` (Apps Script automatically adds `.gs`).
+   - Delete the default `function myFunction() {}` stub and paste the complete
+     contents of `cashfree.gs`.
+   - Press Ctrl+S (or click the Save disk icon).
+3. Update "code.gs" (MODIFIED):
+   - Click `code.gs` in the left sidebar.
+   - Select all existing code, replace it with the complete modified `code.gs`
+     contents, and click Save.
+   - Verify there is only ONE `doGet(e)` and ONE `doPost(e)` in your entire project.
+4. Update "bookings.gs" (MODIFIED):
+   - Click `bookings.gs` in the left sidebar.
+   - Select all existing code, replace it with the complete modified `bookings.gs`
+     contents, and click Save.
+5. Initialize the Cashfree Ledger Sheet:
+   - Open `cashfree.gs`, select `initCashfreeDatabase` from the function dropdown
+     at the top toolbar, and click `Run`.
+   - This safely creates the `CashfreeOrders` tab in your existing Google Sheet
+     without touching your `Bookings`, `Tests`, or `Packages` tabs.
+
+--------------------------------------------------------------------------------
+5. WHERE TO OBTAIN CASHFREE LIVE CREDENTIALS
+--------------------------------------------------------------------------------
+1. Log in to your Cashfree Merchant Dashboard: https://merchant.cashfree.com/
+2. Ensure your account is in "Production / Live" mode (top-right environment switch).
+3. Navigate to: Developers > API Keys (under Payment Gateway).
+4. Generate or copy your Live API Keys:
+   - App ID (Client ID)
+   - Secret Key (Client Secret)
+5. Whitelist your Website Domain (`https://selfcarediagnostics.in`) if domain
+   whitelisting is enabled in your Cashfree dashboard.
+
+CRITICAL SECURITY WARNING:
+Never paste your Cashfree Secret Key into `api.js`, `cart.js`, `config.js`, `code.gs`,
+or any GitHub repository file. It must ONLY be stored in Google Apps Script Properties.
+
+--------------------------------------------------------------------------------
+6. CONFIGURE GOOGLE APPS SCRIPT PROPERTIES
+--------------------------------------------------------------------------------
+1. In your Google Apps Script editor, click the Gear icon (`Project Settings`)
+   on the left sidebar.
+2. Scroll down to the `Script Properties` section and click `Add script property`
+   (or `Edit script properties`).
+3. Add the following exact property names and values:
+
+   Property Name             Value
+   ------------------------  ---------------------------------------------------
+   CASHFREE_APP_ID           <Your_Live_Cashfree_App_ID>
+   CASHFREE_SECRET_KEY       <Your_Live_Cashfree_Secret_Key>
+   CASHFREE_ENV              PRODUCTION
+   CASHFREE_API_VERSION      2023-08-01
+   CASHFREE_RETURN_URL       https://selfcarediagnostics.in/cart.html?cf_order_id={order_id}
+   CASHFREE_WEBHOOK_URL      <Your_Existing_GAS_Web_App_Exec_URL>
+   CASHFREE_ALLOW_SANDBOX    false
+
+4. Click `Save script properties`.
+
+Note on Sandbox Testing:
+If you want to test using Cashfree Sandbox credentials before going live, set:
+  CASHFREE_ENV = SANDBOX
+  CASHFREE_ALLOW_SANDBOX = true
+  (and use your Sandbox App ID & Secret Key).
+When ready for real customers, set `CASHFREE_ENV = PRODUCTION` and `CASHFREE_ALLOW_SANDBOX = false`.
+
+--------------------------------------------------------------------------------
+7. DEPLOY A NEW APPS SCRIPT VERSION (PRESERVING YOUR EXISTING WEB APP URL)
+--------------------------------------------------------------------------------
+To keep your existing `GAS_WEB_APP_URL` in `config.js` unchanged:
+
+1. In Google Apps Script, click `Deploy` (top right) > `Manage deployments`.
+2. Select your active Web App deployment and click the Pencil icon (`Edit`).
+3. Under `Version`, click the dropdown and select `New version`.
+4. Enter a description: "Cashfree Production Payment Gateway v5.1.0".
+5. Ensure:
+   - Execute as: `Me`
+   - Who has access: `Anyone`
+6. Click `Deploy`.
+7. Your Web App `/exec` URL and Spreadsheet ID remain 100% identical.
+
+--------------------------------------------------------------------------------
+8. CONFIGURE CASHFREE RETURN URL & WEBHOOK IN CASHFREE DASHBOARD
+--------------------------------------------------------------------------------
+1. Return URL:
+   - Handled automatically per order via `order_meta.return_url`:
+     `https://selfcarediagnostics.in/cart.html?cf_order_id={order_id}`
+2. Webhook Setup (Optional but Recommended):
+   - In Cashfree Dashboard > Developers > Webhooks > Add Webhook Endpoint.
+   - Enter your Google Apps Script Web App `/exec` URL.
+   - Select API Version `2023-08-01` and enable `PAYMENT_SUCCESS_WEBHOOK`,
+     `PAYMENT_FAILED_WEBHOOK`, and `PAYMENT_USER_DROPPED_WEBHOOK`.
+   - Whenever Cashfree sends a webhook POST, `code.gs` auto-detects `body.data.order.order_id`
+     and routes it to `CashfreeAPI.handleWebhook(e)`, which re-verifies the order
+     directly with Cashfree's server API before updating Google Sheets.
+
+--------------------------------------------------------------------------------
+9. UPDATE WEBSITE FRONTEND FILES ("api.js" & "cart.js")
+--------------------------------------------------------------------------------
+1. Open your website project in Acode / your code editor.
+2. Replace `assets/js/api.js` with the modified `api.js`.
+3. Replace `assets/js/cart.js` with the modified `cart.js`.
+4. Commit and push to GitHub Pages (or upload to your hosting server).
+5. Clear browser cache / hard-refresh `https://selfcarediagnostics.in/cart.html`.
+
+--------------------------------------------------------------------------------
+10. HOW TO TEST PAYMENTS SAFELY
+--------------------------------------------------------------------------------
+⚠️ WARNING BEFORE LIVE TESTING:
+When `CASHFREE_ENV` is set to `PRODUCTION`, any payment you complete will debit
+REAL MONEY from your bank account or UPI app. Use Sandbox mode first, or test Live
+mode with a low-cost test item and verify settlement in your merchant account.
+
+Test Case A — Successful Payment:
+  1. Add a test to cart, select patient(s), choose date/slot, select Online Payment,
+     and click Confirm Booking.
+  2. Complete payment in the Cashfree Checkout modal.
+  3. Expected: Backend verifies `order_status === "PAID"` and matching amount ->
+     Toast shows "Payment verified! Booking confirmed." -> Redirects to WhatsApp
+     with booking summary.
+
+Test Case B — Cancelled Checkout (User Dropped):
+  1. Open Cashfree Checkout modal and close/cancel it without paying.
+  2. Expected: Backend checks Cashfree status (`ACTIVE` / `USER_DROPPED`) ->
+     Booking is NOT confirmed -> Cart remains intact so the customer can retry
+     Online Payment or switch to Cash.
+
+Test Case C — Failed Payment:
+  1. Attempt a payment that is declined/failed.
+  2. Expected: Backend records `PAYMENT_FAILED` -> Booking is NOT confirmed ->
+     Error toast is shown.
+
+Test Case D — Pending Payment / Browser Closed Early:
+  1. If customer closes tab or returns via `?cf_order_id=CF_...`, `cart.js`
+     automatically calls `verifyCashfreePayment` on page load and confirms the
+     booking only if Cashfree reports `PAID`.
+
+--------------------------------------------------------------------------------
+11. HOW TO VERIFY BOOKING STATUS IN GOOGLE SHEETS
+--------------------------------------------------------------------------------
+Open your Google Spreadsheet and inspect two tabs:
+
+1. `CashfreeOrders` Tab:
+   - `CashfreeOrderID`: Starts with `CF_SCDBOOK...`
+   - `ExpectedAmount`: Server-calculated amount in INR.
+   - `OrderStatus`: `ACTIVE` when created -> `PAID` upon verified payment.
+   - `PaymentStatus`: `PAYMENT_PENDING` -> `PAYMENT_SUCCESS` (or `PAYMENT_CANCELLED` / `PAYMENT_FAILED`).
+   - `CFPaymentID` & `BankReference`: Populated with real bank UTR / Cashfree payment ID.
+
+2. `Bookings` Tab:
+   - `BookingID`: `SCDBOOKxxxxxx` (or `SCDBOOKxxxxxx-1`, `SCDBOOKxxxxxx-2` for family bookings).
+   - `PaymentReference`: Matches `CashfreeOrderID` (`CF_SCDBOOK...`) for online orders, or `CASH_...` for cash.
+   - `PaymentMode`: `ONLINE_CASHFREE` or `CASH`.
+   - `PaymentStatus`: `PAYMENT_SUCCESS` (only after server verification) or `PENDING_COLLECTION` (for cash).
+   - `BookingStatus`: `CONFIRMED`.
+
+--------------------------------------------------------------------------------
+12. TROUBLESHOOTING GUIDE
+--------------------------------------------------------------------------------
+- Error: "Cashfree credentials are not configured in Script Properties"
+  Fix: Check Project Settings > Script Properties and ensure `CASHFREE_APP_ID`,
+  `CASHFREE_SECRET_KEY`, and `CASHFREE_ENV=PRODUCTION` are saved with no extra spaces.
+
+- Error: "Security validation failed: Payable amount mismatch"
+  Fix: A test/package price in the browser's cached IndexedDB/localStorage differs
+  from the Google Sheets `Tests` or `Packages` tab. Clear site data or ensure the
+  Google Sheet `OfferPrice` matches the catalogue.
+
+- Error: "Cashfree Order Creation Failed: authentication Failed"
+  Fix: Ensure you are not using Sandbox keys when `CASHFREE_ENV=PRODUCTION` (or
+  Live keys when `CASHFREE_ENV=SANDBOX`).
+
+- Error: Changes in `code.gs` or `cashfree.gs` are not taking effect
+  Fix: You must create a **New Version** under `Deploy > Manage deployments > Edit > New version`
+  in Google Apps Script after saving code changes.
+
+--------------------------------------------------------------------------------
+13. SAFE ROLLBACK PROCEDURE
+--------------------------------------------------------------------------------
+If you ever need to revert to the previous version immediately:
+
+1. Frontend Rollback:
+   - Restore your backup `assets/js/api.js` and `assets/js/cart.js` and push to
+     GitHub Pages.
+2. Backend Rollback:
+   - In Google Apps Script, go to `Deploy > Manage deployments > Edit (Pencil icon)`,
+     select your previous deployment version number from the `Version` dropdown,
+     and click `Deploy` (or paste back `code.gs.bak` and `bookings.gs.bak` and
+     deploy a new version).
+3. Database Safety:
+   - No rollback is needed for Google Sheets because all existing columns in `Bookings`
+     were preserved without destructive changes.
+================================================================================
