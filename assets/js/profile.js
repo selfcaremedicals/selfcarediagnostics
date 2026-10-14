@@ -1,31 +1,36 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v6.4.0 (Zero-Lag 0ms Instant Edition)
+ * Selfcare Diagnostics - My Account Controller v6.5.0
  * Features:
- * - 0ms Instant Local-First Render: Shows profile instantly with zero waiting time.
- * - Non-blocking background Google Sheets synchronization.
- * - Auto-resolves Age from Date of Birth or direct Age values.
- * - Full multi-tenant isolation support.
+ * - Mandatory Profile Onboarding for New Users
+ * - Blood Connect Integration (Addresses removed)
+ * - Progressive 10% Referral Engine (Up to 100% Free Health Checkup)
+ * - Strict Self-Only Cart Reward Flag
  */
 
 const ProfilePage = {
   currentUser: null,
   familyMembers: [],
-  addresses: [],
-  referralCoupons: [],
+  completedReferralsCount: 0,
+  isMandatorySetup: false,
 
   async init() {
     try {
-      // 1. INSTANT 0ms RENDER (Network call kaaga wait pannaadhu)
       this.loadAccountData();
       this.updateCartBadgeUI();
-      this.checkReferralBadges();
+      this.checkReferralStatus();
 
-      // Loading overlay irundhaal athai udanadiyaaga hide seigiradhu
       const loader = document.getElementById('profile-loading-overlay') || document.getElementById('page-loader');
       if (loader) loader.style.display = 'none';
 
-      // 2. NON-BLOCKING BACKGROUND SYNC (UI-ai block pannaamal background-la run aagum)
+      // Check if user is redirected for mandatory onboarding
+      const urlParams = new URLSearchParams(window.location.search);
+      const isParamSetup = urlParams.get('setup') === 'mandatory' || urlParams.get('setup') === '1';
+
+      if (isParamSetup || !this.isProfileFullyComplete()) {
+        this.triggerMandatoryProfileSetup();
+      }
+
       if (navigator.onLine) {
         setTimeout(() => {
           this.syncLiveCloudProfile().catch(e => console.warn('[Profile] Background sync notice:', e));
@@ -34,6 +39,36 @@ const ProfilePage = {
     } catch (err) {
       console.error('ProfilePage init error:', err);
     }
+  },
+
+  isProfileFullyComplete() {
+    if (!this.currentUser) return false;
+    const u = this.currentUser;
+    const nameValid = Boolean(u.name && u.name.trim() !== '' && u.name.trim().toLowerCase() !== 'customer account' && u.name.trim().toLowerCase() !== 'valued customer');
+    const ageValid = Boolean(u.age && Number(u.age) > 0);
+    const genderValid = Boolean(u.gender && u.gender.trim() !== '');
+    const addressValid = Boolean(u.address && u.address.trim() !== '' && u.address.toLowerCase() !== 'address not provided');
+    return Boolean(nameValid && ageValid && genderValid && addressValid);
+  },
+
+  triggerMandatoryProfileSetup() {
+    this.isMandatorySetup = true;
+    this.openMyProfileModal();
+    this.toggleSelfEditMode(true);
+
+    const closeBtn = document.getElementById('my-profile-close-btn');
+    if (closeBtn) closeBtn.style.display = 'none';
+
+    const cancelBtn = document.getElementById('self-edit-cancel-btn');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+
+    const alertBanner = document.getElementById('mandatory-setup-alert');
+    if (alertBanner) alertBanner.style.display = 'flex';
+
+    const saveBtn = document.getElementById('self-edit-save-btn');
+    if (saveBtn) saveBtn.textContent = 'Save & Proceed to Dashboard ➔';
+
+    this.safeShowToast('Welcome! Please complete your profile details to continue.', 'info');
   },
 
   safeShowToast(message, type = 'info') {
@@ -83,11 +118,10 @@ const ProfilePage = {
     }
 
     const storedUser = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-
     const rawAge = storedUser.age || storedUser.Age || vaultProfile.age || vaultProfile.Age || storedUser.dob || vaultProfile.dob || '';
 
     this.currentUser = {
-      name: storedUser.name || vaultProfile.name || 'Valued Customer',
+      name: storedUser.name || vaultProfile.name || '',
       mobile: activeMobile || storedUser.mobile || vaultProfile.mobile || '7010174890',
       email: storedUser.email || vaultProfile.email || '',
       age: this.calculateAge(rawAge),
@@ -99,7 +133,7 @@ const ProfilePage = {
 
     const currentMobile = this.currentUser.mobile;
 
-    // Load Family Members instantly
+    // Load Family Members
     try {
       let savedFam = null;
       if (currentMobile) {
@@ -124,31 +158,10 @@ const ProfilePage = {
       this.familyMembers = [];
     }
 
-    // Load Addresses instantly
-    try {
-      const savedAddr = localStorage.getItem('selfcare_saved_addresses');
-      this.addresses = savedAddr ? JSON.parse(savedAddr) : [
-        {
-          id: 'ADDR_1',
-          label: 'Primary Home',
-          line: this.currentUser.address || 'Chennai, Tamil Nadu',
-          pincode: '600001',
-          location: this.currentUser.location || ''
-        }
-      ];
-    } catch (e) {
-      this.addresses = [];
-    }
+    // Load Completed Referrals Count (0 to 10 cycle)
+    const savedCount = localStorage.getItem(`selfcare_referral_completed_${currentMobile}`) || localStorage.getItem('selfcare_completed_referrals') || '0';
+    this.completedReferralsCount = Math.min(Math.max(parseInt(savedCount, 10) || 0, 0), 10);
 
-    // Load Referral Coupons instantly
-    try {
-      const savedCoupons = localStorage.getItem('selfcare_referral_coupons');
-      this.referralCoupons = savedCoupons ? JSON.parse(savedCoupons) : [];
-    } catch (e) {
-      this.referralCoupons = [];
-    }
-
-    // Instant DOM Render
     this.renderSelfProfile();
     this.populateFormInputs();
     this.renderFamilyCards();
@@ -181,39 +194,17 @@ const ProfilePage = {
           location: p.location || p.Location || this.currentUser.location
         };
 
+        if (res.completedReferrals !== undefined) {
+          this.completedReferralsCount = Math.min(Math.max(parseInt(res.completedReferrals, 10) || 0, 0), 10);
+          localStorage.setItem(`selfcare_referral_completed_${activeMobile}`, String(this.completedReferralsCount));
+          this.checkReferralStatus();
+        }
+
         const serialized = JSON.stringify(this.currentUser);
         localStorage.setItem(`selfcare_profile_${activeMobile}`, serialized);
         localStorage.setItem('selfcare_customer_profile', serialized);
         localStorage.setItem('selfcare_permanent_user', serialized);
 
-        if (typeof Auth !== 'undefined' && Auth.savePermanentSession) {
-          Auth.savePermanentSession(this.currentUser);
-        }
-
-        if (res.familyMembers && Array.isArray(res.familyMembers)) {
-          this.familyMembers = res.familyMembers.map(m => ({
-            id: m.id || m.MemberID || m.memberId || `FAM_${Date.now()}`,
-            name: m.name || m.Name || 'Member',
-            relation: m.relation || m.Relation || 'Relative',
-            mobile: m.mobile || m.Mobile || '',
-            age: this.calculateAge(m.age || m.Age),
-            gender: m.gender || m.Gender || '',
-            bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
-            address: m.address || m.Address || '',
-            location: m.location || m.Location || ''
-          }));
-          localStorage.setItem(`selfcare_family_${activeMobile}`, JSON.stringify(this.familyMembers));
-          localStorage.setItem('selfcare_family_members', JSON.stringify(this.familyMembers));
-          this.renderFamilyCards();
-        }
-
-        if (res.referralCoupons && Array.isArray(res.referralCoupons) && res.referralCoupons.length > 0) {
-          this.referralCoupons = res.referralCoupons;
-          localStorage.setItem('selfcare_referral_coupons', JSON.stringify(this.referralCoupons));
-          this.checkReferralBadges();
-        }
-
-        // Silent DOM refresh without flickering
         this.renderSelfProfile();
         this.populateFormInputs();
       }
@@ -222,12 +213,12 @@ const ProfilePage = {
     }
   },
 
-  checkReferralBadges() {
+  checkReferralStatus() {
     const badge = document.getElementById('referral-reward-badge');
+    const discount = this.completedReferralsCount * 10;
     if (badge) {
-      const activeCount = this.referralCoupons.filter(c => c.status === 'Active').length;
-      if (activeCount > 0) {
-        badge.textContent = `${activeCount}x 10% OFF`;
+      if (discount > 0) {
+        badge.textContent = `${discount}% OFF Unlocked`;
         badge.style.display = 'inline-block';
       } else {
         badge.style.display = 'none';
@@ -238,7 +229,9 @@ const ProfilePage = {
   openMyProfileModal() {
     this.renderSelfProfile();
     this.populateFormInputs();
-    this.toggleSelfEditMode(false);
+    if (!this.isMandatorySetup) {
+      this.toggleSelfEditMode(false);
+    }
     this.openModal('modal-my-profile');
   },
 
@@ -253,14 +246,18 @@ const ProfilePage = {
     const addressEl = document.getElementById('self-view-address');
     const locEl = document.getElementById('self-view-location');
 
-    if (nameEl) nameEl.textContent = u.name || 'Valued Customer';
-    if (avatarEl) avatarEl.textContent = (u.name || 'U').charAt(0).toUpperCase();
+    const displayName = (u.name && u.name.trim()) ? u.name : 'Profile Incomplete';
+    if (nameEl) nameEl.textContent = displayName;
+    if (avatarEl) avatarEl.textContent = displayName.charAt(0).toUpperCase();
     if (mobileEl) mobileEl.textContent = u.mobile ? `+91 ${u.mobile}` : '+91 7010174890';
     if (emailEl) emailEl.textContent = u.email || 'Not provided';
     if (ageGenderEl) ageGenderEl.textContent = `${u.age ? u.age + ' Yrs' : 'Age not set'} • ${u.gender || 'Male'}`;
     if (bloodEl) bloodEl.textContent = u.bloodGroup || 'O+';
-    if (addressEl) addressEl.textContent = u.address || 'Chennai, Tamil Nadu';
+    if (addressEl) addressEl.textContent = u.address || 'Address not provided';
     if (locEl) locEl.textContent = u.location || 'Not set';
+
+    const bgConnectDisplay = document.getElementById('blood-connect-display-bg');
+    if (bgConnectDisplay) bgConnectDisplay.textContent = u.bloodGroup || 'O+';
   },
 
   populateFormInputs() {
@@ -281,20 +278,7 @@ const ProfilePage = {
     if (genderEl && u.gender) genderEl.value = u.gender;
 
     const bloodEl = document.getElementById('self-edit-blood');
-    if (bloodEl && u.bloodGroup) {
-      const rawBg = String(u.bloodGroup).trim().toLowerCase();
-      let matched = false;
-      for (let i = 0; i < bloodEl.options.length; i++) {
-        const optVal = bloodEl.options[i].value.toLowerCase();
-        const optText = bloodEl.options[i].text.toLowerCase();
-        if (optVal === rawBg || optText === rawBg || optText.replace(/\s/g, '') === rawBg.replace(/\s/g, '')) {
-          bloodEl.selectedIndex = i;
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) bloodEl.value = u.bloodGroup;
-    }
+    if (bloodEl && u.bloodGroup) bloodEl.value = u.bloodGroup;
   },
 
   toggleSelfEditMode(isEdit) {
@@ -316,8 +300,21 @@ const ProfilePage = {
     const address = document.getElementById('self-edit-address').value.trim();
     const location = document.getElementById('self-edit-location').value.trim();
 
-    if (!name) {
+    if (!name || name.toLowerCase() === 'customer account' || name.toLowerCase() === 'valued customer') {
       this.safeShowToast('Please enter your full name', 'error');
+      document.getElementById('self-edit-name').focus();
+      return;
+    }
+
+    if (!rawAge || Number(rawAge) <= 0) {
+      this.safeShowToast('Please enter a valid age', 'error');
+      document.getElementById('self-edit-age').focus();
+      return;
+    }
+
+    if (!address) {
+      this.safeShowToast('Please provide your pickup address for sample collection', 'error');
+      document.getElementById('self-edit-address').focus();
       return;
     }
 
@@ -367,10 +364,115 @@ const ProfilePage = {
     }
 
     this.renderSelfProfile();
+    this.safeShowToast('Profile details saved successfully!', 'success');
+
+    if (this.isMandatorySetup) {
+      this.isMandatorySetup = false;
+      setTimeout(() => {
+        window.location.href = 'customer.html';
+      }, 700);
+      return;
+    }
+
     this.toggleSelfEditMode(false);
-    this.safeShowToast('Profile updated successfully!', 'success');
   },
 
+  /* ================= BLOOD CONNECT MODAL ================= */
+  openBloodConnectModal() {
+    this.renderSelfProfile();
+    this.openModal('modal-blood-connect');
+  },
+
+  registerAsBloodDonor() {
+    this.safeShowToast('Thank you! Donor registration module will be active shortly.', 'success');
+  },
+
+  requestEmergencyBloodHelp() {
+    const bg = (this.currentUser && this.currentUser.bloodGroup) || 'Any';
+    const addr = (this.currentUser && this.currentUser.address) || 'Chennai';
+    const msg = `🚨 *URGENT BLOOD REQUEST - CHENNAI*\nBlood Group Needed: *${bg}*\nLocation: ${addr}\nPlease check available donors and connect immediately.`;
+    window.open(`https://wa.me/917010174890?text=${encodeURIComponent(msg)}`, '_blank');
+  },
+
+  /* ================= REFER & EARN PROGRESSIVE ENGINE ================= */
+  openReferEarnModal() {
+    const userMobile = this.currentUser && this.currentUser.mobile ? this.currentUser.mobile : '7010174890';
+    const referCode = `SC${userMobile.slice(-4)}`;
+    
+    const codeEl = document.getElementById('user-refer-code');
+    if (codeEl) codeEl.textContent = referCode;
+
+    this.renderReferralProgress();
+    this.openModal('modal-refer-earn');
+  },
+
+  renderReferralProgress() {
+    const count = this.completedReferralsCount; // 0 to 10
+    const discount = count * 10; // 0% to 100%
+
+    const countDisplay = document.getElementById('referral-count-display');
+    const barFill = document.getElementById('referral-bar-fill');
+    const discountDisplay = document.getElementById('referral-unlocked-discount');
+
+    if (countDisplay) countDisplay.textContent = `${count} / 10 Completed`;
+    if (barFill) barFill.style.width = `${count * 10}%`;
+    if (discountDisplay) {
+      discountDisplay.textContent = discount === 100 ? '100% FREE CHECKUP 🎉' : `${discount}% OFF`;
+    }
+
+    const container = document.getElementById('earned-coupons-container');
+    if (!container) return;
+
+    if (discount === 0) {
+      container.innerHTML = `
+        <div style="padding:12px; background:#F9FAFB; border:1px dashed #D1D5DB; border-radius:10px; font-size:11.5px; color:#6B7280; text-align:center;">
+          Refer your friends to unlock rewards! Each completed referral earns <strong>10% OFF</strong>, reaching <strong>100% FREE</strong> checkup at 10 referrals.
+        </div>
+      `;
+      return;
+    }
+
+    const couponCode = `REF${count * 10}FREE`;
+    const isFree = discount === 100;
+
+    container.innerHTML = `
+      <div class="coupon-reward-card ${isFree ? 'gold-reward' : ''}">
+        <div class="coupon-info-wrap">
+          <span class="coupon-code-badge">🏷️ ${couponCode} (${discount}% OFF)</span>
+          <span class="coupon-note">
+            ${isFree ? '🌟 100% FREE Comprehensive Health Checkup Unlocked!' : `🎉 ${count} referral booking(s) completed! Enjoy ${discount}% OFF.`}
+          </span>
+          <small style="font-size: 9.5px; color: #DC2626; font-weight: 700; margin-top: 2px;">
+            ⚠️ Valid strictly for Primary Account User only (Self)
+          </small>
+        </div>
+        <button type="button" class="apply-coupon-btn" onclick="ProfilePage.applyReferralBonusToCart(${discount}, '${couponCode}')">
+          🛒 Apply to Cart
+        </button>
+      </div>
+    `;
+  },
+
+  applyReferralBonusToCart(discountPercent, couponCode) {
+    localStorage.setItem('selfcare_applied_coupon', couponCode);
+    localStorage.setItem('selfcare_coupon_discount_percent', String(discountPercent));
+    localStorage.setItem('selfcare_coupon_applicable_for', 'self_only');
+
+    this.safeShowToast(`${discountPercent}% Referral Reward Applied to Cart!`, 'success');
+    this.closeModal('modal-refer-earn');
+
+    setTimeout(() => {
+      window.location.href = 'cart.html';
+    }, 600);
+  },
+
+  shareReferralWhatsApp() {
+    const code = document.getElementById('user-refer-code').textContent;
+    const msg = `Book certified clinical lab tests at doorstep with Selfcare Diagnostics! Use my referral code *${code}* during checkout to book your health tests: https://selfcarediagnostics.in`;
+    window.open(`https://wa.me/917010174890?text=${encodeURIComponent(msg)}`, '_blank');
+  },
+
+  /* ================= FAMILY DIRECTORY ================= */
   openFamilyMembersModal() {
     this.renderFamilyCards();
     this.closeMemberForm();
@@ -383,16 +485,14 @@ const ProfilePage = {
     if (!container) return;
 
     const count = this.familyMembers.length;
-    if (countEl) {
-      countEl.textContent = `${count} ${count === 1 ? 'Member' : 'Members'} Saved`;
-    }
+    if (countEl) countEl.textContent = `${count} ${count === 1 ? 'Member' : 'Members'} Saved`;
 
     if (count === 0) {
       container.innerHTML = `
         <div class="empty-family-state">
           <span>👨‍👩‍👧‍👦</span>
           <h4>No Family Members Added</h4>
-          <p>Add your family members or friends to book tests for them using their own mobile number.</p>
+          <p>Add family members or relatives to easily schedule and book diagnostic tests on their behalf.</p>
           <button type="button" class="add-member-top-btn" style="margin: 0 auto;" onclick="ProfilePage.openMemberForm()">
             <span>+</span> Add Member
           </button>
@@ -401,51 +501,39 @@ const ProfilePage = {
       return;
     }
 
-    container.innerHTML = this.familyMembers.map(m => {
-      const cleanMobile = m.mobile ? `+91 ${m.mobile}` : 'Not provided';
-      const cleanAge = m.age ? `${m.age} Yrs` : 'Age not set';
-      const cleanGender = m.gender || 'Not specified';
-      const cleanBg = m.bloodGroup || 'O+';
-      const cleanRelation = m.relation || 'Relative';
-
-      return `
-        <div class="member-display-card">
-          <div class="member-card-header">
-            <div class="member-title-group">
-              <span class="member-name-text">${Utils.escapeHtml(m.name)}</span>
-              <span class="member-relation-badge">${Utils.escapeHtml(cleanRelation)}</span>
-            </div>
-            <div class="member-actions-group">
-              <button type="button" class="card-btn-edit" onclick="ProfilePage.editFamilyMember('${m.id}')">
-                ✏️ Edit
-              </button>
-              <button type="button" class="card-btn-delete" onclick="ProfilePage.deleteFamilyMember('${m.id}')" title="Remove Member">
-                🗑️
-              </button>
-            </div>
+    container.innerHTML = this.familyMembers.map(m => `
+      <div class="member-display-card">
+        <div class="member-card-header">
+          <div class="member-title-group">
+            <span class="member-name-text">${Utils.escapeHtml(m.name)}</span>
+            <span class="member-relation-badge">${Utils.escapeHtml(m.relation || 'Relative')}</span>
           </div>
-
-          <div class="member-card-body-grid">
-            <div class="member-info-item">
-              <span class="info-label">Mobile Number</span>
-              <span class="info-val mobile-highlight">${cleanMobile}</span>
-            </div>
-            <div class="member-info-item">
-              <span class="info-label">Age & Gender</span>
-              <span class="info-val">${cleanAge} • ${cleanGender}</span>
-            </div>
-            <div class="member-info-item">
-              <span class="info-label">Blood Group</span>
-              <span class="info-val">${cleanBg}</span>
-            </div>
-            <div class="member-info-item">
-              <span class="info-label">Address</span>
-              <span class="info-val" style="font-size:10.5px;">${Utils.escapeHtml(m.address || 'Same as primary')}</span>
-            </div>
+          <div class="member-actions-group">
+            <button type="button" class="card-btn-edit" onclick="ProfilePage.editFamilyMember('${m.id}')">✏️ Edit</button>
+            <button type="button" class="card-btn-delete" onclick="ProfilePage.deleteFamilyMember('${m.id}')">🗑️</button>
           </div>
         </div>
-      `;
-    }).join('');
+
+        <div class="member-card-body-grid">
+          <div class="member-info-item">
+            <span class="info-label">Mobile Number</span>
+            <span class="info-val mobile-highlight">${m.mobile ? '+91 ' + m.mobile : 'Not provided'}</span>
+          </div>
+          <div class="member-info-item">
+            <span class="info-label">Age & Gender</span>
+            <span class="info-val">${m.age ? m.age + ' Yrs' : 'Age not set'} • ${m.gender || 'Not specified'}</span>
+          </div>
+          <div class="member-info-item">
+            <span class="info-label">Blood Group</span>
+            <span class="info-val">${m.bloodGroup || 'O+'}</span>
+          </div>
+          <div class="member-info-item">
+            <span class="info-label">Pickup Address</span>
+            <span class="info-val" style="font-size:10.5px;">${Utils.escapeHtml(m.address || 'Same as primary')}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
   },
 
   openMemberForm(memberId = null) {
@@ -522,7 +610,6 @@ const ProfilePage = {
 
     if (!mobile || mobile.length !== 10) {
       this.safeShowToast('Please enter a valid 10-digit mobile number for this member', 'error');
-      document.getElementById('family-mobile-input').focus();
       return;
     }
 
@@ -570,154 +657,30 @@ const ProfilePage = {
 
     this.renderFamilyCards();
     this.closeMemberForm();
-    this.safeShowToast(`${name} details saved & synced!`, 'success');
+    this.safeShowToast(`${name} details saved successfully!`, 'success');
   },
 
   async deleteFamilyMember(id) {
     const target = this.familyMembers.find(m => m.id === id);
     const memberName = target ? target.name : 'Member';
 
-    if (!confirm(`Are you sure you want to remove ${memberName}?`)) {
-      return;
-    }
+    if (!confirm(`Are you sure you want to remove ${memberName}?`)) return;
 
     this.familyMembers = this.familyMembers.filter(m => m.id !== id);
     const serialized = JSON.stringify(this.familyMembers);
     localStorage.setItem('selfcare_family_members', serialized);
 
     const currentMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user') || '7010174890';
-    if (currentMobile) {
-      localStorage.setItem(`selfcare_family_${currentMobile}`, serialized);
-    }
+    if (currentMobile) localStorage.setItem(`selfcare_family_${currentMobile}`, serialized);
 
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
       try {
-        await Api.request('deleteFamilyMember', {
-          id: id,
-          memberId: id,
-          primaryMobile: currentMobile
-        }, false);
-      } catch (err) {
-        console.warn('[Family] Sheet delete warning:', err);
-      }
+        await Api.request('deleteFamilyMember', { id, memberId: id, primaryMobile: currentMobile }, false);
+      } catch (err) {}
     }
 
     this.renderFamilyCards();
     this.safeShowToast(`${memberName} removed.`, 'info');
-  },
-
-  openAddressesModal() {
-    this.renderAddressesList();
-    this.openModal('modal-addresses');
-  },
-
-  renderAddressesList() {
-    const box = document.getElementById('addresses-list-container');
-    if (!box) return;
-
-    if (this.addresses.length === 0) {
-      box.innerHTML = `<p style="font-size:11px; color:#6B7280;">No pickup addresses saved yet.</p>`;
-      return;
-    }
-
-    box.innerHTML = this.addresses.map((a, idx) => `
-      <div style="padding:8px 10px; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <strong style="font-size:12px; color:#045D49;">${Utils.escapeHtml(a.label)} ${idx === 0 ? '★ Default' : ''}</strong>
-          <p style="font-size:11px; color:#374151;">${Utils.escapeHtml(a.line)} - ${a.pincode}</p>
-        </div>
-        <button onclick="ProfilePage.deleteAddress('${a.id}')" style="border:none; background:transparent; color:#dc2626; cursor:pointer;">🗑️</button>
-      </div>
-    `).join('');
-  },
-
-  addNewAddress() {
-    const label = document.getElementById('addr-label-input').value.trim() || 'Home';
-    const line = document.getElementById('addr-line-input').value.trim();
-    const pincode = document.getElementById('addr-pincode-input').value.trim();
-    const location = document.getElementById('addr-loc-input').value.trim();
-
-    if (!line) {
-      this.safeShowToast('Please enter address line', 'error');
-      return;
-    }
-
-    this.addresses.push({
-      id: `ADDR_${Date.now()}`,
-      label,
-      line,
-      pincode: pincode || '600001',
-      location
-    });
-
-    localStorage.setItem('selfcare_saved_addresses', JSON.stringify(this.addresses));
-    this.renderAddressesList();
-    document.getElementById('addr-label-input').value = '';
-    document.getElementById('addr-line-input').value = '';
-    document.getElementById('addr-pincode-input').value = '';
-    document.getElementById('addr-loc-input').value = '';
-    this.safeShowToast('Address saved successfully!', 'success');
-  },
-
-  deleteAddress(id) {
-    this.addresses = this.addresses.filter(a => a.id !== id);
-    localStorage.setItem('selfcare_saved_addresses', JSON.stringify(this.addresses));
-    this.renderAddressesList();
-    this.safeShowToast('Address removed', 'info');
-  },
-
-  openReferEarnModal() {
-    const userMobile = this.currentUser && this.currentUser.mobile ? this.currentUser.mobile : '7010174890';
-    const referCode = `SC${userMobile.slice(-4)}`;
-    const codeEl = document.getElementById('user-refer-code');
-    if (codeEl) codeEl.textContent = referCode;
-
-    this.renderEarnedCouponsList();
-    this.openModal('modal-refer-earn');
-  },
-
-  renderEarnedCouponsList() {
-    const container = document.getElementById('earned-coupons-container');
-    if (!container) return;
-
-    if (!this.referralCoupons || this.referralCoupons.length === 0) {
-      container.innerHTML = `
-        <div style="padding:10px; background:#F9FAFB; border:1px dashed #D1D5DB; border-radius:8px; font-size:11px; color:#6B7280; text-align:center;">
-          No referral rewards unlocked yet. Share your code above! Once your friend books, your 10% coupon will appear here.
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = this.referralCoupons.map((c) => `
-      <div class="coupon-reward-card">
-        <div class="coupon-info-wrap">
-          <span class="coupon-code-badge">🏷️ ${Utils.escapeHtml(c.code)}</span>
-          <span class="coupon-note">🎉 Friend <strong>${Utils.escapeHtml(c.friendName)}</strong> booked a test! Get 10% OFF</span>
-        </div>
-        <button type="button" class="apply-coupon-btn" onclick="ProfilePage.applyCouponToCart('${Utils.escapeHtml(c.code)}')">
-          🛒 Apply to Cart
-        </button>
-      </div>
-    `).join('');
-  },
-
-  applyCouponToCart(couponCode) {
-    localStorage.setItem('selfcare_applied_coupon', couponCode);
-    localStorage.setItem('selfcare_coupon_discount_percent', '10');
-
-    this.safeShowToast(`Coupon "${couponCode}" applied! (10% Discount)`, 'success');
-    this.closeModal('modal-refer-earn');
-
-    setTimeout(() => {
-      window.location.href = 'cart.html';
-    }, 700);
-  },
-
-  shareReferralWhatsApp() {
-    const code = document.getElementById('user-refer-code').textContent;
-    const msg = `Book certified lab tests at doorstep with Selfcare Diagnostics! Use my referral code *${code}* to book your test: https://selfcarediagnostics.com`;
-    window.open(`https://wa.me/917010174890?text=${encodeURIComponent(msg)}`, '_blank');
   },
 
   openGeneralInfoModal() {
@@ -741,51 +704,41 @@ const ProfilePage = {
 
   detectGpsLocation(targetInputId) {
     if (!navigator.geolocation) {
-      this.safeShowToast('GPS Geolocation not supported on this browser', 'error');
+      this.safeShowToast('GPS Geolocation is not supported by your browser', 'error');
       return;
     }
-
-    this.safeShowToast('Detecting current GPS location...', 'info');
-
+    this.safeShowToast('Detecting current GPS coordinates...', 'info');
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude.toFixed(6);
-        const lng = position.coords.longitude.toFixed(6);
-        const mapUrl = `https://maps.google.com/?q=${lat},${lng}`;
-        
+      (pos) => {
+        const url = `https://maps.google.com/?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
         const input = document.getElementById(targetInputId);
-        if (input) input.value = mapUrl;
+        if (input) input.value = url;
         this.safeShowToast('Location detected successfully!', 'success');
       },
-      (err) => {
-        console.warn('Geolocation error:', err);
-        this.safeShowToast('Could not fetch location. Please turn on GPS.', 'error');
-      },
+      () => this.safeShowToast('Unable to detect location. Please enable GPS permissions.', 'error'),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   },
 
-  openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) modal.style.display = 'flex';
+  openModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'flex';
   },
 
-  closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) modal.style.display = 'none';
+  closeModal(id) {
+    if (this.isMandatorySetup && id === 'modal-my-profile') {
+      this.safeShowToast('Please save your profile details to proceed', 'error');
+      return;
+    }
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
   },
 
   updateCartBadgeUI() {
     const badges = document.querySelectorAll('.cart-badge');
     const activeUser = localStorage.getItem('selfcare_active_user');
-    let raw = null;
-
-    if (activeUser) {
-      raw = localStorage.getItem(`selfcare_cart_${activeUser}`);
-    }
-    if (raw === null) {
-      raw = localStorage.getItem('selfcare_cart') ?? localStorage.getItem('cart');
-    }
+    let raw = activeUser ? localStorage.getItem(`selfcare_cart_${activeUser}`) : null;
+    if (raw === null) raw = localStorage.getItem('selfcare_cart') ?? localStorage.getItem('cart');
 
     let count = 0;
     try {
@@ -809,9 +762,5 @@ document.addEventListener('DOMContentLoaded', () => {
   ProfilePage.init();
 });
 
-if (typeof window !== 'undefined') {
-  window.ProfilePage = ProfilePage;
-}
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = ProfilePage;
-}
+if (typeof window !== 'undefined') window.ProfilePage = ProfilePage;
+if (typeof module !== 'undefined' && module.exports) module.exports = ProfilePage;

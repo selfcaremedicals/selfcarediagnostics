@@ -1,13 +1,12 @@
 /* file: assets/js/cart.js */
 /**
- * Selfcare Diagnostics - Slide-by-Slide Wizard Engine v9.3.0
+ * Selfcare Diagnostics - Slide-by-Slide Wizard Engine v9.4.2
  * Features:
- * 1. Direct Checkout: No intermediate confirmation popups, launches Cashfree/Cash directly.
- * 2. Direct Bookings Page Redirect: 100% bypasses WhatsApp and routes straight to bookings.html tracker.
- * 3. Multi-Patient Backend Auto-Split: Generates dedicated unique Booking IDs per family member.
- * 4. Unified Single-Click Checkout: User pays once, backend confirms and stores individual records.
- * 5. Strict Server-Side Verification: Cashfree payment is verified server-side before booking confirmation.
- * 6. Add-on Engine & Dynamic Conflict Validator preserved without changes.
+ * 1. Progressive Referral Engine (10% to 100% OFF): Valid strictly for Primary Account Holder (Self).
+ * 2. Hidden from Family Members: Referral reward coupon is hidden & auto-removed if a family member is selected.
+ * 3. New Customer Referral Rule: Friend's referral code (SCxxxx) requires minimum ₹500 test subtotal.
+ * 4. 100% Free Checkup Support & Cycle Reset: Automatically processes ₹0 orders and resets the 10-referral counter.
+ * 5. Backend Referral Tracking: Passes referralCodeUsed and referrerUserId on booking creation.
  */
 
 const CartPage = {
@@ -57,17 +56,92 @@ const CartPage = {
       code: 'SELFCARE10',
       title: 'Flat 10% Laboratory Discount',
       discountPercent: 10,
-      validUntil: '2026-10-05',
+      validUntil: '2026-12-31',
       description: 'Valid on all preventive panels and blood tests'
     },
     {
       code: 'HEALTH2026',
-      title: 'New Year Health Saver',
+      title: 'Seasonal Health Saver',
       discountPercent: 10,
-      validUntil: '2026-10-05',
-      description: 'Special seasonal checkup savings'
+      validUntil: '2026-12-31',
+      description: 'Special seasonal diagnostic checkup savings'
     }
   ],
+
+  /* ==========================================================
+     REFERRAL & SELF-ONLY VALIDATION HELPERS
+     ========================================================== */
+
+  getPrimaryUserMobile() {
+    const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
+    return String(user.mobile || user.phone || localStorage.getItem('selfcare_active_user') || '7010174890')
+      .replace(/\D/g, '')
+      .slice(-10);
+  },
+
+  getOwnReferralCode() {
+    const mobile = this.getPrimaryUserMobile();
+    return `SC${mobile.slice(-4)}`.toUpperCase();
+  },
+
+  getCompletedReferralsCount() {
+    const mobile = this.getPrimaryUserMobile();
+    const raw = localStorage.getItem(`selfcare_referral_completed_${mobile}`) ||
+                localStorage.getItem('selfcare_completed_referrals') ||
+                '0';
+    const parsed = parseInt(raw, 10);
+    return isNaN(parsed) ? 0 : Math.min(Math.max(parsed, 0), 10);
+  },
+
+  /**
+   * Returns true ONLY if the Primary Account Holder ('SELF') is the sole selected patient
+   */
+  isOnlySelfSelected() {
+    return Array.isArray(this.selectedPatientIds) &&
+           this.selectedPatientIds.length === 1 &&
+           this.selectedPatientIds[0] === 'SELF';
+  },
+
+  /**
+   * Checks if coupon code is a progressive referrer reward (REF10FREE ... REF100FREE)
+   */
+  isProgressiveReferralCoupon(code) {
+    if (!code) return false;
+    return /^REF(10|20|30|40|50|60|70|80|90|100)FREE$/i.test(String(code).trim());
+  },
+
+  getProgressiveCouponPercent(code) {
+    if (!this.isProgressiveReferralCoupon(code)) return 0;
+    const match = String(code).trim().match(/^REF(\d+)FREE$/i);
+    return match ? Math.min(Math.max(parseInt(match[1], 10), 10), 100) : 0;
+  },
+
+  /**
+   * Checks if code is a friend's referral code (e.g. SC4890)
+   */
+  isFriendReferralCode(code) {
+    if (!code) return false;
+    return /^SC\d{4}$/i.test(String(code).trim());
+  },
+
+  getNewTestsSubtotal() {
+    return this.cart.reduce((sum, item) => {
+      if (item.isExistingBookingItem) return sum;
+      return sum + Number(item.price || item.OfferPrice || 0);
+    }, 0);
+  },
+
+  /**
+   * Resets the referral counter after 100% (or progressive reward) redemption so a new 0/10 cycle begins
+   */
+  resetReferralCycleAfterRedemption() {
+    const mobile = this.getPrimaryUserMobile();
+    localStorage.setItem(`selfcare_referral_completed_${mobile}`, '0');
+    localStorage.setItem('selfcare_completed_referrals', '0');
+    localStorage.removeItem('selfcare_applied_coupon');
+    localStorage.removeItem('selfcare_coupon_discount_percent');
+    localStorage.removeItem('selfcare_coupon_applicable_for');
+  },
 
   calculateAge(dobOrAge) {
     if (!dobOrAge) return '';
@@ -103,9 +177,9 @@ const CartPage = {
       this.detectAddonBookingMode();
       this.loadCartData();
       this.loadPatientAndAddressData();
+      this.restorePersistedWizardState();
       this.checkAutoAppliedCoupon();
       this.populateTimeSlotsDropdown();
-      this.restorePersistedWizardState();
       this.renderCartUI();
       this.updateCartBadgeUI();
       this.setupUPIAppReturnListeners();
@@ -123,8 +197,8 @@ const CartPage = {
       const savedSlide = parseInt(sessionStorage.getItem('selfcare_cart_slide'), 10);
 
       if (this.isAddonMode) {
-        this.goToSlide(3, true);
-        this.updateAddonStepperUI();
+        this.goToSlide(1, true);
+        this.applyAddonLocksToUI();
       } else if (requestedSlide && requestedSlide >= 1 && requestedSlide <= 4) {
         this.goToSlide(requestedSlide, true);
       } else if (savedSlide && savedSlide >= 1 && savedSlide <= 4 && this.cart.length > 0) {
@@ -223,12 +297,7 @@ const CartPage = {
   goToSlide(slideIndex, force = false) {
     if (slideIndex < 1 || slideIndex > this.totalSlides) return;
 
-    if (this.isAddonMode && slideIndex < 3) {
-      this.safeShowToast('Patient details and collection mode are locked to this booking', 'info');
-      return;
-    }
-
-    if (!force && !this.isAddonMode) {
+    if (!force) {
       if (slideIndex > 1) {
         if (!this.cart || this.cart.length === 0) {
           this.safeShowToast('Your cart is empty', 'error');
@@ -241,8 +310,7 @@ const CartPage = {
       }
       if (slideIndex > 2) {
         if (!this.selectedPatientPhone || this.selectedPatientPhone.length !== 10) {
-          this.safeShowToast(`Please enter a valid 10-digit mobile number for ${this.selectedPatientName}`, 'error');
-          return;
+          this.selectedPatientPhone = this.getPrimaryUserMobile() || '7010174890';
         }
         if (!this.selectedTimeSlot) {
           this.safeShowToast('Please select a 30-minute collection time slot', 'error');
@@ -275,35 +343,44 @@ const CartPage = {
     }
 
     this.updateBottomControlBarUI();
+
+    if (this.isAddonMode) {
+      this.applyAddonLocksToUI();
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
   tryJumpToSlide(targetSlide) {
-    if (this.isAddonMode && targetSlide < 3) {
-      this.safeShowToast('Collection type & Patient details are locked for this booking', 'info');
-      return;
-    }
     this.goToSlide(targetSlide);
   },
 
-  updateAddonStepperUI() {
-    const node1 = document.getElementById('step-node-1');
-    const node2 = document.getElementById('step-node-2');
-    const conn1 = document.getElementById('connector-1');
-    const conn2 = document.getElementById('connector-2');
+  applyAddonLocksToUI() {
+    if (!this.isAddonMode) return;
 
-    if (node1) {
-      node1.classList.add('locked', 'completed');
-      node1.style.pointerEvents = 'none';
-      node1.title = 'Locked with booking';
-    }
-    if (node2) {
-      node2.classList.add('locked', 'completed');
-      node2.style.pointerEvents = 'none';
-      node2.title = 'Locked with booking';
-    }
-    if (conn1) conn1.classList.add('filled');
-    if (conn2) conn2.classList.add('filled');
+    // 1. Patient selection chips disabled / locked in Slide 1
+    document.querySelectorAll('.patient-chip').forEach(el => {
+      el.style.pointerEvents = 'none';
+      el.style.opacity = '0.85';
+    });
+
+    // 2. Collection mode cards disabled in Slide 4
+    const homeCard = document.getElementById('card-mode-home');
+    const labCard = document.getElementById('card-mode-lab');
+    if (homeCard) { homeCard.style.pointerEvents = 'none'; homeCard.style.opacity = '0.85'; }
+    if (labCard) { labCard.style.pointerEvents = 'none'; labCard.style.opacity = '0.85'; }
+
+    // 3. Slot day buttons & time slot dropdown locked in Slide 2
+    const todayBtn = document.getElementById('slot-day-today');
+    const tomorrowBtn = document.getElementById('slot-day-tomorrow');
+    const slotSelect = document.getElementById('cart-slot-select');
+    if (todayBtn) todayBtn.style.pointerEvents = 'none';
+    if (tomorrowBtn) tomorrowBtn.style.pointerEvents = 'none';
+    if (slotSelect) slotSelect.disabled = true;
+
+    // 4. Address edit button disabled
+    const editAddrBtn = document.getElementById('edit-address-btn');
+    if (editAddrBtn) editAddrBtn.style.display = 'none';
   },
 
   updateBottomControlBarUI() {
@@ -313,12 +390,13 @@ const CartPage = {
     if (!backBtn || !nextBtn) return;
 
     if (this.currentSlide === 1) {
-      backBtn.style.visibility = 'hidden';
-      backBtn.classList.remove('exit-bar-btn');
-    } else if (this.isAddonMode && this.currentSlide === 3) {
-      backBtn.style.visibility = 'visible';
-      backBtn.textContent = '✕ Exit';
-      backBtn.classList.add('exit-bar-btn');
+      backBtn.style.visibility = this.isAddonMode ? 'visible' : 'hidden';
+      if (this.isAddonMode) {
+        backBtn.textContent = '✕ Exit';
+        backBtn.classList.add('exit-bar-btn');
+      } else {
+        backBtn.classList.remove('exit-bar-btn');
+      }
     } else {
       backBtn.style.visibility = 'visible';
       backBtn.textContent = '← Back';
@@ -341,7 +419,7 @@ const CartPage = {
   },
 
   handleBarBack() {
-    if (this.isAddonMode && this.currentSlide === 3) {
+    if (this.isAddonMode && this.currentSlide === 1) {
       this.exitAddonMode();
       return;
     }
@@ -351,9 +429,6 @@ const CartPage = {
     }
   },
 
-  /**
-   * Slide 4-il confirm seithavudan popup illamal direct-ah checkout pogum
-   */
   handleFloatingActionButton() {
     if (this.currentSlide === 1) {
       if (!this.cart || this.cart.length === 0) {
@@ -364,11 +439,13 @@ const CartPage = {
         this.safeShowToast('Please select at least one family member', 'error');
         return;
       }
+      if (this.isAddonMode && (!this.selectedPatientPhone || this.selectedPatientPhone.length !== 10)) {
+        this.selectedPatientPhone = this.getPrimaryUserMobile() || '7010174890';
+      }
       this.goToSlide(2);
     } else if (this.currentSlide === 2) {
       if (!this.selectedPatientPhone || this.selectedPatientPhone.length !== 10) {
-        this.safeShowToast(`Please enter a valid 10-digit mobile number for ${this.selectedPatientName}`, 'error');
-        return;
+        this.selectedPatientPhone = this.getPrimaryUserMobile() || '7010174890';
       }
       if (!this.selectedTimeSlot) {
         this.safeShowToast('Please select a 30-minute collection time slot', 'error');
@@ -384,9 +461,9 @@ const CartPage = {
     } else if (this.currentSlide === 4) {
       if (!this.collectionType) {
         this.safeShowToast('Please select Home Pickup or Lab Walk-in', 'error');
+        this.goToSlide(4);
         return;
       }
-      // Popup ethuvum open seiyamaal direct checkout
       this.handleProceedToCheckout();
     }
   },
@@ -437,13 +514,7 @@ const CartPage = {
     if (this.collectionType === 'lab') return 0;
     if (this.cart.length === 0) return 0;
 
-    let total = subtotal;
-    if (total === null) {
-      total = this.cart.reduce((sum, item) => {
-        if (item.isExistingBookingItem) return sum;
-        return sum + Number(item.price || item.OfferPrice || 0);
-      }, 0);
-    }
+    let total = subtotal !== null ? subtotal : this.getNewTestsSubtotal();
 
     if (total >= 500) {
       return 0;
@@ -502,24 +573,62 @@ const CartPage = {
 
     const labSavings = Math.max(0, totalMrp - subtotalNewTests);
 
+    if (this.appliedCoupon && subtotalNewTests > 0) {
+      const cleanCode = String(this.appliedCoupon).trim().toUpperCase();
+
+      if (this.isProgressiveReferralCoupon(cleanCode)) {
+        if (!this.isOnlySelfSelected()) {
+          this.appliedCoupon = null;
+          localStorage.removeItem('selfcare_applied_coupon');
+          localStorage.removeItem('selfcare_coupon_discount_percent');
+          localStorage.removeItem('selfcare_coupon_applicable_for');
+          this.safeShowToast('Referral reward removed: Valid strictly for Primary Account Holder (Self) only.', 'error');
+        }
+      }
+
+      if (this.appliedCoupon && this.isFriendReferralCode(cleanCode)) {
+        if (subtotalNewTests < 500) {
+          this.appliedCoupon = null;
+          localStorage.removeItem('selfcare_applied_coupon');
+          this.safeShowToast('Referral code removed: Minimum test order of ₹500 is required.', 'error');
+        }
+      }
+    }
+
     let couponDiscount = 0;
     let couponTitle = '';
 
     if (this.appliedCoupon && subtotalNewTests > 0) {
-      const clean = String(this.appliedCoupon).trim();
-      if (clean.toLowerCase().startsWith('selfcare10%')) {
-        const friend = clean.substring(12);
+      const clean = String(this.appliedCoupon).trim().toUpperCase();
+
+      if (this.isProgressiveReferralCoupon(clean)) {
+        const unlockedMaxPercent = this.getCompletedReferralsCount() * 10;
+        const requestedPercent = this.getProgressiveCouponPercent(clean);
+        const effectivePercent = unlockedMaxPercent > 0 ? Math.min(requestedPercent, unlockedMaxPercent) : requestedPercent;
+
+        couponDiscount = Math.round(subtotalNewTests * (effectivePercent / 100));
+        couponTitle = `Referral Reward (${effectivePercent}% OFF - Self Only):`;
+      } else if (this.isFriendReferralCode(clean)) {
         couponDiscount = Math.round(subtotalNewTests * 0.10);
-        couponTitle = `Referral Discount (10% - Referred by ${friend.toUpperCase()}):`;
+        couponTitle = `Referral Code (${clean} - 10% OFF):`;
+      } else if (clean.toLowerCase().startsWith('selfcare10%')) {
+        const friend = clean.substring(11);
+        couponDiscount = Math.round(subtotalNewTests * 0.10);
+        couponTitle = `Referral Discount (10% - ${friend}):`;
       } else {
         couponDiscount = Math.round(subtotalNewTests * 0.10);
         couponTitle = `Coupon Discount (${clean}):`;
       }
     }
-    this.couponDiscountAmount = couponDiscount;
 
+    this.couponDiscountAmount = couponDiscount;
     this.onlineDiscountAmount = 0;
     this.doorstepCharge = this.calculateDoorstepCharge(subtotalNewTests);
+
+    if (this.appliedCoupon && this.getProgressiveCouponPercent(this.appliedCoupon) === 100) {
+      this.doorstepCharge = 0;
+    }
+
     this.updateHomeCollectionBadge(subtotalNewTests);
 
     const finalPayable = Math.max(0, subtotalNewTests - couponDiscount + this.doorstepCharge);
@@ -591,7 +700,7 @@ const CartPage = {
 
     this.selectedPatientId = target.id || 'SELF';
     this.selectedPatientName = target.name || 'Self';
-    this.selectedPatientPhone = target.mobile || '';
+    this.selectedPatientPhone = target.mobile || this.getPrimaryUserMobile() || '';
     this.selectedPatientEmail = target.email || '';
     this.selectedPatientRelation = target.relation || 'Self';
     this.selectedPatientAge = target.age || '';
@@ -640,6 +749,7 @@ const CartPage = {
     }
 
     this.renderItemsList();
+    this.calculateBillSummary();
   },
 
   selectPatient(id, persist = true) {
@@ -671,7 +781,7 @@ const CartPage = {
     }
 
     if (phoneEl) {
-      const primaryPhone = this.selectedPatientPhone || (selectedMembers[0] && selectedMembers[0].mobile) || '';
+      const primaryPhone = this.selectedPatientPhone || (selectedMembers[0] && selectedMembers[0].mobile) || this.getPrimaryUserMobile() || '';
       phoneEl.textContent = primaryPhone ? `+91 ${primaryPhone}` : 'Not set';
     }
 
@@ -741,6 +851,11 @@ const CartPage = {
   assignItemPatient(itemIndex, targetPatientId) {
     if (itemIndex >= 0 && itemIndex < this.cart.length) {
       const targetItem = this.cart[itemIndex];
+
+      if (targetItem.isExistingBookingItem) {
+        this.safeShowToast('Already booked tests cannot be reassigned', 'info');
+        return;
+      }
 
       if (typeof ConflictValidator !== 'undefined') {
         try {
@@ -817,25 +932,25 @@ const CartPage = {
             const mrp = isPaidItem ? Number(item.originalPrice || 0) : Number(item.mrp || item.MRP || offerPrice);
 
             return `
-              <div class="cart-item-card glass-panel-3d-item">
+              <div class="cart-item-card glass-panel-3d-item ${isPaidItem ? 'existing-locked-item' : ''}">
                 <div class="item-main-details">
                   <div class="item-meta-row">
                     <span class="type-badge ${isPackage ? 'package-type' : 'test-type'}">
                       ${isPackage ? 'PACKAGE' : 'TEST'}
                     </span>
                     <span class="item-code-tag">${Utils.escapeHtml(item.code || item.TestCode || item.PackageCode || '')}</span>
-                    ${isPaidItem ? `<span class="paid-tag">PAID</span>` : ''}
+                    ${isPaidItem ? `<span class="paid-tag" style="background:#078866; color:#fff; padding:2px 6px; border-radius:4px; font-size:9px; font-weight:800;">🔒 EXISTING (LOCKED)</span>` : ''}
                   </div>
                   <h4 class="item-title">${Utils.escapeHtml(name)}</h4>
                   <div class="item-price-row">
                     ${(!isPaidItem && mrp > offerPrice) ? `<span class="item-mrp-strike">${Utils.formatCurrency(mrp)}</span>` : ''}
                     <span class="item-offer-price">${Utils.formatCurrency(offerPrice)}</span>
-                    ${isPaidItem ? `<span class="item-paid-note">(Paid: ${Utils.formatCurrency(item.originalPrice || 0)})</span>` : ''}
+                    ${isPaidItem ? `<span class="item-paid-note">(Already Paid: ${Utils.formatCurrency(item.originalPrice || 0)})</span>` : ''}
                   </div>
                 </div>
 
                 <div class="item-actions-row">
-                  ${effectiveMembers.length > 1 ? `
+                  ${(!isPaidItem && effectiveMembers.length > 1) ? `
                     <select class="patient-reassign-select" onchange="CartPage.assignItemPatient(${item.originalIndex}, this.value)">
                       ${effectiveMembers.map(m => `
                         <option value="${m.id}" ${m.id === member.id ? 'selected' : ''}>
@@ -846,7 +961,7 @@ const CartPage = {
                   ` : ''}
 
                   ${isPaidItem ? `
-                    <span class="item-paid-badge">✓ Paid</span>
+                    <span class="item-paid-badge" style="color:#078866; font-size:11px; font-weight:800;">🔒 Cannot Remove</span>
                   ` : `
                     <button type="button" class="item-delete-btn" onclick="CartPage.removeItem(${item.originalIndex})" title="Remove item">🗑️</button>
                   `}
@@ -925,8 +1040,9 @@ const CartPage = {
         originalPrice: Number(item.price || item.OfferPrice || 0),
         mrp: Number(item.mrp || item.MRP || item.price || 0),
         type: item.type || 'test',
-        patientId: item.patientId || 'SELF',
-        isExistingBookingItem: true
+        patientId: item.patientId || this.addonBooking.patientId || 'SELF',
+        isExistingBookingItem: true,
+        removable: false
       }));
 
       this.existingBookingItems = existingMarked;
@@ -1028,7 +1144,7 @@ const CartPage = {
       const b = this.addonBooking;
       this.selectedPatientIds = [b.patientId || 'SELF'];
       this.selectedPatientName = b.patientName || selfPatient.name;
-      this.selectedPatientPhone = b.patientPhone || selfPatient.mobile;
+      this.selectedPatientPhone = b.patientPhone || b.mobile || primaryMobile || selfPatient.mobile || '7010174890';
       this.selectedPatientEmail = b.patientEmail || '';
       this.selectedPatientRelation = b.relation || 'Self';
       this.selectedPatientId = b.patientId || 'SELF';
@@ -1037,6 +1153,7 @@ const CartPage = {
       this.currentPickupAddress = b.address || selfPatient.address;
       this.currentPickupLocation = b.location?.link || b.location || 'Not set';
       this.collectionType = b.collectionType || 'home';
+      this.selectedTimeSlot = b.timeSlot || '';
     } else {
       this.syncPrimaryPatientDetails();
       this.currentPickupAddress = user.address || user.Address || 'Chennai, Tamil Nadu';
@@ -1049,7 +1166,13 @@ const CartPage = {
   checkAutoAppliedCoupon() {
     const savedCoupon = localStorage.getItem('selfcare_applied_coupon');
     if (savedCoupon && savedCoupon.trim()) {
-      this.appliedCoupon = savedCoupon.trim();
+      const clean = savedCoupon.trim().toUpperCase();
+      if (this.isProgressiveReferralCoupon(clean) && !this.isOnlySelfSelected()) {
+        localStorage.removeItem('selfcare_applied_coupon');
+        this.appliedCoupon = null;
+        return;
+      }
+      this.appliedCoupon = clean;
     }
   },
 
@@ -1170,11 +1293,23 @@ const CartPage = {
     const banner = document.getElementById('applied-coupon-banner');
     const inputBox = document.getElementById('coupon-input-box');
     const codeText = document.getElementById('applied-coupon-code-text');
+    const descText = document.getElementById('applied-coupon-desc-text');
 
     if (this.appliedCoupon) {
       if (banner) banner.style.display = 'flex';
       if (inputBox) inputBox.style.display = 'none';
       if (codeText) codeText.textContent = this.appliedCoupon;
+
+      if (descText) {
+        if (this.isProgressiveReferralCoupon(this.appliedCoupon)) {
+          const pct = this.getProgressiveCouponPercent(this.appliedCoupon);
+          descText.textContent = `${pct}% Referral Reward Applied (Self Only)`;
+        } else if (this.isFriendReferralCode(this.appliedCoupon)) {
+          descText.textContent = `10% Friend Referral Applied (Min. ₹500 Verified)`;
+        } else {
+          descText.textContent = `Discount Applied Successfully`;
+        }
+      }
     } else {
       if (banner) banner.style.display = 'none';
       if (inputBox) inputBox.style.display = 'flex';
@@ -1229,9 +1364,9 @@ const CartPage = {
     }
   },
 
-  // ==========================================================
-  // DIRECT CHECKOUT (NO INTERMEDIATE CONFIRMATION POPUPS)
-  // ==========================================================
+  /* ==========================================================
+     DIRECT CHECKOUT (HANDLES CASH, CASHFREE & ₹0 100% FREE)
+     ========================================================== */
   async handleProceedToCheckout() {
     if (this.isProcessingCheckout) return;
 
@@ -1260,9 +1395,7 @@ const CartPage = {
     }
 
     if (!this.selectedPatientPhone || this.selectedPatientPhone.length !== 10) {
-      this.safeShowToast(`Please enter a valid 10-digit mobile number for ${this.selectedPatientName}`, 'error');
-      if (!this.isAddonMode) this.goToSlide(2);
-      return;
+      this.selectedPatientPhone = this.getPrimaryUserMobile() || '7010174890';
     }
 
     if (this.collectionType === 'home' && (!this.currentPickupAddress || this.currentPickupAddress.trim() === '')) {
@@ -1282,6 +1415,8 @@ const CartPage = {
       this.goToSlide(4);
       return;
     }
+
+    this.calculateBillSummary();
 
     this.isProcessingCheckout = true;
 
@@ -1303,7 +1438,7 @@ const CartPage = {
 
     const targetDate = new Date();
     if (this.selectedSlotDay === 'Tomorrow') targetDate.setDate(targetDate.getDate() + 1);
-    const collectionDateStr = this.isAddonMode ? this.addonBooking.collectionDate : targetDate.toISOString().split('T')[0];
+    const collectionDateStr = this.isAddonMode && this.addonBooking ? this.addonBooking.collectionDate : targetDate.toISOString().split('T')[0];
 
     const finalAddress = this.collectionType === 'lab' ? 'Direct Lab Visit (Selfcare Diagnostics, Chennai)' : this.currentPickupAddress;
     const finalLocation = this.collectionType === 'lab' ? 'Lab Center' : this.currentPickupLocation;
@@ -1316,11 +1451,19 @@ const CartPage = {
 
     const defaultPatientId = (selectedMembers[0] && selectedMembers[0].id) || 'SELF';
 
+    const cleanApplied = (this.appliedCoupon || '').trim().toUpperCase();
+    const isFriendRef = this.isFriendReferralCode(cleanApplied);
+    const isSelfRewardRedeem = this.isProgressiveReferralCoupon(cleanApplied);
+    const referralCodeUsed = isFriendRef ? cleanApplied : '';
+    const referrerUserId = isFriendRef ? cleanApplied : '';
+    const isReferralEligible = Boolean(isFriendRef && subtotalNew >= 500);
+    const redeemedReferralPercent = isSelfRewardRedeem ? this.getProgressiveCouponPercent(cleanApplied) : 0;
+
     const patientBookingsData = [];
 
     selectedMembers.forEach((member, idx) => {
       const memberItems = newItems.filter(item => (item.patientId || defaultPatientId) === member.id);
-      if (memberItems.length === 0) return;
+      if (memberItems.length === 0 && !this.isAddonMode) return;
 
       const mSubtotal = memberItems.reduce((sum, it) => sum + Number(it.price || it.OfferPrice || 0), 0);
       const mDiscount = subtotalNew > 0 ? Math.round((mSubtotal / subtotalNew) * couponDiscount) : 0;
@@ -1357,7 +1500,12 @@ const CartPage = {
         onlineDiscount: 0,
         doorstepCharge: mDoorstep,
         finalAmount: mFinal,
-        couponCode: this.appliedCoupon || ''
+        couponCode: cleanApplied,
+        referralCodeUsed: referralCodeUsed,
+        referrerUserId: referrerUserId,
+        isReferralEligible: isReferralEligible,
+        redeemedReferralReward: isSelfRewardRedeem,
+        redeemedReferralPercent: redeemedReferralPercent
       });
     });
 
@@ -1391,16 +1539,18 @@ const CartPage = {
         onlineDiscount: 0,
         doorstepCharge: doorstepCharge,
         finalAmount: finalPayable,
-        couponCode: this.appliedCoupon || ''
+        couponCode: cleanApplied,
+        referralCodeUsed: referralCodeUsed,
+        referrerUserId: referrerUserId,
+        isReferralEligible: isReferralEligible,
+        redeemedReferralReward: isSelfRewardRedeem,
+        redeemedReferralPercent: redeemedReferralPercent
       });
     }
 
-    // ==========================================================
-    // PATHWAY A: CASH ON COLLECTION
-    // ==========================================================
-    if (this.selectedPaymentMode === 'cash') {
+    if (this.selectedPaymentMode === 'cash' || finalPayable === 0) {
       try {
-        const createdIds = [];
+        const isFreeRewardOrder = finalPayable === 0 && isSelfRewardRedeem;
 
         for (const pData of patientBookingsData) {
           const payload = {
@@ -1408,8 +1558,8 @@ const CartPage = {
             isAddon: this.isAddonMode,
             addonBookingId: this.addonBookingId,
             targetBookingId: this.addonBookingId,
-            paymentMode: 'CASH',
-            paymentStatus: 'PENDING_COLLECTION',
+            paymentMode: isFreeRewardOrder ? 'REFERRAL_100_FREE' : 'CASH',
+            paymentStatus: isFreeRewardOrder ? 'PAYMENT_SUCCESS' : 'PENDING_COLLECTION',
             bookingStatus: 'CONFIRMED'
           };
 
@@ -1431,15 +1581,20 @@ const CartPage = {
             currentStage: 1,
             items: pData.items
           });
+        }
 
-          createdIds.push(resBookingId);
+        if (isSelfRewardRedeem) {
+          this.resetReferralCycleAfterRedemption();
         }
 
         this.saveBookedSlot(collectionDateStr, this.selectedTimeSlot);
-        this.safeShowToast('Booking confirmed successfully!', 'success');
+        this.safeShowToast(
+          isFreeRewardOrder ? '100% Free Referral Checkup Booked! Counter reset to 0/10.' : 'Booking confirmed successfully!',
+          'success'
+        );
         this.finalizeConfirmedMultiBooking(patientBookingsData);
       } catch (err) {
-        console.error('Cash booking creation failed:', err);
+        console.error('Booking creation failed:', err);
         this.safeShowToast(err.message || 'Failed to confirm booking. Please try again.', 'error');
       } finally {
         this.resetCheckoutButtonState();
@@ -1447,9 +1602,6 @@ const CartPage = {
       return;
     }
 
-    // ==========================================================
-    // PATHWAY B: CASHFREE PRODUCTION (LIVE) CHECKOUT
-    // ==========================================================
     try {
       if (typeof Api === 'undefined' || typeof Api.createCashfreeOrder !== 'function') {
         throw new Error('Cashfree payment service (Api.createCashfreeOrder) is not available.');
@@ -1481,7 +1633,12 @@ const CartPage = {
         onlineDiscount: 0,
         doorstepCharge: doorstepCharge,
         finalAmount: finalPayable,
-        couponCode: this.appliedCoupon || '',
+        couponCode: cleanApplied,
+        referralCodeUsed: referralCodeUsed,
+        referrerUserId: referrerUserId,
+        isReferralEligible: isReferralEligible,
+        redeemedReferralReward: isSelfRewardRedeem,
+        redeemedReferralPercent: redeemedReferralPercent,
         returnUrl: cleanCanonicalReturnBase
       };
 
@@ -1511,7 +1668,8 @@ const CartPage = {
         address: finalAddress,
         location: finalLocation,
         doorstepCharge: Number(cfOrderRes.doorstepCharge !== undefined ? cfOrderRes.doorstepCharge : doorstepCharge),
-        appliedCoupon: this.appliedCoupon || '',
+        appliedCoupon: cleanApplied,
+        redeemedReferralReward: isSelfRewardRedeem,
         isAddon: this.isAddonMode,
         addonBookingId: this.addonBookingId,
         newItems: newItems,
@@ -1536,7 +1694,6 @@ const CartPage = {
         console.warn('Cashfree checkout notice:', checkoutResult.error);
       }
 
-      // Check payment status on the backend automatically
       await this.verifyAndFinalizeCashfreePayment(
         this.currentPendingBooking.cashfreeOrderId,
         this.currentPendingBooking.bookingId
@@ -1571,10 +1728,6 @@ const CartPage = {
     await this.verifyAndFinalizeCashfreePayment(cfOrderIdFromUrl, bookingId);
   },
 
-  /**
-   * Cashfree Server verification logic.
-   * If success -> directly forwards to bookings.html without opening any popup or WhatsApp!
-   */
   async verifyAndFinalizeCashfreePayment(cashfreeOrderId, bookingId = '') {
     if (this.isVerifyingPayment) return;
     this.isVerifyingPayment = true;
@@ -1625,6 +1778,10 @@ const CartPage = {
           });
         }
 
+        if (pending.redeemedReferralReward || this.isProgressiveReferralCoupon(this.appliedCoupon)) {
+          this.resetReferralCycleAfterRedemption();
+        }
+
         if (pending.collectionDate && pending.timeSlot) {
           this.saveBookedSlot(pending.collectionDate, pending.timeSlot);
         }
@@ -1634,7 +1791,6 @@ const CartPage = {
         return;
       }
 
-      // Non-success case: Toast message mattum kaattappadum (Entha pop-up-um varathu!)
       const statusMsg = (verifyRes && verifyRes.message)
         ? verifyRes.message
         : 'Payment is still pending or not completed. You can retry or choose Cash on Collection.';
@@ -1662,7 +1818,6 @@ const CartPage = {
       if (!this.currentPendingBooking) return;
 
       const timeElapsed = Date.now() - this.intentLaunchTime;
-      // App thirumbi focus aanaal background-il server-idam verify seiyum (Popup open aagathu)
       if (timeElapsed > 3000 && !this.isVerifyingPayment) {
         this.verifyAndFinalizeCashfreePayment(
           this.currentPendingBooking.cashfreeOrderId,
@@ -1678,9 +1833,6 @@ const CartPage = {
     window.addEventListener('focus', handleAppFocusOrVisibility);
   },
 
-  /**
-   * DIRECT REDIRECT TO BOOKINGS TRACKER (WhatsApp bypass)
-   */
   finalizeConfirmedMultiBooking(patientBookingsData) {
     this.clearPersistedWizardState();
     this.cart = [];
@@ -1692,7 +1844,6 @@ const CartPage = {
       ? patientBookingsData[0].bookingId
       : '';
 
-    // Direct Bookings Tracking Page Redirection
     setTimeout(() => {
       if (targetBookingId) {
         window.location.href = `bookings.html?id=${encodeURIComponent(targetBookingId)}`;
@@ -1810,6 +1961,10 @@ const CartPage = {
     } catch (e) {}
   },
 
+  /* ==========================================================
+     COUPONS & PROGRESSIVE REFERRAL MODAL (HIDDEN FOR FAMILY)
+     ========================================================== */
+
   openAvailableCouponsModal() {
     const container = document.getElementById('available-coupons-list');
     if (!container) return;
@@ -1817,21 +1972,20 @@ const CartPage = {
     const todayStr = new Date().toISOString().split('T')[0];
     let allCoupons = [...this.adminCoupons];
 
-    try {
-      const savedRef = localStorage.getItem('selfcare_referral_coupons');
-      if (savedRef) {
-        const refs = JSON.parse(savedRef);
-        refs.forEach(r => {
-          allCoupons.unshift({
-            code: r.code,
-            title: `Referral Reward: ${r.friendName}`,
-            discountPercent: 10,
-            validUntil: '2026-12-31',
-            description: `Earned via friend ${r.friendName}'s booking`
-          });
-        });
-      }
-    } catch (e) {}
+    const completedReferrals = this.getCompletedReferralsCount();
+    if (this.isOnlySelfSelected() && completedReferrals > 0) {
+      const discountPercent = completedReferrals * 10;
+      const refCode = `REF${discountPercent}FREE`;
+      allCoupons.unshift({
+        code: refCode,
+        title: `Referral Bonus: ${discountPercent}% OFF (Self Only)`,
+        discountPercent: discountPercent,
+        validUntil: '2026-12-31',
+        description: discountPercent === 100
+          ? '🎉 100% FREE Checkup unlocked via 10 referrals! Valid strictly for Primary Account Holder (Self).'
+          : `Unlocked via ${completedReferrals} completed referral booking(s). Valid strictly for Primary Account Holder (Self).`
+      });
+    }
 
     container.innerHTML = allCoupons.map(c => {
       const isExpired = c.validUntil < todayStr;
@@ -1857,11 +2011,42 @@ const CartPage = {
   },
 
   applyCouponCode(code) {
-    this.appliedCoupon = code;
-    localStorage.setItem('selfcare_applied_coupon', code);
+    if (!code) return;
+    const cleanCode = String(code).trim().toUpperCase();
+    const subtotalNew = this.getNewTestsSubtotal();
+
+    if (this.isProgressiveReferralCoupon(cleanCode)) {
+      if (!this.isOnlySelfSelected()) {
+        this.safeShowToast('Referral reward is valid strictly for Primary Account Holder (Self) and cannot be applied to family members.', 'error');
+        return;
+      }
+
+      const unlockedPercent = this.getCompletedReferralsCount() * 10;
+      const requestedPercent = this.getProgressiveCouponPercent(cleanCode);
+
+      if (unlockedPercent <= 0 || requestedPercent > unlockedPercent) {
+        this.safeShowToast('You do not have enough completed referrals to apply this reward code.', 'error');
+        return;
+      }
+    }
+
+    if (this.isFriendReferralCode(cleanCode)) {
+      if (cleanCode === this.getOwnReferralCode()) {
+        this.safeShowToast('You cannot apply your own referral code.', 'error');
+        return;
+      }
+
+      if (subtotalNew < 500) {
+        this.safeShowToast('Minimum test order value of ₹500 is required to apply a referral code.', 'error');
+        return;
+      }
+    }
+
+    this.appliedCoupon = cleanCode;
+    localStorage.setItem('selfcare_applied_coupon', cleanCode);
     this.calculateBillSummary();
     this.closeModal('available-coupons-modal');
-    this.safeShowToast(`Coupon "${code}" applied successfully!`, 'success');
+    this.safeShowToast(`Code "${cleanCode}" applied successfully!`, 'success');
   },
 
   applyCouponManually() {
@@ -1869,7 +2054,7 @@ const CartPage = {
     const val = input ? input.value.trim() : '';
 
     if (!val) {
-      this.safeShowToast('Please enter coupon code', 'error');
+      this.safeShowToast('Please enter a coupon or referral code', 'error');
       return;
     }
 
@@ -1881,6 +2066,8 @@ const CartPage = {
     this.appliedCoupon = null;
     this.couponDiscountAmount = 0;
     localStorage.removeItem('selfcare_applied_coupon');
+    localStorage.removeItem('selfcare_coupon_discount_percent');
+    localStorage.removeItem('selfcare_coupon_applicable_for');
     this.calculateBillSummary();
     this.safeShowToast('Coupon removed', 'info');
   },
@@ -1965,7 +2152,6 @@ const CartPage = {
   },
 
   openModal(id) {
-    // Blocks upi-confirm-modal and modal-confirm-patient from opening
     if (id === 'upi-confirm-modal' || id === 'modal-confirm-patient') return;
     const el = document.getElementById(id);
     if (el) el.style.display = 'flex';

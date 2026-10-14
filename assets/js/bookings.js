@@ -5,7 +5,7 @@
  * 1. Multi-Patient Auto-Split Engine: Seamlessly splits grouped multi-patient bookings 
  *    across individual patient chips (e.g. Self gets Self's package, Jazeerah gets Jazeerah's package).
  * 2. Works retroactively on existing bookings using smart patient-item matching.
- * 3. Add-on Tests to Existing Booking trigger -> Direct transfer to Cart Slide 3.
+ * 3. Add-on Tests to Existing Booking trigger -> Direct transfer to Cart Slide 1 (Strict Add-Tests-Only Lock).
  * 4. Live Google Sheets Backend Sync via Api.getBookingsByPatient.
  * 5. Production-safe: Strictly blocks fake mock bookings when user is authenticated.
  */
@@ -600,11 +600,41 @@ const BookingsPage = {
       return;
     }
 
-    sessionStorage.setItem('selfcare_addon_booking', JSON.stringify(booking));
-    localStorage.setItem('selfcare_active_addon_booking_id', booking.bookingId);
-    localStorage.setItem('selfcare_active_addon_booking_data', JSON.stringify(booking));
+    const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
+    const existingItems = this.getPatientItemsForBooking(booking).map(item => ({
+      ...item,
+      isExistingLocked: true,
+      removable: false
+    }));
 
-    window.location.href = `cart.html?addonBookingId=${encodeURIComponent(booking.bookingId)}&slide=3`;
+    const addonLockData = {
+      ...booking,
+      targetSlide: 1,
+      addonMode: 'TESTS_ONLY',
+      isLockedExistingBooking: true,
+      lockedPatientId: activePatient ? activePatient.id : (booking.patientId || 'self'),
+      lockedPatientName: activePatient ? activePatient.name : (booking.patientName || 'Self'),
+      lockedRelation: activePatient ? activePatient.relation : (booking.relation || 'Self'),
+      lockedCollectionType: booking.collectionType || 'home',
+      lockedCollectionDate: booking.collectionDate || '',
+      lockedTimeSlot: booking.timeSlot || '',
+      lockedAddress: booking.address || '',
+      lockedExistingItems: existingItems,
+      permissions: {
+        canAddTests: true,
+        canRemoveExistingTests: false,
+        canChangePatient: false,
+        canChangeSlot: false,
+        canChangeAddress: false,
+        canChangeCollectionType: false
+      }
+    };
+
+    sessionStorage.setItem('selfcare_addon_booking', JSON.stringify(addonLockData));
+    localStorage.setItem('selfcare_active_addon_booking_id', booking.bookingId);
+    localStorage.setItem('selfcare_active_addon_booking_data', JSON.stringify(addonLockData));
+
+    window.location.href = `cart.html?addonBookingId=${encodeURIComponent(booking.bookingId)}&slide=1&mode=addon_only`;
   },
 
   openWhatsAppSupport() {
