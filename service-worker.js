@@ -1,15 +1,15 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v8.0.2 (Zero-Cache Auto-Update Engine)
+ * Selfcare Diagnostics - Service Worker v8.2.0 (Zero-Cache Auto-Update Engine + Cashfree Ready)
  * Features:
  * - Direct SKIP_WAITING Message Listener: Responds instantly to app.js update triggers.
  * - HTTP Cache-Busting Network Fetch: Forces { cache: 'no-cache' } for HTML & scripts so Chrome never serves stale disk files.
- * - Versioned Cache Invalidation: v8.0.2 clean slate automatic cache purge on activation.
+ * - Versioned Cache Invalidation: v8.2.0 clean slate automatic cache purge on activation.
  * - Instant Client Claim & Zero-Lag Activation across all browser tabs.
  * - Relative Path Precache Engine (100% custom domain & root compatible).
  */
 
-const CACHE_NAME = 'selfcare-cache-v8.0.2';
+const CACHE_NAME = 'selfcare-cache-v8.2.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -62,7 +62,7 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache and Auto Skip-Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing auto-updating version 8.0.0...');
+  console.log('[Selfcare SW] Installing auto-updating version 8.2.0...');
   self.skipWaiting(); // Puthu worker udanadiyaga wait pannamal activate aagum
 
   event.waitUntil(
@@ -91,9 +91,9 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// 3. ACTIVATE EVENT - Purges old caches (v7.1.0 and older) and claims all open tabs
+// 3. ACTIVATE EVENT - Purges old caches (v8.0.1 and older) and claims all open tabs
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating version 8.0.0 and purging obsolete caches...');
+  console.log('[Selfcare SW] Activating version 8.2.0 and purging obsolete caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -105,7 +105,7 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      console.log('[Selfcare SW] Claiming clients for v8.0.0...');
+      console.log('[Selfcare SW] Claiming clients for v8.2.0...');
       return self.clients.claim();
     })
   );
@@ -115,7 +115,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Cross-origin and non-GET requests bypass
+  // Cross-origin (including Cashfree SDK/APIs) and non-GET requests bypass
   if (url.origin !== location.origin || event.request.method !== 'GET') {
     return;
   }
@@ -140,8 +140,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML Documents - Strictly Network-First with cache: 'no-cache'
-  if (event.request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
+  // HTML Documents & Core JS/CSS Scripts - Strictly Network-First with cache: 'no-cache'
+  if (
+    event.request.destination === 'document' ||
+    event.request.destination === 'script' ||
+    event.request.destination === 'style' ||
+    url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname === '/' ||
+    url.pathname.endsWith('/')
+  ) {
     event.respondWith(
       fetch(event.request, { cache: 'no-cache' })
         .then((networkResponse) => {
@@ -157,13 +166,16 @@ self.addEventListener('fetch', (event) => {
           const cachedDirect = await caches.match(event.request, { ignoreSearch: true });
           if (cachedDirect) return cachedDirect;
 
-          const indexFallback = await caches.match('./index.html');
-          if (indexFallback) return indexFallback;
+          if (event.request.destination === 'document' || url.pathname.endsWith('.html')) {
+            const indexFallback = await caches.match('./index.html');
+            if (indexFallback) return indexFallback;
 
-          const customerFallback = await caches.match('./customer.html');
-          if (customerFallback) return customerFallback;
+            const customerFallback = await caches.match('./customer.html');
+            if (customerFallback) return customerFallback;
 
-          return caches.match('./login.html');
+            return caches.match('./login.html');
+          }
+          return undefined;
         })
     );
     return;
