@@ -1,14 +1,11 @@
-/* file: customer.css */
+/* file: assets/css/customer.css */
 /**
- * Selfcare Diagnostics - Premium Customer Dashboard CSS v5.8.0
- * 100% Tests Page Visual Parity: 2-Column Tests Grid, Fasting Pills,
- * Know-More Purple Link, Unified Action Buttons & Full 3D Parameter Modals.
- * Includes:
- * 1. Compact Native Web Share Button inside Test & Package Card Header (.card-share-btn)
- * 2. High-Contrast Vibrant Confirm Action Button for Prescription Modal
- * 3. Packages vs Tests Distinct Badges ([📦 Package] vs [🧪 Test])
- * 4. "+ Add More Tests or Packages Manually" Live Search & Dropdown
- * 5. Real-time Total Calculation Banner
+ * Selfcare Diagnostics - Premium Customer Dashboard CSS v9.0.0
+ * Clean & Optimized Edition:
+ * 1. 2-Column Tests/Packages Grid, Fasting Pills, Know-More Purple Link & 3D Parameter Modals
+ * 2. Neon Glowing Priority Cards & Floating Badges (Essential, Popular, Recommended)
+ * 3. Compact Native Web Share Button inside Card & Modal Headers (.card-share-btn)
+ * 4. Smooth Finger Swipe & Auto-Slide 3D Glassmorphic Promo Banner
  */
 
 :root {
@@ -220,95 +217,17 @@ body {
   font-size: 15px;
 }
 
-/* 3D Prescription Upload Banner */
-.prescription-upload-banner {
-  padding: 10px 14px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(240, 253, 248, 0.92));
-  border: 1px solid rgba(7, 136, 102, 0.3);
-  border-radius: var(--radius-md);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(7, 136, 102, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.9);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
-}
-
-.prescription-upload-banner:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(7, 136, 102, 0.18);
-  border-color: var(--primary-green);
-}
-
-.pres-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.pres-icon-3d {
-  font-size: 20px;
-  background: linear-gradient(135deg, rgba(7, 136, 102, 0.15), rgba(228, 0, 90, 0.12));
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 10px rgba(7, 136, 102, 0.1);
-}
-
-.pres-badge {
-  font-size: 8px;
-  font-weight: 800;
-  color: var(--primary-pink);
-  letter-spacing: 0.3px;
-  display: block;
-  margin-bottom: 1px;
-}
-
-.pres-text h4 {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--dark-green);
-  line-height: 1.2;
-}
-
-.pres-text p {
-  font-size: 10px;
-  color: var(--text-muted);
-  font-weight: 500;
-  line-height: 1.2;
-}
-
-.pres-upload-btn {
-  background: linear-gradient(135deg, var(--primary-pink), #ff3377);
-  color: #ffffff;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(228, 0, 90, 0.3);
-  transition: transform 0.2s ease;
-}
-
-.pres-upload-btn:active {
-  transform: scale(0.92);
-}
-
 /* =========================================================
    PREMIUM 3D GLASSMORPHIC HORIZONTAL PROMO SLIDER
    ========================================================= */
-
 .single-slider-box {
   width: 100%;
   min-height: 84px;
   position: relative;
-  overflow: hidden;
+  overflow: hidden !important;
+  touch-action: pan-y !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
   border-radius: 18px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 253, 249, 0.88) 100%);
   backdrop-filter: blur(24px) saturate(190%);
@@ -323,7 +242,6 @@ body {
   box-sizing: border-box;
 }
 
-/* Glass Sheen Refraction Line across Top Edge */
 .single-slider-box::before {
   content: "";
   position: absolute;
@@ -336,13 +254,13 @@ body {
   z-index: 2;
 }
 
-/* Ultra Smooth & Slow Sliding Movement */
 .slider-track {
-  display: flex;
+  display: flex !important;
   width: 100%;
   height: 100%;
   transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
+  will-change: transform !important;
+  touch-action: pan-y !important;
 }
 
 .slide-item {
@@ -365,7 +283,6 @@ body {
   gap: 2px;
 }
 
-/* 3D Glowing Pill Badge */
 .slide-badge {
   font-size: 9px;
   font-weight: 800;
@@ -400,7 +317,6 @@ body {
   margin: 0;
 }
 
-/* Tactile 3D Action Button */
 .slide-btn {
   flex-shrink: 0;
   background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
@@ -431,12 +347,15 @@ body {
   box-shadow: 0 2px 6px rgba(7, 136, 102, 0.25);
 }
 
-
 /* ==========================================================================
-   TESTS PAGE 100% IDENTICAL 2-COLUMN GRID & CARD STYLING
+   POPULAR PACKAGES 2-COLUMN GRID & NEON GLOW CARDS
    ========================================================================= */
 .catalogue-section {
   margin-bottom: 24px;
+}
+
+.catalogue-section .tests-grid {
+  padding-top: 10px !important;
 }
 
 .section-header {
@@ -464,7 +383,6 @@ body {
   opacity: 0.85;
 }
 
-/* 2-Column Compact Tests Grid */
 .tests-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -488,6 +406,130 @@ body {
 .test-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+}
+
+/* Base Neon Glowing Card Setup */
+.neon-glowing-card {
+  position: relative !important;
+}
+
+/* Priority 1: Vibrant Mint & Emerald Neon Glow (⚡ ESSENTIAL) */
+.neon-card-1 {
+  border: 2px solid #05FFA1 !important;
+  background: linear-gradient(160deg, #FFFFFF 0%, #F0FDF8 100%) !important;
+  box-shadow: 0 0 14px rgba(5, 255, 161, 0.5), 0 0 28px rgba(5, 255, 161, 0.22), 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+  animation: neonGlow1Cust 2.4s infinite alternate ease-in-out !important;
+}
+
+@keyframes neonGlow1Cust {
+  0% {
+    border-color: #05FFA1;
+    box-shadow: 0 0 10px rgba(5, 255, 161, 0.4), 0 0 20px rgba(5, 255, 161, 0.18), inset 0 0 6px rgba(5, 255, 161, 0.1);
+    transform: translateY(0);
+  }
+  50% {
+    border-color: #00F59B;
+    box-shadow: 0 0 18px rgba(5, 255, 161, 0.75), 0 0 36px rgba(0, 245, 155, 0.35), inset 0 0 12px rgba(5, 255, 161, 0.2);
+    transform: translateY(-2px);
+  }
+  100% {
+    border-color: #05FFA1;
+    box-shadow: 0 0 10px rgba(5, 255, 161, 0.4), 0 0 20px rgba(5, 255, 161, 0.18), inset 0 0 6px rgba(5, 255, 161, 0.1);
+    transform: translateY(0);
+  }
+}
+
+/* Priority 2: Electric Cyan & Sky Blue Neon Glow (🔥 POPULAR) */
+.neon-card-2 {
+  border: 2px solid #00D2FF !important;
+  background: linear-gradient(160deg, #FFFFFF 0%, #F0F9FF 100%) !important;
+  box-shadow: 0 0 14px rgba(0, 210, 255, 0.5), 0 0 28px rgba(0, 210, 255, 0.22), 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+  animation: neonGlow2Cust 2.4s infinite alternate ease-in-out !important;
+}
+
+@keyframes neonGlow2Cust {
+  0% {
+    border-color: #00D2FF;
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.4), 0 0 20px rgba(0, 210, 255, 0.18), inset 0 0 6px rgba(0, 210, 255, 0.1);
+    transform: translateY(0);
+  }
+  50% {
+    border-color: #38E1FF;
+    box-shadow: 0 0 18px rgba(0, 210, 255, 0.75), 0 0 36px rgba(56, 225, 255, 0.35), inset 0 0 12px rgba(0, 210, 255, 0.2);
+    transform: translateY(-2px);
+  }
+  100% {
+    border-color: #00D2FF;
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.4), 0 0 20px rgba(0, 210, 255, 0.18), inset 0 0 6px rgba(0, 210, 255, 0.1);
+    transform: translateY(0);
+  }
+}
+
+/* Priority 3: Ultra Turquoise / Teal Neon Glow (✨ RECOMMENDED) */
+.neon-card-3 {
+  border: 2px solid #00F5D4 !important;
+  background: linear-gradient(160deg, #FFFFFF 0%, #E6FCF7 100%) !important;
+  box-shadow: 0 0 18px rgba(0, 245, 212, 0.65), 0 0 36px rgba(0, 245, 212, 0.3), 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+  animation: neonGlow3Cust 2.2s infinite alternate ease-in-out !important;
+}
+
+@keyframes neonGlow3Cust {
+  0% {
+    border-color: #00F5D4;
+    box-shadow: 0 0 12px rgba(0, 245, 212, 0.45), 0 0 24px rgba(0, 245, 212, 0.2), inset 0 0 8px rgba(0, 245, 212, 0.1);
+    transform: translateY(0);
+  }
+  50% {
+    border-color: #05FFA1;
+    box-shadow: 0 0 24px rgba(0, 245, 212, 0.85), 0 0 44px rgba(5, 255, 161, 0.45), inset 0 0 14px rgba(0, 245, 212, 0.25);
+    transform: translateY(-2px);
+  }
+  100% {
+    border-color: #00F5D4;
+    box-shadow: 0 0 12px rgba(0, 245, 212, 0.45), 0 0 24px rgba(0, 245, 212, 0.2), inset 0 0 8px rgba(0, 245, 212, 0.1);
+    transform: translateY(0);
+  }
+}
+
+/* Floating Badges */
+.neon-recommended-badge {
+  position: absolute !important;
+  top: -10px !important;
+  right: 10px !important;
+  font-size: 8.5px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.6px !important;
+  padding: 3px 8px !important;
+  border-radius: 20px !important;
+  text-transform: uppercase !important;
+  z-index: 10 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  animation: badgeSparkleCust 1.8s infinite alternate ease-in-out !important;
+}
+
+.neon-badge-1 {
+  background: linear-gradient(135deg, #05FFA1, #078866) !important;
+  color: #033F33 !important;
+  box-shadow: 0 0 12px rgba(5, 255, 161, 0.75), 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+}
+
+.neon-badge-2 {
+  background: linear-gradient(135deg, #00D2FF, #0077B6) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 12px rgba(0, 210, 255, 0.75), 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+}
+
+.neon-badge-3 {
+  background: linear-gradient(135deg, #00F5D4, #078866) !important;
+  color: #033F33 !important;
+  box-shadow: 0 0 14px rgba(0, 245, 212, 0.9), 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+}
+
+@keyframes badgeSparkleCust {
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.05); filter: brightness(1.2); }
 }
 
 .test-card-top {
@@ -700,7 +742,7 @@ body {
 }
 
 /* ==========================================================================
-   TESTS & PACKAGE 3D DETAIL MODAL STYLES
+   PACKAGE 3D DETAIL MODAL STYLES
    ========================================================================= */
 .sia-modal-overlay {
   display: none;
@@ -987,198 +1029,6 @@ body {
 }
 
 /* ==========================================================================
-   PRESCRIPTION MODAL, CHECKBOXES & BUTTONS (HIGH VISIBILITY)
-   ========================================================================= */
-.pres-test-checkbox-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(7, 136, 102, 0.15);
-  margin-bottom: 8px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
-}
-
-.pres-test-checkbox-row label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  flex: 1;
-}
-
-.pres-test-checkbox-row input[type="checkbox"] {
-  accent-color: var(--primary-green);
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.pres-test-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.pres-test-name {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-main);
-}
-
-.pres-type-badge {
-  font-size: 9px;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
-}
-
-.pres-type-badge.package-badge {
-  background: rgba(228, 0, 90, 0.1);
-  color: #E4005A;
-  border: 1px solid rgba(228, 0, 90, 0.2);
-}
-
-.pres-type-badge.test-badge {
-  background: rgba(7, 136, 102, 0.1);
-  color: #078866;
-  border: 1px solid rgba(7, 136, 102, 0.2);
-}
-
-.pres-test-price {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--dark-green);
-}
-
-/* + Add More Tests Manually Button & Search */
-.pres-manual-wrapper {
-  margin-top: 4px;
-}
-
-.add-manual-test-btn {
-  width: 100%;
-  padding: 11px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #045D49;
-  background: rgba(7, 136, 102, 0.08);
-  border: 1px dashed #078866;
-  border-radius: 10px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background 0.2s ease;
-}
-
-.add-manual-test-btn:hover {
-  background: rgba(7, 136, 102, 0.15);
-}
-
-#pres-manual-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid rgba(7, 136, 102, 0.3);
-  border-radius: 8px;
-  font-size: 12px;
-  outline: none;
-  background: #ffffff;
-}
-
-.pres-search-results-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: 180px;
-  overflow-y: auto;
-  background: #ffffff;
-  border: 1px solid rgba(7, 136, 102, 0.3);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  z-index: 100;
-  margin-top: 4px;
-}
-
-.pres-search-item {
-  padding: 9px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  border-bottom: 1px solid #f0f4f2;
-}
-
-.pres-search-item:hover {
-  background: #f0fbf7;
-}
-
-.manual-add-pill {
-  background: #078866;
-  color: #ffffff;
-  border: none;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* Total Banner */
-.pres-total-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  background: rgba(7, 136, 102, 0.08);
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--dark-green);
-  margin-top: 4px;
-}
-
-.pres-total-banner strong {
-  font-size: 16px;
-  color: #045D49;
-}
-
-/* High-Contrast Confirm Action Button */
-.modal-action-btn.pres-confirm-btn {
-  width: 100% !important;
-  padding: 14px !important;
-  font-size: 13px !important;
-  font-weight: 800 !important;
-  border-radius: 12px !important;
-  border: none !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  background: linear-gradient(135deg, #078866, #045D49) !important;
-  color: #FFFFFF !important;
-  box-shadow: 0 8px 24px rgba(7, 136, 102, 0.35) !important;
-  margin-top: 4px !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
-}
-
-.modal-action-btn.pres-confirm-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 28px rgba(7, 136, 102, 0.45) !important;
-}
-
-.modal-action-btn.pres-confirm-btn:active {
-  transform: scale(0.97);
-}
-
-/* ==========================================================================
    TRUST SECTION & SKELETON LOADERS
    ========================================================================= */
 .trust-section {
@@ -1237,7 +1087,7 @@ body {
 }
 
 /* ==========================================================================
-   5-TAB FOOTER NAVIGATION MATCHING TESTS PAGE
+   5-TAB FOOTER NAVIGATION
    ========================================================================= */
 .bottom-nav {
   position: fixed;
@@ -1309,46 +1159,6 @@ body {
   0% { transform: scale(1); }
   50% { transform: scale(1.4); }
   100% { transform: scale(1); }
-}
-
-/* Radar Laser Scanner Simulation */
-.scanning-card {
-  text-align: center;
-  padding: 24px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-}
-
-.scan-box-wrapper {
-  position: relative;
-  width: 140px;
-  height: 140px;
-  border: 2px dashed var(--primary-green);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48px;
-  overflow: hidden;
-  background: rgba(7, 136, 102, 0.04);
-}
-
-.scan-laser-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #35C39A, #E4005A, transparent);
-  box-shadow: 0 0 12px #35C39A;
-  animation: laserScan 1.6s ease-in-out infinite alternate;
-}
-
-@keyframes laserScan {
-  0% { top: 5%; }
-  100% { top: 92%; }
 }
 
 .animate-fade {

@@ -1,12 +1,11 @@
 /* file: assets/css/cart.css */
 /**
- * Selfcare Diagnostics - Complete 3D Glassmorphism Cart & Checkout Engine v8.3.0
- * Features:
- * - Compact & Reduced Font Sizing across all Slides & Modals
- * - Patient Selection on Slide 1 & Reorganized Spacing
- * - Ultra Crisp 3D Glassmorphic Cards & Tactile Buttons
+ * Selfcare Diagnostics - Complete 3D Glassmorphism Cart & Checkout Engine v10.0.0
+ * Clean & Streamlined Edition:
+ * - Unused Coupon & Referral Modal Styles Purged
+ * - Added Patient Overview Tags & Verification Modal Grid Styling
+ * - Compact Mobile-First 3D Glassmorphic Cards & Tactile Buttons
  * - Perfectly Docked Fixed Control Bar above Footer
- * - Zero Overflow, Smooth Spring Pop-in Animations
  */
 
 :root {
@@ -559,6 +558,20 @@ body.glass-bg-body {
   cursor: pointer;
 }
 
+/* Patient Overview Tags in Slide 2 */
+.patient-overview-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #045D49;
+  background: #D1FAE5;
+  border: 1px solid #A7F3D0;
+  padding: 3px 8px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .info-row {
   display: flex;
   gap: 10px;
@@ -632,7 +645,7 @@ body.glass-bg-body {
   line-height: 1.3;
 }
 
-/* Slide 3: Payment & Offers */
+/* Slide 3: Payment Options */
 .payment-options-grid-3d {
   display: flex;
   flex-direction: column;
@@ -664,6 +677,11 @@ body.glass-bg-body {
   gap: 10px;
 }
 
+.pay-card-left input[type="radio"] {
+  accent-color: #078866;
+  cursor: pointer;
+}
+
 .pay-title-inline strong {
   font-size: 12px;
   font-weight: 800;
@@ -685,75 +703,6 @@ body.glass-bg-body {
   color: #334155;
 }
 
-.available-coupons-btn-3d {
-  background: rgba(7, 136, 102, 0.1);
-  color: #045D49;
-  border: 1px solid rgba(7, 136, 102, 0.25);
-  font-size: 10px;
-  font-weight: 800;
-  padding: 5px 10px;
-  border-radius: 7px;
-  cursor: pointer;
-}
-
-.coupon-input-glass-group {
-  display: flex;
-  gap: 6px;
-}
-
-.coupon-input-glass-group input {
-  flex: 1;
-  padding: 9px 12px;
-  border-radius: 10px;
-  border: 1.5px solid #CBD5E1;
-  font-size: 11.5px;
-  outline: none;
-  background: #FFFFFF;
-}
-
-.apply-coupon-btn-3d {
-  padding: 9px 15px;
-  font-size: 11.5px;
-  font-weight: 800;
-  background: #078866;
-  color: #FFFFFF;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  box-shadow: 0 3px 10px rgba(7, 136, 102, 0.22);
-}
-
-.applied-coupon-3d-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #ECFDF5;
-  border: 1.5px solid #059669;
-  padding: 8px 12px;
-  border-radius: 10px;
-  margin-bottom: 8px;
-}
-
-.applied-coupon-3d-banner strong {
-  font-size: 11.5px;
-  color: #065F46;
-}
-
-.applied-coupon-3d-banner p {
-  font-size: 10px;
-  color: #047857;
-  margin: 0;
-}
-
-.remove-coupon-btn-3d {
-  background: transparent;
-  border: none;
-  color: #DC2626;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
 /* =========================================================
    3D GLASS PATIENT TEST CARDS & ACTION BUTTONS (COMPACT)
    ========================================================= */
@@ -764,7 +713,6 @@ body.glass-bg-body {
   margin-bottom: 4px;
 }
 
-/* 3D Glass Patient Container Card */
 .patient-tests-group-card {
   margin-bottom: 2px;
   padding: 11px 12px;
@@ -1242,7 +1190,7 @@ body.glass-bg-body {
 }
 
 /* =========================================================
-   MODALS WITH 3D GLASSMORPHISM (COMPACT)
+   MODALS WITH 3D GLASSMORPHISM
    ========================================================= */
 .sia-modal-overlay {
   display: none;
@@ -1273,12 +1221,6 @@ body.glass-bg-body {
   border: 1.5px solid rgba(7, 136, 102, 0.25);
 }
 
-.upi-3d-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 253, 249, 0.92)) !important;
-  border: 1.5px solid rgba(16, 185, 129, 0.4) !important;
-  box-shadow: 0 24px 60px rgba(0, 48, 35, 0.3), var(--glass-specular) !important;
-}
-
 .animate-3d-pop {
   animation: popIn3D 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
@@ -1295,11 +1237,6 @@ body.glass-bg-body {
   padding: 11px 15px;
   background: linear-gradient(135deg, #045D49, #078866) !important;
   color: #FFFFFF !important;
-}
-
-.upi-glow-header {
-  background: linear-gradient(135deg, #033F33, #078866) !important;
-  box-shadow: 0 3px 14px rgba(7, 136, 102, 0.25);
 }
 
 .modal-title-wrap {
@@ -1337,264 +1274,6 @@ body.glass-bg-body {
   gap: 11px;
 }
 
-.upi-body-center {
-  align-items: center;
-  text-align: center;
-}
-
-.upi-ring-glow-wrapper {
-  position: relative;
-  width: 66px;
-  height: 66px;
-  margin: 3px auto 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.upi-outer-glow-ring {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.25), transparent 70%);
-  animation: upiPulseGlow 2s infinite ease-in-out;
-}
-
-@keyframes upiPulseGlow {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.2); opacity: 1; }
-}
-
-.upi-spinner-3d {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  border: 3px solid rgba(7, 136, 102, 0.15);
-  border-top-color: #078866;
-  border-right-color: #10B981;
-  animation: upiSpin3D 0.9s linear infinite;
-  box-shadow: 0 3px 10px rgba(7, 136, 102, 0.18);
-}
-
-@keyframes upiSpin3D {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.upi-center-brand-icon {
-  position: absolute;
-  font-size: 19px;
-}
-
-.upi-title-text {
-  font-size: 15px;
-  font-weight: 900;
-  color: #045D49;
-  margin: 0;
-}
-
-.upi-sub-message {
-  font-size: 11px;
-  color: #475569;
-  line-height: 1.35;
-  margin: 0;
-  max-width: 300px;
-}
-
-.upi-order-preview-3d-box {
-  width: 100%;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(236, 253, 245, 0.95));
-  border: 1.5px solid #A7F3D0;
-  border-radius: 12px;
-  padding: 10px 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  box-shadow: 0 3px 10px rgba(7, 136, 102, 0.06);
-}
-
-.preview-line {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11.5px;
-}
-
-.preview-line span {
-  color: #64748B;
-  font-weight: 700;
-}
-
-.preview-line strong {
-  color: #1E293B;
-  font-weight: 800;
-}
-
-.green-highlight-glow {
-  color: #078866 !important;
-  font-size: 14.5px !important;
-  font-weight: 900 !important;
-}
-
-.upi-instruction-card-3d {
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
-  border-radius: 10px;
-  padding: 8px 11px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 100%;
-}
-
-.lock-pill-badge {
-  font-size: 9px;
-  font-weight: 800;
-  color: #065F46;
-  background: #D1FAE5;
-  padding: 2px 7px;
-  border-radius: 5px;
-  align-self: center;
-}
-
-.upi-instruction-card-3d p {
-  font-size: 10px;
-  color: #64748B;
-  margin: 0;
-  line-height: 1.3;
-}
-
-.coupons-modal-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 3px 0;
-}
-
-.coupon-item-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 11px 13px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(240, 253, 249, 0.85));
-  border: 1.5px dashed #078866;
-  border-radius: 12px;
-  box-shadow: 0 3px 10px rgba(7, 136, 102, 0.06);
-}
-
-.coupon-meta h5 {
-  font-size: 13px;
-  font-weight: 900;
-  color: #045D49;
-  margin: 0 0 3px 0;
-}
-
-.coupon-meta p {
-  font-size: 10px;
-  color: #475569;
-  margin: 0 0 5px 0;
-  line-height: 1.3;
-}
-
-.coupon-expiry {
-  font-size: 9.5px;
-  font-weight: 800;
-  color: #059669;
-}
-
-.apply-modal-coupon-btn {
-  padding: 7px 14px;
-  font-size: 11px;
-  font-weight: 800;
-  background: linear-gradient(135deg, #078866, #045D49);
-  color: #FFFFFF;
-  border: none;
-  border-radius: 9px;
-  cursor: pointer;
-  box-shadow: 0 3px 10px rgba(7, 136, 102, 0.2);
-}
-
-.patient-verify-card-3d {
-  background: #F8FAFC;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 11px;
-  margin: 4px 0;
-}
-
-.patient-verify-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #E5E7EB;
-  margin-bottom: 8px;
-}
-
-.verified-check-pill {
-  font-size: 10px;
-  font-weight: 800;
-  color: #065F46;
-  background: #D1FAE5;
-  padding: 3px 8px;
-  border-radius: 15px;
-}
-
-.verify-details-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
-  padding: 8px 10px;
-  border-radius: 9px;
-}
-
-.verify-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.verify-lbl {
-  font-size: 8.5px;
-  font-weight: 700;
-  color: #6B7280;
-  text-transform: uppercase;
-}
-
-.verify-val {
-  font-size: 11px;
-  font-weight: 800;
-  color: #111827;
-}
-
-.green-phone {
-  color: #078866 !important;
-  font-size: 11.5px !important;
-}
-
-.verify-pay-summary-3d {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #ECFDF5;
-  border: 1px dashed #078866;
-  border-radius: 9px;
-  padding: 8px 11px;
-  font-size: 11.5px;
-  font-weight: 800;
-  color: #045D49;
-  margin: 4px 0;
-}
-
-.verify-actions-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 4px;
-}
-
 .modal-action-btn {
   width: 100%;
   padding: 10px;
@@ -1607,18 +1286,90 @@ body.glass-bg-body {
   text-decoration: none;
 }
 
-.modal-secondary-btn {
-  width: 100%;
-  padding: 9px;
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 9px;
-  border: 1px solid #D1D5DB;
-  background: #F9FAFB;
-  color: var(--text-muted);
-  cursor: pointer;
+/* Patient Verification Modal Card & Grid Styles */
+.patient-verify-card-3d {
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 12px;
+  margin: 6px 0;
 }
 
+.patient-verify-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.verify-relation-badge {
+  font-size: 9px;
+  font-weight: 800;
+  color: #045D49;
+  background: #ECFDF5;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.verified-check-pill {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #059669;
+  background: #D1FAE5;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+.verify-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.verify-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.verify-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  color: #64748B;
+}
+
+.verify-val {
+  font-size: 11px;
+  font-weight: 800;
+  color: #1E293B;
+}
+
+.green-phone {
+  color: #078866;
+}
+
+.verify-pay-summary-3d {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  background: #ECFDF5;
+  border: 1.5px solid #A7F3D0;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.verify-actions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Edit Address Modal Form Fields */
 .form-field {
   display: flex;
   flex-direction: column;
