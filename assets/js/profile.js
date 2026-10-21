@@ -1,15 +1,19 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v6.7.0
- * Streamlined Edition:
- * - Direct navigation to blood.html & refer.html
- * - Mandatory profile setup completely removed
+ * Selfcare Diagnostics - My Account Controller v6.8.5
+ * Features:
+ * - Anti-multi-click execution lock & dynamic button state
+ * - Strict duplicate member prevention
+ * - Binds primaryUserId, primaryUserName & primaryMobile to backend Family Vault
+ * - Mobile Haptic feedback (vibration on click)
  * - Family Directory Vault preserved
  */
 
 const ProfilePage = {
   currentUser: null,
   familyMembers: [],
+  _isSavingMember: false,
+  _isSavingProfile: false,
 
   async init() {
     try {
@@ -34,6 +38,12 @@ const ProfilePage = {
       Utils.showToast(message, type);
     } else {
       alert(message);
+    }
+  },
+
+  triggerHaptic() {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(25); // Physical click vibration
     }
   },
 
@@ -77,10 +87,12 @@ const ProfilePage = {
 
     const storedUser = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
     const rawAge = storedUser.age || storedUser.Age || vaultProfile.age || vaultProfile.Age || storedUser.dob || vaultProfile.dob || '';
+    const resolvedMobile = activeMobile || storedUser.mobile || vaultProfile.mobile || '7010174890';
 
     this.currentUser = {
+      userId: storedUser.userId || storedUser.UserID || vaultProfile.userId || vaultProfile.UserID || ('SCD_' + resolvedMobile),
       name: storedUser.name || vaultProfile.name || '',
-      mobile: activeMobile || storedUser.mobile || vaultProfile.mobile || '7010174890',
+      mobile: resolvedMobile,
       email: storedUser.email || vaultProfile.email || '',
       age: this.calculateAge(rawAge),
       gender: storedUser.gender || storedUser.Gender || vaultProfile.gender || vaultProfile.Gender || 'Male',
@@ -103,6 +115,8 @@ const ProfilePage = {
       const parsedFam = savedFam ? JSON.parse(savedFam) : [];
       this.familyMembers = parsedFam.map(m => ({
         id: m.id || m.MemberID || m.memberId,
+        primaryUserId: m.primaryUserId || m.PrimaryUserID || ('SCD_' + currentMobile),
+        primaryUserName: m.primaryUserName || m.PrimaryUserName || this.currentUser.name,
         name: m.name || m.Name || 'Member',
         relation: m.relation || m.Relation || 'Relative',
         mobile: m.mobile || m.Mobile || '',
@@ -139,6 +153,7 @@ const ProfilePage = {
 
         this.currentUser = {
           ...this.currentUser,
+          userId: p.userId || p.UserID || ('SCD_' + activeMobile),
           name: p.name || p.Name || this.currentUser.name,
           age: (incomingAge !== undefined && incomingAge !== null && incomingAge !== '') ? this.calculateAge(incomingAge) : this.currentUser.age,
           gender: p.gender || p.Gender || this.currentUser.gender,
@@ -162,6 +177,7 @@ const ProfilePage = {
   },
 
   openMyProfileModal() {
+    this.triggerHaptic();
     this.renderSelfProfile();
     this.populateFormInputs();
     this.toggleSelfEditMode(false);
@@ -212,6 +228,7 @@ const ProfilePage = {
   },
 
   toggleSelfEditMode(isEdit) {
+    this.triggerHaptic();
     const viewMode = document.getElementById('profile-view-mode');
     const editMode = document.getElementById('profile-edit-mode');
     if (viewMode) viewMode.style.display = isEdit ? 'none' : 'block';
@@ -221,6 +238,13 @@ const ProfilePage = {
   },
 
   async saveSelfDetails() {
+    this.triggerHaptic();
+
+    if (this._isSavingProfile) return;
+
+    const saveBtn = document.getElementById('self-edit-save-btn');
+    const originalText = saveBtn ? saveBtn.innerHTML : 'Save Profile Details ✓';
+
     const name = document.getElementById('self-edit-name').value.trim();
     const mobile = document.getElementById('self-edit-mobile').value.replace(/\D/g, '').slice(-10);
     const bloodGroup = document.getElementById('self-edit-blood').value;
@@ -236,33 +260,41 @@ const ProfilePage = {
       return;
     }
 
-    const calculatedAge = this.calculateAge(rawAge);
-    const activeMobile = mobile || (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
+    try {
+      this._isSavingProfile = true;
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = 'Saving Details... ⏳';
+      }
 
-    this.currentUser = {
-      ...this.currentUser,
-      name,
-      mobile: activeMobile,
-      bloodGroup,
-      age: calculatedAge,
-      gender,
-      email,
-      address,
-      location
-    };
+      const calculatedAge = this.calculateAge(rawAge);
+      const activeMobile = mobile || (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
 
-    const serialized = JSON.stringify(this.currentUser);
-    localStorage.setItem(`selfcare_profile_${activeMobile}`, serialized);
-    localStorage.setItem('selfcare_customer_profile', serialized);
-    localStorage.setItem('selfcare_permanent_user', serialized);
+      this.currentUser = {
+        ...this.currentUser,
+        userId: (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile),
+        name,
+        mobile: activeMobile,
+        bloodGroup,
+        age: calculatedAge,
+        gender,
+        email,
+        address,
+        location
+      };
 
-    if (typeof Auth !== 'undefined' && Auth.savePermanentSession) {
-      Auth.savePermanentSession(this.currentUser);
-    }
+      const serialized = JSON.stringify(this.currentUser);
+      localStorage.setItem(`selfcare_profile_${activeMobile}`, serialized);
+      localStorage.setItem('selfcare_customer_profile', serialized);
+      localStorage.setItem('selfcare_permanent_user', serialized);
 
-    if (navigator.onLine && typeof Api !== 'undefined') {
-      try {
+      if (typeof Auth !== 'undefined' && Auth.savePermanentSession) {
+        Auth.savePermanentSession(this.currentUser);
+      }
+
+      if (navigator.onLine && typeof Api !== 'undefined') {
         const cloudPayload = {
+          userId: this.currentUser.userId,
           mobile: activeMobile,
           name: this.currentUser.name,
           age: this.currentUser.age,
@@ -274,20 +306,31 @@ const ProfilePage = {
         };
 
         if (typeof Api.updateProfile === 'function') {
-          Api.updateProfile(cloudPayload).catch(() => {});
+          await Api.updateProfile(cloudPayload);
         } else if (typeof Api.request === 'function') {
-          Api.request('updateProfile', cloudPayload, false).catch(() => {});
+          await Api.request('updateProfile', cloudPayload, false);
         }
-      } catch (e) {}
-    }
+      }
 
-    this.renderSelfProfile();
-    this.safeShowToast('Profile details saved successfully!', 'success');
-    this.toggleSelfEditMode(false);
+      this.renderSelfProfile();
+      this.safeShowToast('Profile details saved successfully!', 'success');
+      this.toggleSelfEditMode(false);
+    } catch (e) {
+      console.error(e);
+      this.safeShowToast('Profile details saved locally!', 'info');
+      this.toggleSelfEditMode(false);
+    } finally {
+      this._isSavingProfile = false;
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+      }
+    }
   },
 
   /* ================= FAMILY DIRECTORY ================= */
   openFamilyMembersModal() {
+    this.triggerHaptic();
     this.renderFamilyCards();
     this.closeMemberForm();
     this.openModal('modal-family-members');
@@ -351,6 +394,7 @@ const ProfilePage = {
   },
 
   openMemberForm(memberId = null) {
+    this.triggerHaptic();
     const listView = document.getElementById('family-list-view');
     const formView = document.getElementById('family-form-view');
     const formTitle = document.getElementById('member-form-title');
@@ -395,6 +439,7 @@ const ProfilePage = {
   },
 
   closeMemberForm() {
+    this.triggerHaptic();
     const listView = document.getElementById('family-list-view');
     const formView = document.getElementById('family-form-view');
     if (listView) listView.style.display = 'block';
@@ -406,6 +451,14 @@ const ProfilePage = {
   },
 
   async saveFamilyMember() {
+    this.triggerHaptic();
+
+    // Prevent duplicate rapid clicks
+    if (this._isSavingMember) return;
+
+    const saveBtn = document.getElementById('family-save-btn') || document.querySelector('#family-form-view .modal-action-btn');
+    const originalText = saveBtn ? saveBtn.innerHTML : 'Save Member ✓';
+
     const editId = document.getElementById('family-edit-id').value.trim();
     const name = document.getElementById('family-name-input').value.trim();
     const relation = document.getElementById('family-relation-select').value;
@@ -427,54 +480,83 @@ const ProfilePage = {
       return;
     }
 
-    const currentMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user') || '7010174890';
-    const finalMemberId = editId || `FAM_${Date.now()}`;
-    const calculatedAge = this.calculateAge(rawAge);
+    try {
+      this._isSavingMember = true;
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = 'Saving Member... ⏳';
+      }
 
-    const memberPayload = {
-      id: finalMemberId,
-      memberId: finalMemberId,
-      MemberID: finalMemberId,
-      primaryMobile: currentMobile,
-      PrimaryMobile: currentMobile,
-      name,
-      relation,
-      bloodGroup,
-      age: calculatedAge,
-      gender,
-      mobile,
-      email,
-      address,
-      location,
-      updatedAt: new Date().toISOString()
-    };
+      // Logged-in Primary User Identification
+      const activeMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user') || '7010174890';
+      const activeName = (this.currentUser && this.currentUser.name && this.currentUser.name.trim()) ? this.currentUser.name : 'Customer Account';
+      const activeUserId = (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile);
 
-    if (editId) {
-      this.familyMembers = this.familyMembers.map(m => (m.id === editId ? memberPayload : m));
-    } else {
-      this.familyMembers.push(memberPayload);
-    }
+      const finalMemberId = editId || `FAM_${Date.now()}`;
+      const calculatedAge = this.calculateAge(rawAge);
 
-    const serialized = JSON.stringify(this.familyMembers);
-    localStorage.setItem('selfcare_family_members', serialized);
-    if (currentMobile) {
-      localStorage.setItem(`selfcare_family_${currentMobile}`, serialized);
-    }
+      const memberPayload = {
+        id: finalMemberId,
+        memberId: finalMemberId,
+        MemberID: finalMemberId,
+        // Primary Account Binding
+        primaryUserId: activeUserId,
+        PrimaryUserID: activeUserId,
+        primaryUserName: activeName,
+        PrimaryUserName: activeName,
+        primaryMobile: activeMobile,
+        PrimaryMobile: activeMobile,
+        // Member Details
+        name,
+        relation,
+        bloodGroup,
+        age: calculatedAge,
+        gender,
+        mobile,
+        email,
+        address,
+        location,
+        updatedAt: new Date().toISOString()
+      };
 
-    if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
-      try {
-        await Api.request('saveFamilyMember', memberPayload, false);
-      } catch (err) {
-        console.warn('[Family] Sheet save warning:', err);
+      if (editId) {
+        this.familyMembers = this.familyMembers.map(m => (m.id === editId ? memberPayload : m));
+      } else {
+        // Prevent duplicate entry on multiple rapid submits
+        const alreadyExists = this.familyMembers.some(m => m.name.toLowerCase() === name.toLowerCase() && m.mobile === mobile);
+        if (!alreadyExists) {
+          this.familyMembers.push(memberPayload);
+        }
+      }
+
+      const serialized = JSON.stringify(this.familyMembers);
+      localStorage.setItem('selfcare_family_members', serialized);
+      if (activeMobile) {
+        localStorage.setItem(`selfcare_family_${activeMobile}`, serialized);
+      }
+
+      if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
+        try {
+          await Api.request('saveFamilyMember', memberPayload, false);
+        } catch (err) {
+          console.warn('[Family] Sheet save warning:', err);
+        }
+      }
+
+      this.renderFamilyCards();
+      this.closeMemberForm();
+      this.safeShowToast(`${name} details saved successfully!`, 'success');
+    } finally {
+      this._isSavingMember = false;
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
       }
     }
-
-    this.renderFamilyCards();
-    this.closeMemberForm();
-    this.safeShowToast(`${name} details saved successfully!`, 'success');
   },
 
   async deleteFamilyMember(id) {
+    this.triggerHaptic();
     const target = this.familyMembers.find(m => m.id === id);
     const memberName = target ? target.name : 'Member';
 
@@ -498,10 +580,12 @@ const ProfilePage = {
   },
 
   openGeneralInfoModal() {
+    this.triggerHaptic();
     this.openModal('modal-general-info');
   },
 
   handleLogout() {
+    this.triggerHaptic();
     if (confirm('Are you sure you want to log out?')) {
       if (typeof Auth !== 'undefined' && Auth.logout) {
         Auth.logout();
@@ -513,10 +597,12 @@ const ProfilePage = {
   },
 
   openSupportDeskModal() {
+    this.triggerHaptic();
     this.openModal('modal-support-desk');
   },
 
   detectGpsLocation(targetInputId) {
+    this.triggerHaptic();
     if (!navigator.geolocation) {
       this.safeShowToast('GPS Geolocation is not supported by your browser', 'error');
       return;
@@ -540,6 +626,7 @@ const ProfilePage = {
   },
 
   closeModal(id) {
+    this.triggerHaptic();
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   },
