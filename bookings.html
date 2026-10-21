@@ -16,6 +16,73 @@
   <link rel="stylesheet" href="assets/css/components.css?v=5.8.0">
   <link rel="stylesheet" href="assets/css/responsive.css?v=5.8.0">
   <link rel="stylesheet" href="assets/css/bookings.css?v=5.8.0">
+
+  <style>
+    /* Membership Crown Badges */
+    .chip-avatar {
+      position: relative !important;
+    }
+    .crown-avatar-badge {
+      position: absolute !important;
+      top: -8px !important;
+      right: -6px !important;
+      font-size: 13px !important;
+      filter: drop-shadow(0 1px 2px rgba(217, 119, 6, 0.5)) !important;
+    }
+    .crown-inline-badge {
+      font-size: 13px !important;
+      margin-left: 3px !important;
+      vertical-align: middle !important;
+      filter: drop-shadow(0 1px 2px rgba(217, 119, 6, 0.4)) !important;
+    }
+    /* Add Tests Dedicated Center Banner */
+    .add-tests-center-banner {
+      margin-bottom: 15px !important;
+      background: linear-gradient(135deg, rgba(240, 253, 249, 0.98), rgba(255, 255, 255, 0.98)) !important;
+      border: 1.5px solid rgba(7, 136, 102, 0.28) !important;
+      border-radius: 14px !important;
+      padding: 12px 14px !important;
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      gap: 12px !important;
+      box-shadow: 0 4px 18px rgba(7, 136, 102, 0.08) !important;
+    }
+    .add-tests-banner-left strong {
+      font-size: 12.5px !important;
+      color: #045D49 !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 5px !important;
+    }
+    .add-tests-banner-left span {
+      font-size: 10.5px !important;
+      color: #536E66 !important;
+      font-weight: 600 !important;
+      display: block !important;
+      margin-top: 2px !important;
+    }
+    .add-tests-banner-btn {
+      background: linear-gradient(135deg, #078866, #045D49) !important;
+      color: #ffffff !important;
+      border: none !important;
+      padding: 9px 16px !important;
+      border-radius: 10px !important;
+      font-size: 12px !important;
+      font-weight: 800 !important;
+      cursor: pointer !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      box-shadow: 0 4px 14px rgba(7, 136, 102, 0.28) !important;
+      white-space: nowrap !important;
+      flex-shrink: 0 !important;
+      transition: transform 0.2s ease !important;
+    }
+    .add-tests-banner-btn:active {
+      transform: scale(0.96) !important;
+    }
+  </style>
 </head>
 <body>
 
@@ -36,31 +103,30 @@
   <!-- Main Container -->
   <main class="main-container">
 
-    <!-- Section 1: Name-Wise Patient & Family Selector (Customer + Family Members) -->
+    <!-- Section 1: Patient & Family Selector (Single clean chip per member) -->
     <section class="patient-selector-section glass-card animate-fade">
       <div class="section-title-wrap">
         <div>
           <h3>👥 Patient Bookings</h3>
           <p>Select a family member to view their live sample tracking</p>
         </div>
-        <button type="button" class="add-member-mini-btn" onclick="window.location.href='profile.html'">+ Add Member</button>
       </div>
 
       <!-- Horizontal Scrollable Patient Name Chips -->
       <div class="patient-chips-scroll" id="patient-chips-list">
-        <!-- Dynamically rendered: Customer (Self), Member 1, Member 2 -->
+        <!-- Dynamically rendered -->
       </div>
     </section>
 
-    <!-- Section 2: If Selected Patient Has Multiple Bookings, Show Booking Switcher -->
+    <!-- Section 2: Chronological Date-wise Booking Switcher -->
     <div id="patient-bookings-subnav" class="bookings-subnav-container" style="display: none;">
       <!-- Populated when a patient has >1 booking -->
     </div>
 
-    <!-- Section 3: DIRECT ACTIVE LIVE TRACKING VIEW (NO SEARCH REQUIRED) -->
+    <!-- Section 3: DIRECT ACTIVE LIVE TRACKING VIEW -->
     <div id="active-track-view" style="display: none;">
 
-      <!-- Booking Info Overview Card -->
+      <!-- 1. Booking Info Overview Card (Address banner removed) -->
       <section class="booking-meta-card glass-card animate-fade">
         <div class="meta-head-row">
           <div>
@@ -88,14 +154,14 @@
             <strong id="disp-amount-val">₹0</strong>
           </div>
         </div>
-
-        <div class="location-banner" id="disp-location-box">
-          <span id="disp-location-icon">📍</span>
-          <span id="disp-location-text">Pickup address details</span>
-        </div>
       </section>
 
-      <!-- Dynamic Live Tracking Stepper -->
+      <!-- 2. ADD TESTS BOX (Positioned between Booking Reference & Live Diagnostic Progress) -->
+      <div id="disp-add-tests-box" style="display: none;">
+        <!-- Dynamically injected if within 3 hours cutoff -->
+      </div>
+
+      <!-- 3. Dynamic Live Tracking Stepper -->
       <section class="stepper-card glass-card animate-fade">
         <div class="stepper-title-row">
           <h4>🧪 Live Diagnostic Progress</h4>
@@ -107,7 +173,7 @@
         </div>
       </section>
 
-      <!-- Booked Tests Summary List -->
+      <!-- 4. Booked Tests Summary List -->
       <section class="tests-summary-card glass-card animate-fade">
         <h4>📋 Booked Tests & Packages</h4>
         <div class="booked-tests-list" id="disp-tests-list">
@@ -115,7 +181,7 @@
         </div>
       </section>
 
-      <!-- Phlebotomist / Lab Support Action -->
+      <!-- 5. Lab Support Action -->
       <section class="support-card glass-card animate-fade">
         <div class="support-details">
           <strong>Need Instant Help with Sample Pickup?</strong>
@@ -128,7 +194,7 @@
 
     </div>
 
-    <!-- Section 4: EMPTY STATE (If the selected family member has no booking yet) -->
+    <!-- Section 4: EMPTY STATE -->
     <section id="patient-empty-state" class="empty-state-card glass-card" style="display: none;">
       <div class="empty-state-icon">📋</div>
       <h3 id="empty-patient-title">No Active Bookings</h3>
@@ -141,7 +207,7 @@
 
   </main>
 
-  <!-- 5-Tab Fixed Bottom Navigation (Track Booking Active) -->
+  <!-- 5-Tab Fixed Bottom Navigation -->
   <nav class="bottom-nav">
     <a href="customer.html" class="nav-item">
       <span class="nav-icon">🏠</span>
@@ -166,7 +232,7 @@
     </a>
   </nav>
 
-  <!-- Core JavaScript Scripts Matching Customer & Cart Pages -->
+  <!-- Core JavaScript Scripts -->
   <script src="assets/js/config.js?v=5.8.0"></script>
   <script src="assets/js/utils.js?v=5.8.0"></script>
   <script src="assets/js/api.js?v=5.8.0"></script>
@@ -174,6 +240,6 @@
   <script src="assets/js/offline-sync.js?v=5.8.0"></script>
   <script src="assets/js/auth.js?v=5.8.0"></script>
   <script src="assets/js/app.js?v=5.8.0"></script>
-  <script src="assets/js/bookings.js?v=5.8.0"></script>
+  <script src="assets/js/bookings.js?v=6.4.0"></script>
 </body>
 </html>

@@ -1,0 +1,361 @@
+<!-- file: technician.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Technician Operations Portal - Selfcare Diagnostics</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="stylesheet" href="assets/css/global.css?v=6.4.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=6.4.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=6.4.0">
+  <link rel="stylesheet" href="assets/css/technician.css?v=1.0.0">
+</head>
+<body class="tech-body-bg">
+
+  <!-- Floating Glass App Header -->
+  <header class="tech-header glass-nav-3d">
+    <div class="tech-header-left">
+      <div class="brand-wrap">
+        <h1 class="logo-text">SELFCARE <span class="logo-sub">TECH PORTAL</span></h1>
+        <p class="tagline" id="tech-zone-tagline">Diagnostics Staff Operations</p>
+      </div>
+    </div>
+    
+    <div class="tech-header-right" id="tech-user-badge-wrap" style="display: none;">
+      <div class="tech-profile-pill">
+        <span class="tech-avatar-circle" id="tech-avatar-icon">🧑‍🔬</span>
+        <div class="tech-meta-text">
+          <strong id="tech-display-name">Technician</strong>
+          <span class="role-badge" id="tech-display-role">Lab</span>
+        </div>
+      </div>
+      <button type="button" class="tech-logout-btn" onclick="TechnicianApp.logout()" title="Logout">
+        🚪
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workstation Container -->
+  <main class="main-container tech-main-wrapper">
+
+    <!-- MODE SWITCH TABS (Shown if tech has multi-access or toggling) -->
+    <div class="mode-switch-card glass-panel-3d" id="tech-mode-switcher" style="display: none;">
+      <button type="button" class="mode-tab-btn active" id="btn-mode-lab" onclick="TechnicianApp.switchPortalMode('lab')">
+        🔬 Lab Walk-in Billing
+      </button>
+      <button type="button" class="mode-tab-btn" id="btn-mode-home" onclick="TechnicianApp.switchPortalMode('home')">
+        🏠 Home Collection Fleet
+      </button>
+    </div>
+
+    <!-- =========================================================
+         SECTION 1: LAB WALK-IN DESK (ID: Techlab...)
+         ========================================================= -->
+    <div id="lab-portal-view" class="portal-view-section active">
+      
+      <!-- Top Test & Package Search Input -->
+      <section class="glass-panel-3d group-card search-catalogue-box">
+        <div class="group-title-row">
+          <h4>🔍 Search Tests & Health Packages</h4>
+          <span class="sub-counter-badge" id="cat-items-counter">Instant Lookup</span>
+        </div>
+        
+        <div class="search-input-group">
+          <input type="text" id="catalogue-search-input" 
+                 placeholder="Type test name, code (e.g. CBC, Lipid, HbA1c, PKG001)..." 
+                 autocomplete="off" 
+                 oninput="TechnicianApp.handleSearchInput(this.value)">
+          <button type="button" class="clear-search-btn" id="clear-search-btn" onclick="TechnicianApp.clearSearch()">✕</button>
+        </div>
+
+        <!-- Live Dropdown Suggestions Box -->
+        <div id="search-results-dropdown" class="search-dropdown-menu" style="display: none;"></div>
+      </section>
+
+      <!-- Customer Lookup & Identification -->
+      <section class="glass-panel-3d group-card">
+        <div class="group-title-row">
+          <h4>👤 Customer / Patient Information</h4>
+          <button type="button" class="mini-btn-emerald" onclick="TechnicianApp.openNewCustomerModal()">
+            + New Customer
+          </button>
+        </div>
+
+        <div class="customer-search-grid">
+          <div class="form-field-unit">
+            <label>Customer Mobile Number</label>
+            <div class="mobile-autofill-wrap">
+              <span class="prefix-91">+91</span>
+              <input type="tel" id="cust-mobile-input" maxlength="10" placeholder="Enter 10-digit mobile"
+                     oninput="TechnicianApp.handleCustomerMobileLookup(this.value)">
+            </div>
+          </div>
+
+          <div class="form-field-unit">
+            <label>Patient Name</label>
+            <input type="text" id="cust-name-input" placeholder="Patient full name">
+          </div>
+        </div>
+
+        <div class="customer-extra-grid">
+          <div class="form-field-unit">
+            <label>Age</label>
+            <input type="number" id="cust-age-input" placeholder="Age" min="1" max="120">
+          </div>
+          <div class="form-field-unit">
+            <label>Gender</label>
+            <select id="cust-gender-select">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-field-unit">
+            <label>Family Member Select</label>
+            <select id="cust-family-dropdown" onchange="TechnicianApp.handleFamilySelect(this.value)">
+              <option value="SELF">Self (Primary)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Dedicated In-Page Walk-in Cart Table -->
+      <section class="glass-panel-3d group-card inpage-cart-card">
+        <div class="group-title-row">
+          <h4>🧪 Lab Billing Cart Items</h4>
+          <span class="cart-pill-counter" id="inpage-cart-count">0 Items</span>
+        </div>
+
+        <div id="inpage-cart-items-list" class="cart-items-table-list">
+          <div class="empty-inpage-cart">
+            <span>🛒</span>
+            <p>No tests or packages added yet. Search above to add items for lab counter checkout.</p>
+          </div>
+        </div>
+
+        <!-- Bill Summary Card (₹0 Doorstep Collection Fee strictly applied) -->
+        <div class="bill-summary-strip">
+          <div class="bill-summary-row">
+            <span>Total Tests MRP:</span>
+            <span class="strikethrough-val" id="lab-bill-mrp">₹0</span>
+          </div>
+          <div class="bill-summary-row">
+            <span>Diagnostic Offer Price:</span>
+            <span id="lab-bill-subtotal">₹0</span>
+          </div>
+          <div class="bill-summary-row">
+            <span>Doorstep Sample Collection:</span>
+            <span class="green-highlight">FREE (₹0 - Direct Lab Counter)</span>
+          </div>
+          <div class="bill-summary-divider"></div>
+          <div class="bill-summary-row final-row">
+            <strong>Grand Payable Amount:</strong>
+            <strong class="grand-payable-emerald" id="lab-bill-grand-total">₹0</strong>
+          </div>
+        </div>
+
+        <div class="cart-bottom-actions">
+          <button type="button" class="btn-clear-cart" onclick="TechnicianApp.clearInPageCart()">
+            Clear All
+          </button>
+          <button type="button" class="primary-glow-action-btn" id="btn-submit-lab-booking" onclick="TechnicianApp.executeLabCounterCheckout()">
+            ✓ Confirm Lab Bill & Print Receipt
+          </button>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- =========================================================
+         SECTION 2: HOME COLLECTION FLEET (ID: Techhome...)
+         ========================================================= -->
+    <div id="home-portal-view" class="portal-view-section">
+      
+      <!-- Technician Wallet & Cash-in-Hand Dashboard -->
+      <section class="glass-panel-3d wallet-main-card">
+        <div class="wallet-top-header">
+          <div>
+            <span class="wallet-label-sub">Technician Earnings Wallet</span>
+            <h2 class="wallet-balance-num" id="wallet-balance-amount">₹0</h2>
+          </div>
+          <div class="cash-in-hand-wrap">
+            <span class="cash-label">Cash In Hand</span>
+            <strong class="cash-val" id="wallet-cash-in-hand">₹0</strong>
+          </div>
+        </div>
+
+        <div class="wallet-payout-grid">
+          <button type="button" class="payout-action-btn" onclick="TechnicianApp.requestWithdrawal('Same Day')">
+            ⚡ Same Day Payout
+          </button>
+          <button type="button" class="payout-action-btn" onclick="TechnicianApp.requestWithdrawal('Weekly')">
+            📅 Weekly Payout
+          </button>
+          <button type="button" class="payout-action-btn" onclick="TechnicianApp.requestWithdrawal('Monthly')">
+            🗓️ Monthly Payout
+          </button>
+        </div>
+      </section>
+
+      <!-- Quick Action Utilities -->
+      <div class="quick-utilities-row">
+        <button type="button" class="utility-chip-btn ild-call-btn" onclick="TechnicianApp.openIldDirectoryModal()">
+          📞 Call ILD Hubs
+        </button>
+        <button type="button" class="utility-chip-btn" onclick="TechnicianApp.refreshAssignedTrips()">
+          🔄 Refresh Trips
+        </button>
+        <button type="button" class="utility-chip-btn" onclick="TechnicianApp.detectCurrentGpsLocation()">
+          📍 Update GPS
+        </button>
+      </div>
+
+      <!-- Assigned Trips List (Accept / Reject Flow & 10KM Radius Filter) -->
+      <section class="glass-panel-3d group-card">
+        <div class="group-title-row">
+          <h4>📦 Assigned Home Collection Pickups</h4>
+          <span class="sub-counter-badge" id="assigned-jobs-count">0 Trips</span>
+        </div>
+
+        <div id="assigned-jobs-container" class="jobs-vertical-list">
+          <!-- Populated dynamically via technician.js -->
+        </div>
+      </section>
+
+      <!-- Active Accepted Queue (Trip In-Progress & Mark Completed) -->
+      <section class="glass-panel-3d group-card">
+        <div class="group-title-row">
+          <h4>🚀 Active Collections Queue</h4>
+          <span class="sub-counter-badge" id="active-queue-count">0 In-Progress</span>
+        </div>
+
+        <div id="active-queue-container" class="jobs-vertical-list">
+          <!-- Populated dynamically via technician.js -->
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- =========================================================
+       MODALS
+       ========================================================= -->
+
+  <!-- Modal 1: Technician Authentication (Techlab / Techhome) -->
+  <div id="tech-login-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>🔒</span>
+          <h3>Technician Operations Login</h3>
+        </div>
+      </div>
+      <div class="sia-modal-body">
+        <p class="login-subtext">
+          Enter your admin-issued Staff ID (e.g. <code>TechlabRamesh</code> or <code>TechhomeSuresh</code>) and password[span_9](start_span)[span_9](end_span)[span_10](start_span)[span_10](end_span).
+        </p>
+
+        <form id="tech-login-form" onsubmit="TechnicianApp.handleLogin(event)">
+          <div class="form-field-unit">
+            <label>Technician ID</label>
+            <input type="text" id="tech-login-id" placeholder="Techlab... or Techhome..." required autocomplete="username">
+          </div>
+          <div class="form-field-unit">
+            <label>Password</label>
+            <input type="password" id="tech-login-pass" placeholder="Enter admin password" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" class="primary-glow-action-btn" style="margin-top: 12px; width: 100%;">
+            Login to Operations Desk ➔
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Add New Customer -->
+  <div id="new-customer-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>➕</span>
+          <h3>Register New Customer</h3>
+        </div>
+        <button type="button" class="sia-close-btn" onclick="TechnicianApp.closeModal('new-customer-modal')">✕</button>
+      </div>
+      <div class="sia-modal-body">
+        <form id="new-customer-form" onsubmit="TechnicianApp.handleSaveNewCustomer(event)">
+          <div class="form-field-unit">
+            <label>Mobile Number (10 Digits)</label>
+            <input type="tel" id="new-cust-phone" maxlength="10" placeholder="10-digit mobile number" required>
+          </div>
+          <div class="form-field-unit">
+            <label>Customer Full Name</label>
+            <input type="text" id="new-cust-name" placeholder="Full name" required>
+          </div>
+          <div class="customer-extra-grid">
+            <div class="form-field-unit">
+              <label>Age</label>
+              <input type="number" id="new-cust-age" placeholder="Age" min="1" max="120" required>
+            </div>
+            <div class="form-field-unit">
+              <label>Gender</label>
+              <select id="new-cust-gender">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-field-unit">
+            <label>Address / Area</label>
+            <input type="text" id="new-cust-address" placeholder="Door No, Street, Chennai Area">
+          </div>
+
+          <button type="submit" class="primary-glow-action-btn" style="margin-top: 10px; width: 100%;">
+            Save Customer & Select ✓
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Call ILD Hub Handover Directory -->
+  <div id="ild-directory-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>📞</span>
+          <h3>Area-wise ILD Hub Handover Directory</h3>
+        </div>
+        <button type="button" class="sia-close-btn" onclick="TechnicianApp.closeModal('ild-directory-modal')">✕</button>
+      </div>
+      <div class="sia-modal-body">
+        <p class="ild-desc">
+          Enquire and coordinate with the nearest Internal Logistics Delivery (ILD) coordinator to handover collected blood and urine vacutainers:
+        </p>
+
+        <div class="ild-contacts-stack" id="ild-contacts-list">
+          <!-- Populated dynamically via technician.js -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core JavaScript Architecture -->
+  <script src="assets/js/config.js?v=8.2.0"></script>
+  <script src="assets/js/utils.js?v=12.0.0"></script>
+  <script src="assets/js/api.js?v=5.1.0"></script>
+  <script src="assets/js/offline-db.js?v=5.0.0"></script>
+  <script src="assets/js/offline-sync.js?v=5.0.0"></script>
+  <script src="assets/js/auth.js?v=3.4.0"></script>
+  <script src="assets/js/technician.js?v=1.0.0"></script>
+</body>
+</html>

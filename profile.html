@@ -63,31 +63,34 @@
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 3. Blood Connect (Replaces Addresses) -->
-      <div class="menu-item-row" onclick="ProfilePage.openBloodConnectModal()">
+      <!-- 3. Membership (Redirects to membership.html) -->
+      <div class="menu-item-row" onclick="window.location.href='membership.html'">
+        <div class="menu-left">
+          <span class="menu-icon">👑</span>
+          <span class="menu-label">Membership</span>
+        </div>
+        <span class="menu-chevron">›</span>
+      </div>
+
+      <!-- 4. Blood Connect (Redirects to blood.html) -->
+      <div class="menu-item-row" onclick="window.location.href='blood.html'">
         <div class="menu-left">
           <span class="menu-icon">🩸</span>
           <span class="menu-label">Blood Connect</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <span class="blood-badge-pill">Donor Finder</span>
-          <span class="menu-chevron">›</span>
-        </div>
+        <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 4. Refer And Earn -->
-      <div class="menu-item-row" onclick="ProfilePage.openReferEarnModal()">
+      <!-- 5. Refer And Earn (Redirects to refer.html) -->
+      <div class="menu-item-row" onclick="window.location.href='refer.html'">
         <div class="menu-left">
           <span class="menu-icon">🎁</span>
           <span class="menu-label">Refer And Earn</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <span class="refer-badge-pill" id="referral-reward-badge" style="display:none;">Up to 100% OFF</span>
-          <span class="menu-chevron">›</span>
-        </div>
+        <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 5. General Info -->
+      <!-- 6. General Info -->
       <div class="menu-item-row" onclick="ProfilePage.openGeneralInfoModal()">
         <div class="menu-left">
           <span class="menu-icon">ℹ️</span>
@@ -96,7 +99,7 @@
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 6. Logout -->
+      <!-- 7. Logout -->
       <div class="menu-item-row" onclick="ProfilePage.handleLogout()">
         <div class="menu-left">
           <span class="menu-icon">🚪</span>
@@ -105,7 +108,7 @@
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 7. Support Desk -->
+      <!-- 8. Support Desk -->
       <div class="menu-item-row" onclick="ProfilePage.openSupportDeskModal()">
         <div class="menu-left">
           <span class="menu-icon">🎧</span>
@@ -122,7 +125,7 @@
        MODALS
        ========================================================================= -->
 
-  <!-- Modal 1: My Profile Details & Mandatory Setup -->
+  <!-- Modal 1: My Profile Details -->
   <div id="modal-my-profile" class="sia-modal-overlay">
     <div class="sia-modal-content glass-modal-3d animate-3d-pop">
       <div class="sia-modal-header">
@@ -134,15 +137,6 @@
       </div>
 
       <div class="sia-modal-body">
-        
-        <!-- Mandatory Onboarding Notice for New Users -->
-        <div id="mandatory-setup-alert" class="mandatory-setup-box" style="display: none;">
-          <div class="alert-icon">⚡</div>
-          <div>
-            <strong>Profile Setup Required</strong>
-            <p>Please complete your primary contact details and sample pickup address to access test booking.</p>
-          </div>
-        </div>
 
         <!-- View Mode -->
         <div id="profile-view-mode">
@@ -360,140 +354,6 @@
     </div>
   </div>
 
-  <!-- Modal 3: Blood Connect (Blood Donor Network) -->
-  <div id="modal-blood-connect" class="sia-modal-overlay">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header blood-header">
-        <div class="modal-title-wrap">
-          <span>🩸</span>
-          <h3>Selfcare Blood Connect</h3>
-        </div>
-        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-blood-connect')">✕</button>
-      </div>
-
-      <div class="sia-modal-body">
-        <div class="blood-connect-hero">
-          <div class="blood-drop-circle">🩸</div>
-          <h4>Chennai Voluntary Blood Network</h4>
-          <p>Connecting verified donors with patients requiring urgent blood units across Chennai diagnostic and clinical centers.</p>
-        </div>
-
-        <div class="user-blood-group-card">
-          <span class="sub-lbl">Your Registered Blood Group:</span>
-          <strong class="blood-type-val" id="blood-connect-display-bg">O+</strong>
-          <small class="verified-tag">✓ Verified</small>
-        </div>
-
-        <div class="blood-features-list">
-          <div class="blood-feature-item">
-            <span class="feat-icon">🤝</span>
-            <div>
-              <strong>Verified Voluntary Donors</strong>
-              <p>Direct emergency contact database for rare and common blood groups.</p>
-            </div>
-          </div>
-          <div class="blood-feature-item">
-            <span class="feat-icon">🚨</span>
-            <div>
-              <strong>Instant Emergency SOS</strong>
-              <p>Broadcast high-priority hospital requests directly via verified channels.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="blood-action-box">
-          <button type="button" class="blood-register-btn" onclick="ProfilePage.registerAsBloodDonor()">
-            ❤️ Register as Voluntary Donor (Coming Soon)
-          </button>
-          <button type="button" class="blood-emergency-btn" onclick="ProfilePage.requestEmergencyBloodHelp()">
-            💬 Emergency Blood Request (WhatsApp Desk)
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal 4: Refer And Earn (Progressive 10% - 100% Milestone Engine + Min ₹500 Rule) -->
-  <div id="modal-refer-earn" class="sia-modal-overlay">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header">
-        <div class="modal-title-wrap">
-          <span>🎁</span>
-          <h3>Refer & Earn Free Checkup</h3>
-        </div>
-        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-refer-earn')">✕</button>
-      </div>
-
-      <div class="sia-modal-body">
-        
-        <!-- INSTRUCTION BANNER -->
-        <div class="referral-instructions-card">
-          <div class="instruction-header">
-            <span class="sparkle-icon">✨</span>
-            <h4>Get FREE Health Checkup for referring your friends and family!</h4>
-          </div>
-          
-          <div class="instruction-steps-grid">
-            <div class="inst-step">
-              <span class="step-badge">1 Refer</span>
-              <p><strong>10% Discount</strong> unlocked per completed order (Min. ₹500).</p>
-            </div>
-            <div class="inst-step">
-              <span class="step-badge">5 Referrals</span>
-              <p><strong>50% Discount</strong> applied directly to your cart.</p>
-            </div>
-            <div class="inst-step highlight-step">
-              <span class="step-badge">10 Referrals</span>
-              <p><strong>100% FREE</strong> Complete Preventive Checkup!</p>
-            </div>
-          </div>
-
-          <div class="restriction-notice-pill">
-            <span class="rule-icon">⚠️</span>
-            <p><strong>Important Rules:</strong><br>
-            1. Referred friend must complete a booking worth <strong>minimum ₹500</strong> using your code.<br>
-            2. This progressive discount is valid strictly for the <strong>Primary Account Holder (Self)</strong> and cannot be used for family members.<br>
-            3. Once the 100% discount is redeemed, your milestone counter resets to 0 to begin a new cycle.</p>
-          </div>
-        </div>
-
-        <!-- PROGRESS TRACKER -->
-        <div class="referral-live-tracker-card">
-          <div class="tracker-header">
-            <span>Eligible Referral Bookings (₹500+):</span>
-            <strong id="referral-count-display">0 / 10 Completed</strong>
-          </div>
-          <div class="tracker-bar-bg">
-            <div class="tracker-bar-fill" id="referral-bar-fill" style="width: 0%;"></div>
-          </div>
-          <div class="tracker-reward-summary">
-            <span>Cart Discount Status:</span>
-            <strong class="highlight-discount" id="referral-unlocked-discount">0% OFF</strong>
-          </div>
-        </div>
-
-        <!-- SHARE CARD -->
-        <div class="refer-invite-box">
-          <div class="referral-code-pill">
-            <span>YOUR REFERRAL CODE:</span>
-            <strong id="user-refer-code">SC7010</strong>
-          </div>
-
-          <button type="button" class="whatsapp-share-btn" onclick="ProfilePage.shareReferralWhatsApp()">
-            <span>💬</span> Share Referral Link via WhatsApp
-          </button>
-        </div>
-
-        <!-- REWARD COUPON CARD -->
-        <div class="earned-rewards-section" style="margin-top: 10px;">
-          <h5 class="reward-section-title">🎁 Available Cart Coupon:</h5>
-          <div id="earned-coupons-container" class="earned-coupons-list"></div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
   <!-- Modal 5: General Info -->
   <div id="modal-general-info" class="sia-modal-overlay">
     <div class="sia-modal-content glass-modal-3d animate-3d-pop">
@@ -590,6 +450,6 @@
   <script src="assets/js/offline-sync.js?v=6.0.0"></script>
   <script src="assets/js/auth.js?v=6.0.0"></script>
   <script src="assets/js/app.js?v=6.0.0"></script>
-  <script src="assets/js/profile.js?v=6.2.0"></script>
+  <script src="assets/js/profile.js?v=6.7.0"></script>
 </body>
 </html>

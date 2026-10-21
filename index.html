@@ -1,4 +1,4 @@
-<!-- file: index.html[span_0](start_span)[span_0](end_span) -->
+<!-- file: index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -722,7 +722,7 @@
         <div class="form-group">
           <label for="staff-id-input">Admin or Technician ID</label>
           <div class="staff-input-wrap">
-            <input type="text" id="staff-id-input" placeholder="Enter ID" autocomplete="username">
+            <input type="text" id="staff-id-input" placeholder="Enter ID (e.g. Techlab... or Techhome...)" autocomplete="username">
           </div>
         </div>
 
@@ -868,14 +868,44 @@
         }, 1200);
       },
 
+      /**
+       * Safe Login Check (Prevents Infinite Redirect Loops)
+       */
       checkExistingLogin() {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // If logout query param is present, purge all cached tokens and stay on login form
+        if (urlParams.get('logout') === 'true') {
+          localStorage.removeItem('selfcare_active_user');
+          localStorage.removeItem('selfcare_user_role');
+          localStorage.removeItem('selfcare_active_tech');
+          localStorage.removeItem('selfcare_active_technician');
+          localStorage.removeItem('selfcare_auth_token');
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          return;
+        }
+
         const userRole = localStorage.getItem('selfcare_user_role');
         const activeUser = localStorage.getItem('selfcare_active_user');
 
         if (activeUser && userRole) {
-          if (userRole === 'admin') window.location.replace('admin.html');
-          else if (userRole === 'technician') window.location.replace('technician.html');
-          else window.location.replace('customer.html');
+          if (userRole === 'admin') {
+            window.location.replace('admin.html');
+          } else if (userRole === 'technician') {
+            // Only redirect if active technician session data actually exists in storage
+            const hasTech = localStorage.getItem('selfcare_active_tech') || localStorage.getItem('selfcare_active_technician');
+            if (hasTech) {
+              window.location.replace('technician.html');
+            } else {
+              // Stale technician flag detected - clear it to break infinite loop!
+              localStorage.removeItem('selfcare_user_role');
+              localStorage.removeItem('selfcare_active_user');
+            }
+          } else {
+            window.location.replace('customer.html');
+          }
         }
       },
 
@@ -904,9 +934,6 @@
         document.getElementById('phone-error-hint').style.display = 'none';
       },
 
-      /**
-       * REQUEST OTP: Displays banner at top and auto-fills 4 input boxes
-       */
       async requestOtp() {
         const input = document.getElementById('user-mobile-input');
         const val = input ? input.value.trim() : '';
@@ -925,7 +952,6 @@
         try {
           let serverRes = null;
 
-          // Call backend if available
           if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.requestOtp === 'function') {
             try {
               serverRes = await Api.requestOtp(this.phone);
@@ -945,7 +971,6 @@
           document.getElementById('step-otp-view').style.display = 'block';
           document.getElementById('disp-phone-target').textContent = `+91 ${this.phone}`;
 
-          // 1. Show Top Banner with OTP
           const topBadge = document.getElementById('top-otp-badge');
           const topDisp = document.getElementById('top-otp-display');
           if (topBadge && topDisp) {
@@ -953,7 +978,6 @@
             topBadge.style.display = 'flex';
           }
 
-          // 2. Clear old values and auto-fill into 4 input boxes
           const inputs = document.querySelectorAll('#step-otp-view .otp-digit');
           inputs.forEach(i => i.value = '');
 
@@ -971,9 +995,6 @@
         }
       },
 
-      /**
-       * Auto-fills the 4 OTP digit boxes
-       */
       autoFillOtp() {
         if (!this.generatedOtp) return;
         const digits = String(this.generatedOtp).split('');
@@ -983,7 +1004,6 @@
           input.value = digits[idx] || '';
         });
 
-        // Focus on last box
         if (inputs[inputs.length - 1]) {
           inputs[inputs.length - 1].focus();
         }
@@ -1041,7 +1061,6 @@
         try {
           let serverUser = null;
 
-          // 1. Backend Server verification
           if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.verifyOtp === 'function') {
             try {
               serverUser = await Api.verifyOtp(this.phone, enteredOtp);
@@ -1053,7 +1072,6 @@
             }
           }
 
-          // 2. Offline / Fallback check
           if (!serverUser && enteredOtp !== this.generatedOtp && enteredOtp !== '1234') {
             throw new Error('Invalid OTP entered. Please try again.');
           }
@@ -1061,7 +1079,6 @@
           const currentMobile = this.phone;
           const previousMobile = localStorage.getItem('selfcare_active_user');
 
-          // Stash previous user cart safely
           if (previousMobile && previousMobile !== currentMobile) {
             try {
               const activeCart = localStorage.getItem('selfcare_cart');
@@ -1087,7 +1104,6 @@
             localStorage.setItem('selfcare_customer_profile', JSON.stringify(userData));
           }
 
-          // Restore Isolated Cart
           try {
             const userVaultCart = localStorage.getItem(`selfcare_cart_${currentMobile}`);
             localStorage.setItem('selfcare_cart', userVaultCart || JSON.stringify([]));
@@ -1113,13 +1129,15 @@
 
       /**
        * STAFF / ADMIN / TECHNICIAN LOGIN HANDLER
+       * Handles whitespace trimming, local admin db check & live Google Sheets API verification
        */
-      handleStaffLogin() {
+      async handleStaffLogin() {
         const idInput = document.getElementById('staff-id-input');
         const pwdInput = document.getElementById('staff-password-input');
         const errorHint = document.getElementById('staff-error-hint');
+        const loginBtn = document.getElementById('staff-login-btn');
 
-        const enteredId = idInput ? idInput.value.trim().toLowerCase() : '';
+        const enteredId = idInput ? idInput.value.replace(/\s+/g, '').toLowerCase() : '';
         const enteredPwd = pwdInput ? pwdInput.value.trim() : '';
 
         errorHint.style.display = 'none';
@@ -1128,6 +1146,11 @@
           errorHint.textContent = 'Please enter both ID and Password.';
           errorHint.style.display = 'block';
           return;
+        }
+
+        if (loginBtn) {
+          loginBtn.disabled = true;
+          loginBtn.textContent = 'Verifying Credentials...';
         }
 
         // 1. Check ADMIN CREDENTIALS
@@ -1141,29 +1164,70 @@
           return;
         }
 
-        // 2. Check TECHNICIAN CREDENTIALS (Created by Admin)
+        // 2. Check TECHNICIAN CREDENTIALS in localStorage
         let technicians = [];
         try {
           const storedTechs = localStorage.getItem('selfcare_technicians');
           if (storedTechs) technicians = JSON.parse(storedTechs);
         } catch (e) {}
 
-        const matchedTech = technicians.find(t => 
-          (t.loginId || '').toLowerCase() === enteredId && t.password === enteredPwd
-        );
+        const matchedTech = technicians.find(t => {
+          const tId = String(t.id || t.loginId || t.TechID || t.LoginID || '').replace(/\s+/g, '').toLowerCase();
+          const tPwd = String(t.pass || t.password || t.Password || '').trim();
+          return tId === enteredId && tPwd === enteredPwd;
+        });
 
         if (matchedTech) {
-          localStorage.setItem('selfcare_active_user', matchedTech.loginId);
+          const techId = matchedTech.id || matchedTech.loginId || matchedTech.TechID || enteredId;
+          const techData = {
+            id: techId,
+            name: matchedTech.name || matchedTech.Name || techId,
+            zone: matchedTech.zone || matchedTech.ZoneArea || 'Chennai Zone',
+            role: 'technician'
+          };
+          localStorage.setItem('selfcare_active_user', techId);
           localStorage.setItem('selfcare_user_role', 'technician');
-          localStorage.setItem('selfcare_active_technician', JSON.stringify(matchedTech));
-          localStorage.setItem('selfcare_auth_token', `TECH_TOKEN_${matchedTech.loginId}`);
+          localStorage.setItem('selfcare_active_tech', JSON.stringify(techData));
+          localStorage.setItem('selfcare_active_technician', JSON.stringify(techData));
+          localStorage.setItem('selfcare_auth_token', `TECH_TOKEN_${techId}`);
 
-          if (typeof Utils !== 'undefined') Utils.showToast(`Welcome Technician ${matchedTech.name}!`, 'success');
+          if (typeof Utils !== 'undefined') Utils.showToast(`Welcome Technician ${techData.name}!`, 'success');
           setTimeout(() => window.location.replace('technician.html'), 400);
           return;
         }
 
-        // If credentials do not match
+        // 3. Live Google Sheets Backend Verification via Api.staffLogin
+        if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.staffLogin === 'function') {
+          try {
+            const serverRes = await Api.staffLogin(enteredId, enteredPwd);
+            if (serverRes && (serverRes.success || serverRes.userId)) {
+              const techId = serverRes.userId || serverRes.techId || enteredId;
+              const techData = {
+                id: techId,
+                name: serverRes.name || techId,
+                zone: serverRes.area || serverRes.zone || 'Chennai Zone',
+                role: serverRes.role || 'technician'
+              };
+              localStorage.setItem('selfcare_active_user', techId);
+              localStorage.setItem('selfcare_user_role', 'technician');
+              localStorage.setItem('selfcare_active_tech', JSON.stringify(techData));
+              localStorage.setItem('selfcare_active_technician', JSON.stringify(techData));
+              localStorage.setItem('selfcare_auth_token', `TECH_TOKEN_${techId}`);
+
+              if (typeof Utils !== 'undefined') Utils.showToast(`Welcome Technician ${techData.name}!`, 'success');
+              setTimeout(() => window.location.replace('technician.html'), 400);
+              return;
+            }
+          } catch (netErr) {
+            console.warn('[IndexPortal] Live staff login check notice:', netErr);
+          }
+        }
+
+        // 4. If credentials do not match
+        if (loginBtn) {
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Login to Workspace ➔';
+        }
         errorHint.textContent = 'Invalid ID or Password. Please check credentials.';
         errorHint.style.display = 'block';
         if (typeof Utils !== 'undefined') Utils.showToast('Invalid credentials', 'error');

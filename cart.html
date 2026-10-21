@@ -14,7 +14,10 @@
   <link rel="stylesheet" href="assets/css/global.css?v=6.3.0">
   <link rel="stylesheet" href="assets/css/components.css?v=6.3.0">
   <link rel="stylesheet" href="assets/css/responsive.css?v=6.3.0">
-  <link rel="stylesheet" href="assets/css/cart.css?v=8.1.0">
+  <link rel="stylesheet" href="assets/css/cart.css?v=10.0.0">
+
+  <!-- Official Razorpay Checkout SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body class="glass-bg-body">
 
@@ -64,7 +67,7 @@
           <p class="slide-subtext">Choose family members and review tests assigned to each patient</p>
         </div>
 
-        <!-- Multi-Patient Selection Carousel (Moved to Slide 1) -->
+        <!-- Multi-Patient Selection Carousel -->
         <div class="glass-panel-3d group-box" id="patient-selection-section">
           <div class="group-title-row">
             <h4>👥 Choose Family Members</h4>
@@ -80,7 +83,7 @@
             <span class="items-count-pill" id="cart-items-count-badge">0 Items</span>
           </div>
 
-          <!-- Grouped Cart Items Container (Contains all Patient Cards + Their Add Buttons) -->
+          <!-- Grouped Cart Items Container -->
           <div id="cart-items-list" class="cart-items-vertical-list"></div>
         </div>
 
@@ -102,16 +105,6 @@
             <div class="summary-row highlight-savings">
               <span class="s-label">Diagnostic Package Savings:</span>
               <span class="s-value" id="bill-lab-savings">- ₹0</span>
-            </div>
-
-            <div class="summary-row discount-row" id="bill-coupon-row" style="display: none;">
-              <span class="s-label" id="bill-coupon-label">Coupon Discount:</span>
-              <span class="s-value green-val" id="bill-coupon-amount">- ₹0</span>
-            </div>
-
-            <div class="summary-row discount-row" id="bill-online-pay-row" style="display: none !important;">
-              <span class="s-label">Online Payment Discount:</span>
-              <span class="s-value green-val" id="bill-online-pay-discount">- ₹0</span>
             </div>
 
             <div class="summary-row">
@@ -146,7 +139,7 @@
           <p class="slide-subtext">Confirm collection address and choose a convenient time slot</p>
         </div>
 
-        <!-- Selected Patient(s) Live Summary & Address Card -->
+        <!-- Selected Patient Live Summary & Address Card -->
         <div class="glass-panel-3d group-box patient-info-card-3d" id="selected-patient-details-card">
           <div class="patient-info-header">
             <div>
@@ -158,7 +151,6 @@
             </button>
           </div>
 
-          <!-- Multi-patient Overview Tags container -->
           <div id="selected-patients-overview-tags" class="selected-patients-tag-wrap" style="display:none; gap:6px; flex-wrap:wrap; margin-bottom:10px;"></div>
 
           <div class="patient-info-body">
@@ -188,7 +180,7 @@
           </div>
         </div>
 
-        <!-- Appointment Date & 30-Minute Time Slot Picker -->
+        <!-- Appointment Date & Slot Picker -->
         <div class="glass-panel-3d group-box schedule-slot-box" id="pickup-details-card">
           <div class="group-title-row">
             <h4 id="slot-picker-title">⏱️ Sample Collection Date & Slot</h4>
@@ -209,37 +201,36 @@
       </section>
 
       <!-- =========================================================
-           SLIDE 3: PAYMENT & COUPONS / OFFERS
+           SLIDE 3: PAYMENT METHOD (RAZORPAY ONLINE & CASH)
            ========================================================= -->
       <section class="wizard-slide" id="cart-slide-3">
         <div class="slide-header">
           <span class="slide-badge">Step 3 of 4</span>
-          <h2>Payment & Offers</h2>
-          <p class="slide-subtext">Select payment mode and save extra with coupons or referral codes</p>
+          <h2>Payment Method</h2>
+          <p class="slide-subtext">Choose your preferred payment method</p>
         </div>
 
-        <!-- Payment Mode Card Group -->
         <div class="glass-panel-3d group-box">
           <div class="group-title-row">
-            <h4>💳 Select Payment Method</h4>
+            <h4>💳 Select Payment Option</h4>
           </div>
 
           <div class="payment-options-grid-3d">
-            <!-- Option 1: Online UPI -->
-            <div class="pay-option-card-3d" id="pay-card-online" onclick="CartPage.selectPaymentMode('online')">
+            <!-- Option 1: Razorpay Online Payment -->
+            <div class="pay-option-card-3d active" id="pay-card-online" onclick="CartPage.selectPaymentMode('online')">
               <div class="pay-card-left">
-                <input type="radio" name="payment_mode" value="online">
+                <input type="radio" name="payment_mode" value="online" checked>
                 <div>
                   <div class="pay-title-inline">
-                    <strong>UPI / GPay / PhonePe / Paytm</strong>
+                    <strong>Pay Online (UPI / Cards / NetBanking)</strong>
                   </div>
-                  <p>Fast & secure payment directly via your preferred UPI app.</p>
+                  <p>Instant online checkout via Razorpay (GPay, PhonePe, Paytm, Cards).</p>
                 </div>
               </div>
-              <span class="pay-icon-tag">⚡ Fast</span>
+              <span class="pay-icon-tag" style="background:#ECFDF5; color:#045D49;">⚡ Fast</span>
             </div>
 
-            <!-- Option 2: Cash -->
+            <!-- Option 2: Cash on Collection -->
             <div class="pay-option-card-3d" id="pay-card-cash" onclick="CartPage.selectPaymentMode('cash')">
               <div class="pay-card-left">
                 <input type="radio" name="payment_mode" value="cash">
@@ -254,40 +245,10 @@
             </div>
           </div>
         </div>
-
-        <!-- Coupons & Offers Group -->
-        <div class="glass-panel-3d group-box">
-          <div class="group-title-row">
-            <h4>🏷 Coupons & Health Offers</h4>
-            <button type="button" class="available-coupons-btn-3d" onclick="CartPage.openAvailableCouponsModal()">
-              🎁 View Coupons
-            </button>
-          </div>
-
-          <div id="applied-coupon-banner" class="applied-coupon-3d-banner" style="display: none;">
-            <div class="applied-left">
-              <span class="coupon-emoji">🎉</span>
-              <div>
-                <strong id="applied-coupon-code-text">SELFCARE10</strong>
-                <p id="applied-coupon-desc-text">Discount Applied Successfully</p>
-              </div>
-            </div>
-            <button type="button" class="remove-coupon-btn-3d" onclick="CartPage.removeCoupon()">Remove ✕</button>
-          </div>
-
-          <div id="coupon-input-box" class="coupon-input-glass-group">
-            <input type="text" id="coupon-code-input" placeholder="Enter coupon or friend's referral code (e.g. SC4890)">
-            <button type="button" class="apply-coupon-btn-3d" onclick="CartPage.applyCouponManually()">Apply</button>
-          </div>
-
-          <p id="referral-coupon-helper-note" style="font-size: 10.5px; color: #536E66; margin-top: 6px; line-height: 1.35;">
-            💡 Friend's referral code requires a minimum test order of <strong>₹500</strong>. Earned referral bonus coupons (10%–100% OFF) are applicable strictly for <strong>Primary Account Holder (Self)</strong>.
-          </p>
-        </div>
       </section>
 
       <!-- =========================================================
-           SLIDE 4: SELECT COLLECTION TYPE (HOME PICKUP OR LAB WALK-IN)
+           SLIDE 4: COLLECTION TYPE (HOME PICKUP OR LAB WALK-IN)
            ========================================================= -->
       <section class="wizard-slide" id="cart-slide-4">
         <div class="slide-header">
@@ -321,7 +282,7 @@
         </div>
       </section>
 
-      <!-- UNIFIED 3-COLUMN CONTROL BAR (FIXED ABOVE FOOTER) -->
+      <!-- UNIFIED 3-COLUMN CONTROL BAR -->
       <div class="cart-floating-bar-3d glass-nav-3d" id="cart-fixed-bottom-bar">
         <div class="floating-left-btn-wrap">
           <button type="button" class="bar-nav-btn secondary-bar-btn" id="bar-back-btn" onclick="CartPage.handleBarBack()">
@@ -343,146 +304,6 @@
 
     </div>
   </main>
-
-  <!-- MODALS -->
-  <div id="upi-payment-modal" class="sia-modal-overlay" style="display: none;">
-    <div class="sia-modal-content glass-modal-3d upi-3d-card animate-3d-pop">
-      <div class="sia-modal-header upi-glow-header">
-        <div class="modal-title-wrap">
-          <span class="pulse-secure-icon">🔒</span>
-          <h3>Secure UPI Payment Checkout</h3>
-        </div>
-      </div>
-
-      <div class="sia-modal-body upi-body-center">
-        <div class="upi-ring-glow-wrapper">
-          <div class="upi-outer-glow-ring"></div>
-          <div class="upi-spinner-3d"></div>
-          <div class="upi-center-brand-icon">⚡</div>
-        </div>
-
-        <h3 class="upi-title-text">Opening Secure UPI Gateway...</h3>
-        <p class="upi-sub-message">Redirecting securely to Google Pay, PhonePe, Paytm, or BHIM UPI app.</p>
-
-        <div class="upi-order-preview-3d-box">
-          <div class="preview-line">
-            <span>Booking ID:</span>
-            <strong id="upi-modal-book-ref">SCDBOOK...</strong>
-          </div>
-          <div class="preview-line">
-            <span>Payable Amount:</span>
-            <strong class="green-highlight-glow" id="upi-modal-amount">₹0</strong>
-          </div>
-        </div>
-
-        <div class="upi-instruction-card-3d">
-          <span class="lock-pill-badge">🛡️ Bank Grade Security</span>
-          <p>Please approve the request inside your UPI app. Do not share your UPI PIN with anyone.</p>
-        </div>
-
-        <div id="upi-fallback-container" style="display: none; margin-top: 10px; width: 100%;">
-          <a id="upi-direct-manual-link" href="#" class="modal-action-btn primary-glow-btn">
-            ⚡ Tap to Open UPI App Manually
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="upi-confirm-modal" class="sia-modal-overlay" style="display: none;">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header">
-        <div class="modal-title-wrap">
-          <span>❓</span>
-          <h3>Confirm UPI Transaction</h3>
-        </div>
-      </div>
-      <div class="sia-modal-body" style="text-align: center;">
-        <div class="status-symbol-icon pending-icon" style="font-size: 30px; margin-bottom: 6px;">💳</div>
-        <h4 style="color: var(--dark-green); font-size: 14px; margin-bottom: 6px;">Did you complete the payment?</h4>
-        <p class="upi-sub-message" style="font-size: 11.5px; margin-bottom: 12px;">
-          Please confirm if your payment of <strong class="green-text" id="upi-confirm-amt-text">₹0</strong> was debited in your UPI app.
-        </p>
-
-        <div class="pending-ref-box" style="background:#F0FDF4; border:1px solid #A7F3D0; border-radius:10px; padding:8px 10px; font-size:11px; margin-bottom:14px; text-align:left;">
-          <div>Booking ID: <strong id="upi-confirm-book-id">-</strong></div>
-          <div>Payment Ref: <strong id="upi-confirm-pay-ref">-</strong></div>
-        </div>
-
-        <div class="verify-actions-stack">
-          <button type="button" class="modal-action-btn primary-glow-btn" onclick="CartPage.confirmUserPaymentSuccess()">
-            ✓ Yes, Payment Done (Send to WhatsApp)
-          </button>
-          <button type="button" class="modal-secondary-btn" onclick="CartPage.confirmUserPaymentFailed()">
-            ✕ No, Payment Failed / Cancelled
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="modal-confirm-patient" class="sia-modal-overlay" style="display: none;">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header">
-        <div class="modal-title-wrap">
-          <span>🛡️</span>
-          <h3>Verify Booking Details</h3>
-        </div>
-        <button class="sia-close-btn" onclick="CartPage.closeModal('modal-confirm-patient')">✕</button>
-      </div>
-
-      <div class="sia-modal-body">
-        <p style="font-size:11.5px; color:#536E66; line-height:1.4;">
-          Please verify if this diagnostic booking is for the correct patient(s) before proceeding:
-        </p>
-
-        <div class="patient-verify-card-3d">
-          <div class="patient-verify-head">
-            <div>
-              <h4 id="verify-patient-name" style="font-size:13.5px;">-</h4>
-              <span id="verify-patient-relation" class="verify-relation-badge">Self</span>
-            </div>
-            <span class="verified-check-pill">Verified ✓</span>
-          </div>
-
-          <div id="verify-patient-multi-list" style="display:none; margin-bottom:8px;"></div>
-
-          <div class="verify-details-grid">
-            <div class="verify-item">
-              <span class="verify-lbl">Mobile (WhatsApp)</span>
-              <strong class="verify-val green-phone" id="verify-patient-mobile">+91 ----------</strong>
-            </div>
-            <div class="verify-item">
-              <span class="verify-lbl">Age & Gender</span>
-              <strong class="verify-val" id="verify-patient-age-gender">-</strong>
-            </div>
-            <div class="verify-item">
-              <span class="verify-lbl">Collection Mode</span>
-              <strong class="verify-val" id="verify-patient-collection">-</strong>
-            </div>
-            <div class="verify-item">
-              <span class="verify-lbl">Time Slot</span>
-              <strong class="verify-val" id="verify-patient-slot">-</strong>
-            </div>
-          </div>
-        </div>
-
-        <div class="verify-pay-summary-3d">
-          <span>Total Payable:</span>
-          <strong id="verify-total-amount" style="font-size:16px; color:#078866;">₹0</strong>
-        </div>
-
-        <div class="verify-actions-stack">
-          <button type="button" class="modal-action-btn primary-glow-btn" onclick="CartPage.confirmPatientAndProceed()">
-            Confirm & Proceed to Payment ➔
-          </button>
-          <button type="button" class="modal-secondary-btn" onclick="CartPage.closeModal('modal-confirm-patient'); CartPage.goToSlide(3);">
-            🔄 Change Payment Mode
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Modal: Edit Address & Location with GPS + Mobile Number -->
   <div id="edit-address-modal" class="sia-modal-overlay" style="display: none;">
@@ -519,21 +340,6 @@
     </div>
   </div>
 
-  <div id="available-coupons-modal" class="sia-modal-overlay" style="display: none;">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header">
-        <div class="modal-title-wrap">
-          <span>🎁</span>
-          <h3>Available Coupons & Offers</h3>
-        </div>
-        <button class="sia-close-btn" onclick="CartPage.closeModal('available-coupons-modal')">✕</button>
-      </div>
-      <div class="sia-modal-body">
-        <div id="available-coupons-list" class="coupons-modal-list"></div>
-      </div>
-    </div>
-  </div>
-
   <!-- 5-Tab Fixed Bottom Navigation -->
   <nav class="bottom-nav">
     <a href="customer.html" class="nav-item">
@@ -560,12 +366,12 @@
   </nav>
 
   <script src="assets/js/config.js?v=6.3.0"></script>
-  <script src="assets/js/utils.js?v=6.3.0"></script>
-  <script src="assets/js/api.js?v=6.3.0"></script>
-  <script src="assets/js/offline-db.js?v=6.3.0"></script>
-  <script src="assets/js/offline-sync.js?v=6.3.0"></script>
-  <script src="assets/js/auth.js?v=6.3.0"></script>
-  <script src="assets/js/app.js?v=6.3.0"></script>
-  <script src="assets/js/cart.js?v=9.4.0"></script>
+  <script src="assets/js/utils.js?v=12.1.0"></script>
+  <script src="assets/js/api.js?v=6.0.0"></script>
+  <script src="assets/js/offline-db.js?v=5.0.0"></script>
+  <script src="assets/js/offline-sync.js?v=5.0.0"></script>
+  <script src="assets/js/auth.js?v=3.4.0"></script>
+  <script src="assets/js/app.js?v=4.1.0"></script>
+  <script src="assets/js/cart.js?v=12.0.0"></script>
 </body>
 </html>

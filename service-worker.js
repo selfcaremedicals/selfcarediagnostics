@@ -1,15 +1,14 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v8.4.0 (Zero-Cache Auto-Update Engine + Direct Booking Flow)
+ * Selfcare Diagnostics - Service Worker v10.1.1
  * Features:
- * - Direct SKIP_WAITING Message Listener: Responds instantly to app.js update triggers.
- * - Cache Version Bump to v8.4.0: Automatically purges v8.3.0 and older cached files.
- * - HTTP Cache-Busting Network Fetch: Forces { cache: 'no-cache' } for HTML & scripts so Chrome never serves stale disk files.
- * - Instant Client Claim & Zero-Lag Activation across all browser tabs.
- * - Relative Path Precache Engine (100% custom domain & root compatible).
+ * - Upgraded Cache Version to purge stale cart scripts
+ * - Network-First for core App Shell (HTML, JS, CSS) with cache fallback
+ * - Automatic skipWaiting() and immediate client takeover (clients.claim())
+ * - ignoreSearch cache matching for versioned asset URLs (?v=...)
  */
 
-const CACHE_NAME = 'selfcare-cache-v8.4.0';
+const CACHE_NAME = 'selfcare-cache-v10.1.1';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -38,6 +37,7 @@ const ASSETS_TO_CACHE = [
   './assets/css/bookings.css',
   './assets/css/profile.css',
   './assets/css/admin.css',
+  './assets/css/technician.css',
   './assets/js/config.js',
   './assets/js/api.js',
   './assets/js/utils.js',
@@ -55,6 +55,7 @@ const ASSETS_TO_CACHE = [
   './assets/js/bookings.js',
   './assets/js/profile.js',
   './assets/js/admin.js',
+  './assets/js/technician.js',
   './assets/images/logo.png',
   './assets/images/icon-192.png',
   './assets/images/icon-512.png'
@@ -62,7 +63,7 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache and Auto Skip-Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing auto-updating version 8.4.0...');
+  console.log('[Selfcare SW] Installing updated version v10.1.1...');
   self.skipWaiting();
 
   event.waitUntil(
@@ -90,38 +91,41 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// 3. ACTIVATE EVENT - Purges old caches (v8.3.0 and older) and claims all open tabs
+// 3. ACTIVATE EVENT - Purges obsolete caches and claims all open clients
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating version 8.4.0 and purging obsolete caches...');
+  console.log('[Selfcare SW] Activating version v10.1.1 and purging old caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('[Selfcare SW] Deleting old locked cache:', cacheName);
+            console.log('[Selfcare SW] Deleting obsolete cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     }).then(() => {
-      console.log('[Selfcare SW] Claiming clients for v8.4.0...');
+      console.log('[Selfcare SW] Claiming clients for v10.1.1...');
       return self.clients.claim();
     })
   );
 });
 
-// 4. FETCH EVENT - Network-First for HTML/Scripts with Chrome HTTP Cache Bypass
+// 4. FETCH EVENT - Network-First for HTML/Scripts/CSS, Cache fallback for offline
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // Bypass non-GET and cross-origin requests
   if (url.origin !== location.origin || event.request.method !== 'GET') {
     return;
   }
 
+  // Bypass backend Google Apps Script / API calls
   if (url.pathname.includes('/exec') || url.pathname.includes('/api/')) {
     return;
   }
 
+  // Local development bypass
   const isLocalDev = Boolean(
     url.hostname === 'localhost' ||
     url.hostname === '127.0.0.1' ||
@@ -136,6 +140,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Core App Shell & Scripts: Always try fresh network fetch first
   if (
     event.request.destination === 'document' ||
     event.request.destination === 'script' ||
@@ -162,11 +167,11 @@ self.addEventListener('fetch', (event) => {
           if (cachedDirect) return cachedDirect;
 
           if (event.request.destination === 'document' || url.pathname.endsWith('.html')) {
-            const indexFallback = await caches.match('./index.html');
-            if (indexFallback) return indexFallback;
-
             const customerFallback = await caches.match('./customer.html');
             if (customerFallback) return customerFallback;
+
+            const indexFallback = await caches.match('./index.html');
+            if (indexFallback) return indexFallback;
 
             return caches.match('./login.html');
           }
@@ -176,6 +181,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Versioned assets (?v=...)
   const hasVersionQuery = url.searchParams.has('v');
   if (hasVersionQuery) {
     event.respondWith(
@@ -189,13 +195,12 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
-          return caches.match(event.request, { ignoreSearch: true });
-        })
+        .catch(() => caches.match(event.request, { ignoreSearch: true }))
     );
     return;
   }
 
+  // Static Assets (Images, Icons, Fonts) - Cache First with Network Revalidation
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
