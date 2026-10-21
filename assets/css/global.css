@@ -1,6 +1,6 @@
 /**
- * Selfcare Diagnostics - Global CSS
- * Defines core design tokens, color variables, typography, and base layout rules.
+ * Selfcare Diagnostics - Global CSS v2.0
+ * High-performance styles: Zero touch delay, instant button feedback & hardware acceleration
  */
 
 :root {
@@ -29,12 +29,18 @@
   padding: 0;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-color);
   color: var(--text-main);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
 
@@ -43,20 +49,60 @@ a {
   color: inherit;
 }
 
-button, input {
+/* ================= ULTRA-FAST TOUCH & INTERACTION ENGINE ================= */
+/* 300ms mobile tap delay-ஐ நீக்கி Instant Touch Feedback வழங்குகிறது */
+button,
+a,
+input,
+select,
+.card-btn-edit,
+.card-btn-delete,
+.add-member-top-btn,
+.modal-action-btn,
+.action-btn,
+.nav-item,
+.cart-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  cursor: pointer;
+  transition: transform 0.08s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.08s ease;
+  will-change: transform;
+}
+
+button, input, select {
   font-family: inherit;
   border: none;
   outline: none;
 }
 
+/* Instant Button Click / Tap Micro-Feedback */
+button:active,
+.add-member-top-btn:active,
+.modal-action-btn:active,
+.action-btn:active,
+.card-btn-edit:active,
+.card-btn-delete:active {
+  transform: scale(0.95) !important;
+  opacity: 0.88;
+}
+
+/* Disabled state */
+button:disabled,
+.modal-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade {
-  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Scrollbar */
