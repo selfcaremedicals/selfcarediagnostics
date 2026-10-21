@@ -1,12 +1,14 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v6.8.5
+ * Selfcare Diagnostics - My Account Controller v6.8.6
  * Features:
+ * - Added Cloud Sync for Family Vault (fetches backend members across devices & networks)
+ * - Auto background sync on page load and modal open
  * - Anti-multi-click execution lock & dynamic button state
  * - Strict duplicate member prevention
  * - Binds primaryUserId, primaryUserName & primaryMobile to backend Family Vault
  * - Mobile Haptic feedback (vibration on click)
- * - Family Directory Vault preserved
+ * - Family Directory Vault preserved offline and revalidated online
  */
 
 const ProfilePage = {
@@ -25,7 +27,8 @@ const ProfilePage = {
 
       if (navigator.onLine) {
         setTimeout(() => {
-          this.syncLiveCloudProfile().catch(e => console.warn('[Profile] Background sync notice:', e));
+          this.syncLiveCloudProfile().catch(e => console.warn('[Profile] Background profile sync notice:', e));
+          this.syncLiveCloudFamilyMembers().catch(e => console.warn('[Profile] Background family sync notice:', e));
         }, 150);
       }
     } catch (err) {
@@ -103,7 +106,7 @@ const ProfilePage = {
 
     const currentMobile = this.currentUser.mobile;
 
-    // Load Family Members
+    // Load Family Members from local cache
     try {
       let savedFam = null;
       if (currentMobile) {
@@ -172,7 +175,53 @@ const ProfilePage = {
         this.populateFormInputs();
       }
     } catch (err) {
-      console.warn('[Profile] Background sync notice:', err);
+      console.warn('[Profile] Background profile sync notice:', err);
+    }
+  },
+
+  async syncLiveCloudFamilyMembers() {
+    const activeMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
+    if (!navigator.onLine || typeof Api === 'undefined' || !activeMobile) return;
+
+    try {
+      let res = null;
+      if (typeof Api.getFamilyMembers === 'function') {
+        res = await Api.getFamilyMembers(activeMobile);
+      } else if (typeof Api.request === 'function') {
+        res = await Api.request('getFamilyMembers', {
+          mobile: activeMobile,
+          primaryMobile: activeMobile,
+          userId: (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile),
+          primaryUserId: (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile)
+        }, false);
+      }
+
+      if (res && (res.status === 'success' || res.success)) {
+        const incomingList = res.familyMembers || res.members || res.data || [];
+        if (Array.isArray(incomingList)) {
+          this.familyMembers = incomingList.map(m => ({
+            id: m.id || m.MemberID || m.memberId || ('FAM_' + Date.now()),
+            primaryUserId: m.primaryUserId || m.PrimaryUserID || ('SCD_' + activeMobile),
+            primaryUserName: m.primaryUserName || m.PrimaryUserName || (this.currentUser && this.currentUser.name) || '',
+            name: m.name || m.Name || 'Member',
+            relation: m.relation || m.Relation || 'Relative',
+            mobile: m.mobile || m.Mobile || '',
+            age: this.calculateAge(m.age || m.Age),
+            gender: m.gender || m.Gender || '',
+            bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
+            address: m.address || m.Address || '',
+            location: m.location || m.Location || ''
+          }));
+
+          const serialized = JSON.stringify(this.familyMembers);
+          localStorage.setItem('selfcare_family_members', serialized);
+          localStorage.setItem(`selfcare_family_${activeMobile}`, serialized);
+
+          this.renderFamilyCards();
+        }
+      }
+    } catch (err) {
+      console.warn('[Profile] Background family sync notice:', err);
     }
   },
 
@@ -334,6 +383,11 @@ const ProfilePage = {
     this.renderFamilyCards();
     this.closeMemberForm();
     this.openModal('modal-family-members');
+
+    // On-demand re-sync if empty or reopening modal online
+    if (navigator.onLine) {
+      this.syncLiveCloudFamilyMembers().catch(e => console.warn('[Profile] Modal open sync notice:', e));
+    }
   },
 
   renderFamilyCards() {
