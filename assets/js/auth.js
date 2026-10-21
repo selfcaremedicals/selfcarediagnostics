@@ -1,13 +1,11 @@
 /* file: assets/js/auth.js */
 /**
- * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.4.0
+ * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.5.0
  * Features:
- * - Synchronized with LoginPage & IndexPortal keys
- * - Multi-tenant user isolation support
+ * - Full field preservation on new logins (address, email, bloodGroup, location, age, gender)
+ * - Purges family directory cache on logout to avoid multi-user contamination
  * - 0ms Synchronous local-first session verification
- * - Secure OTP verification (Strict server validation guard)
- * - Complete Profile Fields Preservation (Age, Gender, DOB, BloodGroup, Email)
- * - No session expiration, No auto-logout
+ * - Secure OTP verification with master fallback (1234)
  */
 
 const Auth = {
@@ -17,8 +15,7 @@ const Auth = {
   ROLE_KEY: 'selfcare_user_role',
 
   /**
-   * 0ms Synchronous Check:
-   * Network call ethuvum illamal instant-ah localStorage vazhiya check seiyum.
+   * 0ms Synchronous Check
    */
   isLoggedIn() {
     try {
@@ -26,7 +23,6 @@ const Auth = {
       const token = localStorage.getItem(this.TOKEN_KEY);
       if (activeUser && token) return true;
 
-      // Legacy key fallback
       const legacy = localStorage.getItem('selfcare_permanent_user') || localStorage.getItem('selfcare_user_session');
       if (legacy) {
         const parsed = JSON.parse(legacy);
@@ -39,7 +35,7 @@ const Auth = {
   },
 
   /**
-   * Logged-in user data-vai 0 millisecond-il edukkum
+   * Logged-in user data-vai 0ms-il edukkum
    */
   getUser() {
     try {
@@ -69,7 +65,6 @@ const Auth = {
         };
       }
 
-      // Legacy fallback
       const legacy = localStorage.getItem('selfcare_permanent_user') || localStorage.getItem('selfcare_user_session');
       return legacy ? JSON.parse(legacy) : null;
     } catch (e) {
@@ -77,16 +72,12 @@ const Auth = {
     }
   },
 
-  /**
-   * Backward compatibility-kaga getSession method
-   */
   getSession() {
     return this.getUser();
   },
 
   /**
    * Mobile + OTP verify aanathum permanent-ah save seiyum
-   * Intha session eppothume expire aagathu.
    */
   savePermanentSession(userData) {
     if (!userData) return false;
@@ -95,7 +86,6 @@ const Auth = {
 
     if (!cleanMobile) return false;
 
-    // Existing profile data-vai preserve seigiradhu (Wipe-out aagividaamal thadukkirom)
     let existingProfile = {};
     try {
       const stored = localStorage.getItem(this.PROFILE_KEY) || localStorage.getItem(`selfcare_profile_${cleanMobile}`);
@@ -105,12 +95,12 @@ const Auth = {
     const permanentUser = {
       ...existingProfile,
       ...userData,
-      userId: userData.userId || existingProfile.userId || `SCD_${cleanMobile}`,
+      userId: userData.userId || userData.UserID || existingProfile.userId || `SCD_${cleanMobile}`,
       mobile: cleanMobile,
       phone: cleanMobile,
-      name: userData.name || existingProfile.name || 'Valued Customer',
+      name: userData.name || userData.Name || existingProfile.name || 'Valued Customer',
       age: userData.age || userData.Age || existingProfile.age || existingProfile.Age || '',
-      dob: userData.dob || userData.DOB || userData.dateOfBirth || existingProfile.dob || existingProfile.dateOfBirth || '',
+      dob: userData.dob || userData.DOB || userData.dateOfBirth || existingProfile.dob || '',
       gender: userData.gender || userData.Gender || existingProfile.gender || 'Male',
       bloodGroup: userData.bloodGroup || userData.BloodGroup || existingProfile.bloodGroup || 'O+',
       email: userData.email || userData.Email || existingProfile.email || '',
@@ -123,18 +113,15 @@ const Auth = {
 
     try {
       const serialized = JSON.stringify(permanentUser);
-      // Permanent storage updates
       localStorage.setItem(this.ACTIVE_USER_KEY, cleanMobile);
       localStorage.setItem(this.PROFILE_KEY, serialized);
       localStorage.setItem(`selfcare_profile_${cleanMobile}`, serialized);
       localStorage.setItem(this.TOKEN_KEY, userData.token || existingProfile.token || `PERMANENT_NABL_TOKEN_${cleanMobile}`);
       localStorage.setItem(this.ROLE_KEY, permanentUser.role);
 
-      // Legacy keys for backward compatibility
       localStorage.setItem('selfcare_permanent_user', serialized);
       localStorage.setItem('selfcare_user_session', serialized);
 
-      // IndexedDB metadata backup
       if (typeof OfflineDB !== 'undefined' && OfflineDB.setMetadata) {
         OfflineDB.setMetadata('user_session', permanentUser);
       }
@@ -147,16 +134,12 @@ const Auth = {
     }
   },
 
-  /**
-   * Backward compatibility-kaga setSession
-   */
   setSession(sessionData) {
     return this.savePermanentSession(sessionData);
   },
 
   /**
-   * OTP Verification Engine:
-   * Validates OTP with backend without security bypass
+   * OTP Verification Engine (All backend profile fields mapped on login)
    */
   async verifyOtpAndLogin(mobile, otp) {
     try {
@@ -177,7 +160,6 @@ const Auth = {
 
       let serverUser = null;
 
-      // 1. Strict Server Verification Guard
       if (navigator.onLine && typeof Api !== 'undefined') {
         try {
           if (typeof Api.verifyOtp === 'function') {
@@ -187,7 +169,6 @@ const Auth = {
           }
         } catch (netErr) {
           const errText = netErr.message || '';
-          // Server reject seidhaal kandippaaga login thadukka vendum
           if (errText.includes('Invalid OTP') || errText.includes('OTP')) {
             return { success: false, message: errText };
           }
@@ -195,17 +176,21 @@ const Auth = {
         }
       }
 
-      // 2. Offline / Local fallback check (Master OTP 1234)
       if (!serverUser && cleanOtp !== '1234') {
         return { success: false, message: 'Invalid OTP entered. Please try again.' };
       }
 
+      // Backend profile fields-ai முழுமையாக சேமிக்கிறோம் (Address, Email, BloodGroup உட்பட)
       const userData = {
-        userId: (serverUser && serverUser.userId) ? serverUser.userId : `SCD_${cleanMobile}`,
+        userId: (serverUser && (serverUser.userId || serverUser.UserID)) ? (serverUser.userId || serverUser.UserID) : `SCD_${cleanMobile}`,
         mobile: cleanMobile,
-        name: (serverUser && serverUser.name) ? serverUser.name : 'Valued Customer',
+        name: (serverUser && (serverUser.name || serverUser.Name)) ? (serverUser.name || serverUser.Name) : 'Valued Customer',
         age: (serverUser && (serverUser.age || serverUser.Age)) ? String(serverUser.age || serverUser.Age) : '',
         gender: (serverUser && (serverUser.gender || serverUser.Gender)) ? (serverUser.gender || serverUser.Gender) : 'Male',
+        bloodGroup: (serverUser && (serverUser.bloodGroup || serverUser.BloodGroup)) ? (serverUser.bloodGroup || serverUser.BloodGroup) : 'O+',
+        email: (serverUser && (serverUser.email || serverUser.Email)) ? (serverUser.email || serverUser.Email) : '',
+        address: (serverUser && (serverUser.address || serverUser.Address)) ? (serverUser.address || serverUser.Address) : '',
+        location: (serverUser && (serverUser.location || serverUser.Location)) ? (serverUser.location || serverUser.Location) : '',
         token: (serverUser && serverUser.token) ? serverUser.token : `PERMANENT_NABL_TOKEN_${cleanMobile}`,
         role: (serverUser && serverUser.role) ? serverUser.role : 'patient'
       };
@@ -219,19 +204,12 @@ const Auth = {
     }
   },
 
-  /**
-   * Profile field updates
-   */
   updateProfile(updatedFields) {
     const current = this.getUser() || {};
     const merged = { ...current, ...updatedFields };
     return this.savePermanentSession(merged);
   },
 
-  /**
-   * Page Auth Guard:
-   * Login state irundhal 0ms-il page run aagum, illaiyenil mattum redirect pannum.
-   */
   requireAuth(redirectUrl = 'index.html') {
     if (!this.isLoggedIn()) {
       window.location.href = redirectUrl;
@@ -240,9 +218,6 @@ const Auth = {
     return true;
   },
 
-  /**
-   * Explicit manual reset thevaipattaal mattum
-   */
   logout() {
     try {
       const activeMobile = localStorage.getItem(this.ACTIVE_USER_KEY);
@@ -261,24 +236,20 @@ const Auth = {
       localStorage.removeItem('selfcare_user_session');
       localStorage.removeItem('selfcare_cart');
       localStorage.removeItem('cart');
+      // Multi-user பாதுகாப்பிற்காக பழைய family cache நீக்கம்
+      localStorage.removeItem('selfcare_family_members');
 
       if (typeof Utils !== 'undefined' && Utils.showToast) {
         Utils.showToast('Logged out successfully', 'info');
       }
       setTimeout(() => {
         window.location.replace('index.html');
-      }, 400);
+      }, 350);
     } catch (e) {
       console.error('Logout error:', e);
     }
   }
 };
 
-// Global window object injection
-if (typeof window !== 'undefined') {
-  window.Auth = Auth;
-}
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Auth;
-}
+if (typeof window !== 'undefined') window.Auth = Auth;
+if (typeof module !== 'undefined' && module.exports) module.exports = Auth;

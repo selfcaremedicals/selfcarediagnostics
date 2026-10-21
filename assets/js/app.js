@@ -1,17 +1,12 @@
 /* file: assets/js/app.js */
 /**
- * Selfcare Diagnostics - Main Application Controller (app.js) v4.1.0 (Auto-Update Engine)
+ * Selfcare Diagnostics - Main Application Controller v4.2.0 (Turbo Reload Engine)
  * Features:
- * - Instant synchronous 0ms local-first session restoration.
- * - Multi-tenant vault-aware cart isolation (selfcare_cart_${activeUser}).
- * - Multi-Patient context detection & isolated dynamic ConflictValidator.
- * - Allows multiple family members to independently order same tests without false blocks.
- * - Non-blocking IndexedDB & smart dev Service Worker bypass.
- * - ZERO-CACHE AUTO-UPDATE ENGINE:
- *   1. Forces updateViaCache: 'none' (Browser will never cache service-worker.js).
- *   2. Automatic skipWaiting signal dispatch when new update is installed.
- *   3. Instant seamless auto-reload on new version arrival without manual cache clearing.
- *   4. Periodic & visibility-change update triggers.
+ * - Prevents sudden first-install page reloads (hadPreviousController guard)
+ * - Instant synchronous 0ms local-first session restoration
+ * - Multi-tenant vault-aware cart isolation
+ * - Non-blocking IndexedDB & smart dev Service Worker bypass
+ * - Instant seamless auto-reload only on genuine version upgrade
  */
 
 const App = {
@@ -19,7 +14,7 @@ const App = {
 
   async init() {
     try {
-      console.log('[Selfcare App] Initializing v4.1.0 (Auto-Update Engine)...');
+      console.log('[Selfcare App] Initializing v4.2.0...');
       
       // 1. Instant Synchronous User Session Check (0ms lag)
       if (typeof Auth !== 'undefined' && Auth.getUser) {
@@ -29,7 +24,7 @@ const App = {
         }
       }
 
-      // 2. Synchronous & Direct Cart Restoration (Vault-aware instant load)
+      // 2. Synchronous & Direct Cart Restoration
       this.loadCartDirect();
 
       // 3. Non-blocking Background IndexedDB Initialization
@@ -44,7 +39,7 @@ const App = {
       if (navigator.onLine && typeof OfflineSync !== 'undefined' && OfflineSync.bootstrap) {
         setTimeout(() => {
           OfflineSync.bootstrap().catch(e => console.warn('[Selfcare App] Sync bootstrap notice:', e));
-        }, 2000);
+        }, 1500);
       }
 
       // 6. Navigation listeners (Back button cart sync)
@@ -64,9 +59,6 @@ const App = {
     }
   },
 
-  /**
-   * Resolves the current target patient context (defaults to 'SELF')
-   */
   getTargetPatientId() {
     try {
       if (typeof window !== 'undefined') {
@@ -84,10 +76,6 @@ const App = {
     return 'SELF';
   },
 
-  /**
-   * Instant Synchronous Cart Load:
-   * Checks active user vault first to guarantee absolute user isolation.
-   */
   loadCartDirect() {
     try {
       let localCart = null;
@@ -110,12 +98,7 @@ const App = {
         }
       }
 
-      if (Array.isArray(localCart)) {
-        this.cart = localCart;
-      } else {
-        this.cart = [];
-      }
-
+      this.cart = Array.isArray(localCart) ? localCart : [];
       this.updateCartUI();
     } catch (e) {
       console.error('[Selfcare App] Direct cart read error:', e);
@@ -124,9 +107,6 @@ const App = {
     }
   },
 
-  /**
-   * Backward compatible async loadCart
-   */
   async loadCart() {
     this.loadCartDirect();
     if (this.cart.length === 0 && typeof OfflineDB !== 'undefined' && OfflineDB.getCart) {
@@ -141,9 +121,7 @@ const App = {
   },
 
   /**
-   * ZERO-CACHE AUTO-UPDATE SERVICE WORKER HANDLER:
-   * - updateViaCache: 'none' -> Browser eppothume server-idam direct-ah fresh file check seiyum.
-   * - Auto skipWaiting trigger -> User manual clear cache seiya thevaiyillai.
+   * ZERO-CACHE AUTO-UPDATE SERVICE WORKER HANDLER
    */
   handleServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
@@ -159,31 +137,22 @@ const App = {
     if (isLocalhost) {
       navigator.serviceWorker.getRegistrations().then(registrations => {
         for (let registration of registrations) {
-          registration.unregister().then(() => {
-            console.log('[Selfcare App] Localhost dev mode: Unregistered old Service Worker.');
-          });
+          registration.unregister();
         }
-      }).catch(err => console.warn('[Selfcare App] SW unregister notice:', err));
-
-      if ('caches' in window) {
-        caches.keys().then(names => {
-          names.forEach(name => caches.delete(name));
-        });
-      }
+      }).catch(() => {});
       return;
     }
 
-    // Production: updateViaCache: 'none' forces browser to bypass HTTP cache for service-worker.js
+    // Check if an existing controller was present before new install
+    let hadPreviousController = Boolean(navigator.serviceWorker.controller);
+
     navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).then((registration) => {
-      // 1. Instant check on page load
       registration.update();
 
-      // 2. Already waiting service worker irundhal udanadiyaga activate seigirom
       if (registration.waiting) {
         registration.waiting.postMessage({ type: 'SKIP_WAITING', action: 'skipWaiting' });
       }
 
-      // 3. Pudhiya version download aagum pothu auto-activate & reload logic
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
         if (newWorker) {
@@ -196,14 +165,12 @@ const App = {
         }
       });
 
-      // 4. App open-il irukkumpothe thirumba focus aanaal background-il update check seiyum
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           registration.update().catch(() => {});
         }
       });
 
-      // 5. Periodic 15 minutes background check
       setInterval(() => {
         registration.update().catch(() => {});
       }, 15 * 60 * 1000);
@@ -212,9 +179,13 @@ const App = {
       console.warn('[Selfcare App] Service Worker registration notice:', err);
     });
 
-    // Pudhiya Service Worker controller eduthavudan oru murai mattum seamless reload
+    // Guard: முதல்முறை app திறக்கும் போது தேவையின்றி reload ஆவதைத் தடுக்கிறது
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadPreviousController) {
+        hadPreviousController = true;
+        return;
+      }
       if (!refreshing) {
         refreshing = true;
         console.log('[Selfcare App] Reloading with latest version...');
@@ -223,9 +194,6 @@ const App = {
     });
   },
 
-  /**
-   * Universal Save Cart - Syncs memory, localStorage, multi-tenant vault, and background IndexedDB
-   */
   async saveCart(newCart) {
     try {
       if (Array.isArray(newCart)) {
@@ -236,7 +204,6 @@ const App = {
         localStorage.setItem('cart', cartStr);
         localStorage.setItem('selfcare_cart', cartStr);
 
-        // Multi-tenant isolation: Always save into active user's dedicated vault
         const activeUser = localStorage.getItem('selfcare_active_user');
         if (activeUser) {
           localStorage.setItem(`selfcare_cart_${activeUser}`, cartStr);
@@ -244,7 +211,6 @@ const App = {
       }
       this.updateCartUI();
 
-      // Background IndexedDB write without blocking UI thread
       if (typeof OfflineDB !== 'undefined' && OfflineDB.saveCart) {
         OfflineDB.saveCart(this.cart).catch(() => {});
       }
@@ -253,9 +219,6 @@ const App = {
     }
   },
 
-  /**
-   * Safe Add to Cart with Multi-Patient Isolation & Dynamic ConflictValidator
-   */
   async addToCart(item) {
     try {
       if (!item) return;
@@ -270,9 +233,7 @@ const App = {
         patientId: targetPatientId
       };
 
-      // 1. Multi-Patient Isolated Conflict Check
       if (typeof ConflictValidator !== 'undefined' && typeof ConflictValidator.checkConflict === 'function') {
-        // Filter only tests belonging to THIS specific family member
         const patientCart = this.cart.filter(i => (i.patientId || 'SELF') === targetPatientId);
         const conflict = ConflictValidator.checkConflict(itemWithPatient, patientCart);
         
@@ -282,8 +243,6 @@ const App = {
         }
       }
       
-      // 2. Patient-Scoped Duplicate Check
-      // (Allows different patients in the family to order the exact same test, e.g. CBC)
       const alreadyInCartForPatient = this.cart.find(c => {
         const cId = String(c.TestID || c.PackageID || c.id || '');
         const cCode = String(c.TestCode || c.PackageCode || c.code || '');
@@ -296,7 +255,6 @@ const App = {
         return;
       }
 
-      // 3. Structured Cart Item Payload
       const cartItem = {
         ...item,
         id: itemId,
@@ -329,7 +287,6 @@ const App = {
         const cPatientId = c.patientId || 'SELF';
 
         if (targetPatientId) {
-          // Remove only this patient's instance of the item
           return !(cId === sId && cPatientId === targetPatientId);
         }
         return cId !== sId;
@@ -377,11 +334,5 @@ document.addEventListener('DOMContentLoaded', () => {
   App.init();
 });
 
-// Global window exposure
-if (typeof window !== 'undefined') {
-  window.App = App;
-}
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = App;
-}
+if (typeof window !== 'undefined') window.App = App;
+if (typeof module !== 'undefined' && module.exports) module.exports = App;
