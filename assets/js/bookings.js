@@ -1,13 +1,16 @@
 /* file: assets/js/bookings.js */
 /**
- * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v5.1.0
+ * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v6.5.0
  * Features:
- * 1. Multi-Patient Auto-Split Engine: Seamlessly splits grouped multi-patient bookings 
- *    across individual patient chips (e.g. Self gets Self's package, Jazeerah gets Jazeerah's package).
- * 2. Works retroactively on existing bookings using smart patient-item matching.
- * 3. Add-on Tests to Existing Booking trigger -> Direct transfer to Cart Slide 1 (Strict Add-Tests-Only Lock).
- * 4. Live Google Sheets Backend Sync via Api.getBookingsByPatient.
- * 5. Production-safe: Strictly blocks fake mock bookings when user is authenticated.
+ * 1. Strict 3-Hour Slot Window: "Add Tests" box appears ONLY up to 3 hours after the appointment slot.
+ * 2. Add Tests Box Layout: Rendered strictly between Booking Meta Card and Live Diagnostic Progress.
+ * 3. User Deduplication: Merges same user records into ONE clean chip (No duplicate Self / Member chips).
+ * 4. Membership Crown (👑): Dynamically displays Prime Crown on the user's avatar & name if membership is active.
+ * 5. Clean Human-Readable Date & Time: Replaces ugly ISO timestamps with "Today, 21 Oct 2026 • 06:30 AM - 07:00 AM".
+ * 6. Chronological Date Sorter: Newest bookings first (Today -> Yesterday -> Older dates).
+ * 7. Doorstep Fee Auto-Sync: Reflects ₹100 collection fee for orders below ₹500 (e.g. ₹350 + ₹100 = ₹450).
+ * 8. Deep Add-On Booking Serializer: Correctly identifies Health Packages (like 'SELFCARE BASIC HEALTH'),
+ *    expands all package sheet constituents & parameters, and syncs target patient context to prevent re-adding duplicate/covered tests.
  */
 
 const BookingsPage = {
@@ -16,6 +19,9 @@ const BookingsPage = {
   selectedPatientId: null,
   selectedPatientIndex: 0,
   currentActiveBooking: null,
+
+  // Cutoff window: Allowed up to 3 hours from the scheduled slot end time
+  ADD_TESTS_WINDOW_HOURS: 3,
 
   async init() {
     try {
@@ -49,6 +55,152 @@ const BookingsPage = {
       Utils.showToast(msg, type);
     } else {
       alert(msg);
+    }
+  },
+
+  /**
+   * Checks if user has an active Care Membership
+   */
+  isMembershipActive() {
+    try {
+      const mem = localStorage.getItem('selfcare_membership') || localStorage.getItem('selfcare_is_member');
+      if (mem === 'true' || mem === 'active') return true;
+      if (mem) {
+        const p = JSON.parse(mem);
+        if (p && (p.isActive || p.status === 'active' || p.plan)) return true;
+      }
+      const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+      if (user && (user.isMember || user.membership === 'active' || user.hasMembership || user.role === 'member')) {
+        return true;
+      }
+
+      // Check if any booking contains annual membership item
+      const bookings = this.allBookings || [];
+      const hasMemBooking = bookings.some(b => {
+        let bItems = b.items;
+        if (typeof bItems === 'string') {
+          try { bItems = JSON.parse(bItems); } catch (e) { bItems = []; }
+        }
+        return Array.isArray(bItems) && bItems.some(it => String(it.name || it.TestName || '').toUpperCase().includes('MEMBERSHIP'));
+      });
+      if (hasMemBooking) return true;
+    } catch (e) {}
+    return false;
+  },
+
+  /**
+   * Converts any raw date string (ISO / YYYY-MM-DD) into a clean Date object
+   */
+  parseDateClean(dateStr) {
+    if (!dateStr) return new Date();
+    if (dateStr instanceof Date) return dateStr;
+    const s = String(dateStr).trim();
+    if (s.includes('T')) {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d;
+    }
+    const cleanYmd = s.split('T')[0].split(' ')[0];
+    const parts = cleanYmd.split('-');
+    if (parts.length === 3) {
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    }
+    const d2 = new Date(s);
+    return isNaN(d2.getTime()) ? new Date() : d2;
+  },
+
+  /**
+   * Formats dates as: "Today, 21 Oct 2026", "Yesterday, 20 Oct 2026", or "21 Oct 2026"
+   */
+  formatFriendlyDate(rawDate, includeYear = true) {
+    if (!rawDate) return 'Today';
+    try {
+      const d = this.parseDateClean(rawDate);
+      const now = new Date();
+
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      
+      const yest = new Date(now);
+      yest.setDate(now.getDate() - 1);
+      const yestStr = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, '0')}-${String(yest.getDate()).padStart(2, '0')}`;
+
+      const tmrw = new Date(now);
+      tmrw.setDate(now.getDate() + 1);
+      const tmrwStr = `${tmrw.getFullYear()}-${String(tmrw.getMonth() + 1).padStart(2, '0')}-${String(tmrw.getDate()).padStart(2, '0')}`;
+
+      const targetStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthName = months[d.getMonth()];
+      const day = d.getDate();
+      const year = d.getFullYear();
+
+      if (targetStr === todayStr) {
+        return includeYear ? `Today, ${day} ${monthName} ${year}` : `Today, ${day} ${monthName}`;
+      }
+      if (targetStr === yestStr) {
+        return includeYear ? `Yesterday, ${day} ${monthName} ${year}` : `Yesterday, ${day} ${monthName}`;
+      }
+      if (targetStr === tmrwStr) {
+        return includeYear ? `Tomorrow, ${day} ${monthName} ${year}` : `Tomorrow, ${day} ${monthName}`;
+      }
+
+      return includeYear ? `${day} ${monthName} ${year}` : `${day} ${monthName}`;
+    } catch (e) {
+      return String(rawDate).split('T')[0];
+    }
+  },
+
+  /**
+   * STRICT 3-HOUR WINDOW:
+   * Example: If slot is 11:30 AM - 12:00 PM today, customer has up to 3 hours
+   * from 12:00 PM (i.e. until Today 3:00 PM) to add tests.
+   */
+  isWithinAddTestsTimeWindow(booking) {
+    if (!booking) return false;
+
+    // 1. If report already completed/delivered, sample is finished
+    const stage = this.getBookingStage(booking);
+    if (stage >= 5) return false;
+
+    const collectionDate = booking.collectionDate;
+    const timeSlot = booking.timeSlot;
+    if (!collectionDate) return false;
+
+    try {
+      const slotDateObj = this.parseDateClean(collectionDate);
+      let slotHour = 12;
+      let slotMinute = 0;
+
+      if (timeSlot && typeof timeSlot === 'string') {
+        // e.g. "11:30 AM - 12:00 PM" -> Extract end time "12:00 PM"
+        const parts = timeSlot.split(/[-–to]/i);
+        const targetTimePart = (parts.length > 1 ? parts[1] : parts[0]).trim();
+        
+        const match = targetTimePart.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+        if (match) {
+          let h = parseInt(match[1], 10);
+          const m = parseInt(match[2], 10);
+          const ampm = match[3] ? match[3].toUpperCase() : '';
+
+          if (ampm === 'PM' && h < 12) h += 12;
+          if (ampm === 'AM' && h === 12) h = 0;
+
+          slotHour = h;
+          slotMinute = m;
+        }
+      }
+
+      slotDateObj.setHours(slotHour, slotMinute, 0, 0);
+
+      // Cutoff time: Exactly 3 hours after the slot ends
+      const cutoffTimeMs = slotDateObj.getTime() + (this.ADD_TESTS_WINDOW_HOURS * 60 * 60 * 1000);
+      const nowMs = Date.now();
+
+      // Current time must be within cutoff limit
+      return nowMs <= cutoffTimeMs;
+    } catch (e) {
+      console.warn('Error evaluating add tests time window:', e);
+      return false;
     }
   },
 
@@ -114,58 +266,81 @@ const BookingsPage = {
 
     if (savedBookings.length === 0 && !shouldSkipMock) {
       savedPatients = [
-        { id: 'self', name: selfName !== 'Customer (Self)' ? selfName : 'Valued Customer', relation: 'Self' },
-        { id: 'patient_spouse', name: familyMembers[0]?.name || 'Family Member 1', relation: familyMembers[0]?.relation || 'Spouse' }
+        { id: 'self', name: selfName !== 'Customer (Self)' ? selfName : 'Valued Customer', relation: 'Self', isSelf: true }
       ];
     } else {
       const patientMap = new Map();
-      patientMap.set('self', { id: 'self', name: selfName, relation: 'Self' });
+      const cleanMobile = currentMobile ? String(currentMobile).replace(/\D/g, '').slice(-10) : '';
+      const normalizedSelfName = selfName.trim().toLowerCase();
 
-      familyMembers.forEach((fm, idx) => {
-        const key = fm.id || fm.name || `fam_${idx}`;
-        patientMap.set(String(key).toLowerCase(), {
-          id: key,
-          name: fm.name || `Member ${idx + 1}`,
-          relation: fm.relation || 'Family'
-        });
+      // Base Primary User Record (Single Self Chip)
+      patientMap.set('self', {
+        id: 'self',
+        name: selfName,
+        relation: 'Self',
+        isSelf: true
       });
 
-      // Extract patients from bookings (including multi-patient bookings)
+      // Strict Deduplication Helper: Detects if record belongs to Self
+      const isSelfIdentifier = (id, name, relation) => {
+        const sId = String(id || '').trim().toLowerCase();
+        const sName = String(name || '').trim().toLowerCase();
+        const sRel = String(relation || '').trim().toLowerCase();
+
+        if (sId === 'self' || sId === 'patient_self') return true;
+        if (cleanMobile && (sId === cleanMobile || sId === `scd_${cleanMobile}`)) return true;
+        if (sRel === 'self') return true;
+        if (sName === normalizedSelfName || sName === 'customer (self)' || sName === 'valued customer') return true;
+        return false;
+      };
+
+      // Add registered family members (Skipping self duplication)
+      familyMembers.forEach((fm, idx) => {
+        if (!fm) return;
+        if (isSelfIdentifier(fm.id, fm.name, fm.relation)) return;
+
+        const key = String(fm.name || fm.id || `fam_${idx}`).trim().toLowerCase();
+        if (!patientMap.has(key)) {
+          patientMap.set(key, {
+            id: fm.id || key,
+            name: fm.name || `Member ${idx + 1}`,
+            relation: fm.relation || 'Family',
+            isSelf: false
+          });
+        }
+      });
+
+      // Add members from bookings (Skipping duplicates by name)
       savedBookings.forEach(b => {
         const pName = b.patientName || selfName;
-        const pKey = b.patientId || pName;
-        if (!patientMap.has(String(pKey).toLowerCase())) {
-          patientMap.set(String(pKey).toLowerCase(), {
-            id: pKey,
+        const pId = b.patientId || pName;
+        const pRel = b.relation || 'Member';
+
+        if (isSelfIdentifier(pId, pName, pRel)) return;
+
+        const key = String(pName).trim().toLowerCase();
+        if (!patientMap.has(key)) {
+          patientMap.set(key, {
+            id: pId,
             name: pName,
-            relation: b.relation || 'Member'
+            relation: pRel,
+            isSelf: false
           });
         }
 
         if (b.selectedPatients && Array.isArray(b.selectedPatients)) {
           b.selectedPatients.forEach(sp => {
-            const spKey = sp.id || sp.name;
-            if (spKey && !patientMap.has(String(spKey).toLowerCase())) {
-              patientMap.set(String(spKey).toLowerCase(), {
-                id: spKey,
-                name: sp.name,
-                relation: sp.relation || 'Member'
-              });
-            }
-          });
-        }
+            if (!sp) return;
+            if (isSelfIdentifier(sp.id, sp.name, sp.relation)) return;
 
-        if (b.items && Array.isArray(b.items)) {
-          b.items.forEach(it => {
-            if (it.patientName && it.patientName.toLowerCase() !== selfName.toLowerCase()) {
-              const itKey = it.patientId || it.patientName;
-              if (!patientMap.has(String(itKey).toLowerCase())) {
-                patientMap.set(String(itKey).toLowerCase(), {
-                  id: itKey,
-                  name: it.patientName,
-                  relation: it.relation || 'Member'
-                });
-              }
+            const spKey = String(sp.name || sp.id).trim().toLowerCase();
+            if (!patientMap.has(spKey)) {
+              patientMap.set(spKey, {
+                id: sp.id || spKey,
+                name: sp.name,
+                relation: sp.relation || 'Member',
+                isSelf: false
+              });
             }
           });
         }
@@ -223,16 +398,29 @@ const BookingsPage = {
       return;
     }
 
+    const isMember = this.isMembershipActive();
+
     container.innerHTML = this.patientsList.map((p, idx) => {
+      const isSelf = p.id === 'self' || p.isSelf || String(p.relation).toLowerCase() === 'self';
+      const showCrown = isSelf && isMember;
       const initial = (p.name || 'U').charAt(0).toUpperCase();
+
       return `
         <div class="patient-chip ${idx === this.selectedPatientIndex ? 'active' : ''}" 
              id="chip-${idx}" 
              onclick="BookingsPage.selectPatientByIndex(${idx})">
-          <div class="chip-avatar">${initial}</div>
+          <div class="chip-avatar">
+            ${initial}
+            ${showCrown ? '<span class="crown-avatar-badge" title="Active Care Member">👑</span>' : ''}
+          </div>
           <div class="chip-info">
-            <span class="chip-name">${this.safeEscape(p.name)}</span>
-            <span class="chip-relation">${this.safeEscape(p.relation)}</span>
+            <span class="chip-name">
+              ${this.safeEscape(p.name)}
+              ${showCrown ? '<span class="crown-inline-badge" title="Care Member">👑</span>' : ''}
+            </span>
+            <span class="chip-relation">
+              ${showCrown ? '⭐ Care Member' : this.safeEscape(p.relation)}
+            </span>
           </div>
         </div>
       `;
@@ -281,24 +469,19 @@ const BookingsPage = {
     this.selectPatientByIndex(0);
   },
 
-  /**
-   * Smart Patient Filter: Matches bookings whether booked individually or part of a group booking
-   */
   getBookingsForPatient(patient) {
     if (!patient) return [];
     const pId = String(patient.id || '').trim().toLowerCase();
     const pName = String(patient.name || '').trim().toLowerCase();
-    const isSelf = pId === 'self' || pId === 'patient_self' || pName.includes('self') || pName.includes('valued');
+    const isSelf = pId === 'self' || patient.isSelf || pId === 'patient_self' || pName.includes('self') || pName.includes('valued');
 
-    return this.allBookings.filter(b => {
+    const filtered = this.allBookings.filter(b => {
       const bPatientId = String(b.patientId || '').trim().toLowerCase();
       const bPatientName = String(b.patientName || '').trim().toLowerCase();
 
-      // 1. Direct Booking Match
       if (bPatientId === pId || bPatientName === pName) return true;
       if (isSelf && (bPatientId === 'self' || bPatientId === 'patient_self' || bPatientId === '')) return true;
 
-      // 2. Multi-patient check in selectedPatients
       if (b.selectedPatients && Array.isArray(b.selectedPatients)) {
         const inSelected = b.selectedPatients.some(sp => {
           const spId = String(sp.id || '').trim().toLowerCase();
@@ -308,7 +491,6 @@ const BookingsPage = {
         if (inSelected) return true;
       }
 
-      // 3. Multi-patient check in items
       if (b.items && Array.isArray(b.items)) {
         const inItems = b.items.some(it => {
           const itId = String(it.patientId || '').trim().toLowerCase();
@@ -320,11 +502,15 @@ const BookingsPage = {
 
       return false;
     });
+
+    // CHRONOLOGICAL SORTING: Newest bookings first (Today -> Yesterday -> Older)
+    return filtered.sort((a, b) => {
+      const timeA = this.parseDateClean(a.collectionDate || a.createdAt || a.bookingDate).getTime();
+      const timeB = this.parseDateClean(b.collectionDate || b.createdAt || b.bookingDate).getTime();
+      return timeB - timeA;
+    });
   },
 
-  /**
-   * Smart Item Filter: Returns ONLY tests/packages belonging to this specific patient
-   */
   getPatientItemsForBooking(booking) {
     if (!booking) return [];
     let items = booking.items;
@@ -336,9 +522,8 @@ const BookingsPage = {
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
     const pId = String(activePatient.id || '').trim().toLowerCase();
     const pName = String(activePatient.name || '').trim().toLowerCase();
-    const isSelf = pId === 'self' || pId === 'patient_self' || pName.includes('self');
+    const isSelf = pId === 'self' || activePatient.isSelf || pName.includes('self');
 
-    // 1. Check if items already have patientId or patientName tagged
     const hasTaggedItems = items.some(it => it.patientId || it.patientName);
     if (hasTaggedItems) {
       const matched = items.filter(it => {
@@ -352,7 +537,6 @@ const BookingsPage = {
       if (matched.length > 0) return matched;
     }
 
-    // 2. Smart Positional Heuristic: For duplicate items booked for 2 members (e.g. Self + Jazeerah)
     if (items.length > 1 && booking.selectedPatients && booking.selectedPatients.length === items.length) {
       const patientIdx = booking.selectedPatients.findIndex(sp => {
         const spId = String(sp.id || '').trim().toLowerCase();
@@ -364,7 +548,6 @@ const BookingsPage = {
       }
     }
 
-    // 3. Fallback: If not partitioned, show item if this booking directly belongs to this patient
     const bId = String(booking.patientId || '').trim().toLowerCase();
     const bName = String(booking.patientName || '').trim().toLowerCase();
     if (bId === pId || bName === pName || (isSelf && (bId === 'self' || bId === 'patient_self'))) {
@@ -412,12 +595,17 @@ const BookingsPage = {
         subnav.style.display = 'flex';
         let selectedBId = preferredBookingId || patientBookings[0].bookingId;
 
-        subnav.innerHTML = patientBookings.map(b => `
-          <button type="button" class="booking-subtab ${b.bookingId === selectedBId ? 'active' : ''}" 
-                  onclick="BookingsPage.selectSpecificBooking('${b.bookingId}')">
-            ${this.safeEscape(b.bookingId)} (${this.safeEscape(b.collectionDate || 'Recent')})
-          </button>
-        `).join('');
+        // Clean Date-wise Labels: SCDBOOK583132 (Today, 21 Oct)
+        subnav.innerHTML = patientBookings.map(b => {
+          const friendlyDate = this.formatFriendlyDate(b.collectionDate, false);
+          const isSelected = b.bookingId === selectedBId;
+          return `
+            <button type="button" class="booking-subtab ${isSelected ? 'active' : ''}" 
+                    onclick="BookingsPage.selectSpecificBooking('${b.bookingId}')">
+              ${this.safeEscape(b.bookingId)} (${friendlyDate})
+            </button>
+          `;
+        }).join('');
 
         const activeBooking = patientBookings.find(b => b.bookingId === selectedBId) || patientBookings[0];
         this.renderBookingDetails(activeBooking);
@@ -459,9 +647,6 @@ const BookingsPage = {
     const slotEl = document.getElementById('disp-time-slot');
     const paymentEl = document.getElementById('disp-payment-status');
     const amtEl = document.getElementById('disp-amount-val');
-    const locBox = document.getElementById('disp-location-box');
-    const locIcon = document.getElementById('disp-location-icon');
-    const locText = document.getElementById('disp-location-text');
 
     const isLab = booking.collectionType === 'lab' || String(booking.address || '').includes('Direct Lab');
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
@@ -476,32 +661,82 @@ const BookingsPage = {
       patientEl.textContent = `${activePatient.name} (${activePatient.relation || 'Self'})`;
     }
 
+    // CLEAN SCHEDULED SLOT FORMATTING: "Today, 21 Oct 2026 • 06:30 AM - 07:00 AM"
     if (slotEl) {
-      slotEl.textContent = `${booking.collectionDate || 'Today'} • ${booking.timeSlot || '07:30 AM - 08:00 AM'}`;
+      const friendlyDate = this.formatFriendlyDate(booking.collectionDate, true);
+      const slotTime = booking.timeSlot || '07:30 AM - 08:00 AM';
+      slotEl.textContent = `${friendlyDate} • ${slotTime}`;
     }
 
     if (paymentEl) {
-      const isPaid = (booking.paymentStatus || '').includes('SUCCESS');
-      paymentEl.textContent = isPaid ? '✅ Paid Online' : '💵 Cash on Visit';
-      paymentEl.style.color = isPaid ? '#059669' : '#D97706';
-    }
+      const payStatus = String(booking.paymentStatus || '').toUpperCase();
+      const payMode = String(booking.paymentMode || '').toUpperCase();
 
-    const patientItems = this.getPatientItemsForBooking(booking);
-    const patientSum = patientItems.reduce((acc, it) => acc + Number(it.price || it.OfferPrice || 0), 0);
-    if (amtEl) amtEl.textContent = this.safeFormatCurrency(patientSum > 0 ? patientSum : (booking.finalAmount || 0));
-
-    if (locBox && locText && locIcon) {
-      if (isLab) {
-        locIcon.textContent = '🏢';
-        locText.textContent = 'Selfcare Diagnostics Central Laboratory, Chennai';
+      if (payStatus.includes('SUCCESS') || payMode.includes('RAZORPAY') || payMode.includes('ONLINE')) {
+        paymentEl.textContent = '✅ Paid Online (Razorpay)';
+        paymentEl.style.color = '#059669';
+      } else if (payStatus === 'PAID_AT_LAB' || payMode === 'CASH_LAB_COUNTER') {
+        paymentEl.textContent = '✅ Paid at Lab Counter';
+        paymentEl.style.color = '#059669';
+      } else if (payMode.includes('UPI')) {
+        paymentEl.textContent = '⚡ UPI QR on Collection';
+        paymentEl.style.color = '#D97706';
       } else {
-        locIcon.textContent = '🏠';
-        locText.textContent = booking.address || 'Doorstep sample pickup registered';
+        paymentEl.textContent = '💵 Cash on Visit';
+        paymentEl.style.color = '#D97706';
       }
     }
 
+    // ACCURATE TOTAL CALCULATION (Tests Price + Doorstep Charge)
+    const patientItems = this.getPatientItemsForBooking(booking);
+    const patientSum = patientItems.reduce((acc, it) => acc + Number(it.price || it.OfferPrice || 0), 0);
+    
+    // Auto-derive doorstep fee if order subtotal < 500 and mode is home pickup
+    let doorstepCharge = Number(booking.doorstepCharge || 0);
+    if (doorstepCharge === 0 && !isLab && patientSum > 0 && patientSum < 500) {
+      doorstepCharge = 100;
+    }
+
+    let finalDisplayTotal = Number(booking.finalAmount || 0);
+    if (!finalDisplayTotal || finalDisplayTotal < (patientSum + doorstepCharge)) {
+      finalDisplayTotal = patientSum + doorstepCharge;
+    }
+
+    if (amtEl) amtEl.textContent = this.safeFormatCurrency(finalDisplayTotal);
+
+    // RENDER ADD TESTS BANNER (BETWEEN META CARD & LIVE PROGRESS)
+    this.renderAddTestsCenterBanner(booking);
+
     this.renderTimelineStepper(booking);
-    this.renderBookedTests(booking);
+    this.renderBookedTests(booking, doorstepCharge);
+  },
+
+  /**
+   * Renders the Add Tests Box between Booking Reference & Live Diagnostic Progress
+   */
+  renderAddTestsCenterBanner(booking) {
+    const bannerBox = document.getElementById('disp-add-tests-box');
+    if (!bannerBox) return;
+
+    const canAddTests = this.isWithinAddTestsTimeWindow(booking);
+
+    if (canAddTests) {
+      bannerBox.style.display = 'block';
+      bannerBox.innerHTML = `
+        <div class="add-tests-center-banner glass-card animate-fade">
+          <div class="add-tests-banner-left">
+            <strong><span>➕</span> Want to add more tests to this visit?</strong>
+            <span>100% Free Doorstep Collection Fee (Clubbed Visit)</span>
+          </div>
+          <button type="button" class="add-tests-banner-btn" onclick="BookingsPage.goToAddTests('${booking.bookingId}')">
+            <span>➕</span> Add Tests
+          </button>
+        </div>
+      `;
+    } else {
+      bannerBox.style.display = 'none';
+      bannerBox.innerHTML = '';
+    }
   },
 
   renderTimelineStepper(booking) {
@@ -554,15 +789,13 @@ const BookingsPage = {
     }).join('');
   },
 
-  renderBookedTests(booking) {
+  renderBookedTests(booking, doorstepCharge = 0) {
     const container = document.getElementById('disp-tests-list');
     if (!container) return;
 
     const items = this.getPatientItemsForBooking(booking);
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
-
-    const stage = this.getBookingStage(booking);
-    const canAddTests = stage <= 2;
+    const isLab = booking.collectionType === 'lab' || String(booking.address || '').includes('Direct Lab');
 
     let html = items.map(item => `
       <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f5f9;">
@@ -576,16 +809,15 @@ const BookingsPage = {
       </div>
     `).join('');
 
-    if (canAddTests) {
+    // HOME COLLECTION CHARGE ROW DISPLAY (FOR ORDERS < ₹500)
+    if (!isLab && doorstepCharge > 0) {
       html += `
-        <div style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(7, 136, 102, 0.25); display: flex; justify-content: space-between; align-items: center; background: #F0FDF9; padding: 10px 12px; border-radius: 10px;">
-          <div>
-            <strong style="font-size: 12px; color: #045D49; display: block;">Want to add more tests to this visit?</strong>
-            <span style="font-size: 10px; color: #536E66;">Home collection fee ₹0 FREE (Clubbed)</span>
+        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 8px; border-bottom:1px solid #f1f5f9; background:#fff7ed; border-radius:8px; margin-top:8px;">
+          <div style="display:flex; flex-direction:column; gap:1px;">
+            <span style="font-size:12px; font-weight:700; color:#9a3412;">🏠 Home Sample Collection Fee</span>
+            <span style="font-size:9.5px; color:#c2410c; font-weight:600;">Standard doorstep charge (Orders below ₹500)</span>
           </div>
-          <button type="button" class="add-tests-action-btn" onclick="BookingsPage.goToAddTests('${booking.bookingId}')" style="background: linear-gradient(135deg, #078866, #045D49); color: #ffffff; border: none; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 3px 10px rgba(7, 136, 102, 0.25); white-space: nowrap;">
-            <span>➕</span> Add Tests
-          </button>
+          <strong style="color:#c2410c; font-size:13px;">${this.safeFormatCurrency(doorstepCharge)}</strong>
         </div>
       `;
     }
@@ -600,19 +832,71 @@ const BookingsPage = {
       return;
     }
 
+    // STRICT 3-HOUR TIME WINDOW VALIDATION
+    if (!this.isWithinAddTestsTimeWindow(booking)) {
+      this.safeShowToast('⚠️ Add-on tests window has expired (Allowed only within 3 hours of appointment slot).', 'error');
+      return;
+    }
+
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
-    const existingItems = this.getPatientItemsForBooking(booking).map(item => ({
-      ...item,
-      isExistingLocked: true,
-      removable: false
-    }));
+    const rawItems = this.getPatientItemsForBooking(booking);
+    const pId = activePatient ? activePatient.id : (booking.patientId || 'self');
+
+    const existingItems = rawItems.map((item, idx) => {
+      let isPkg = false;
+      if (typeof ConflictValidator !== 'undefined' && typeof ConflictValidator.isPackage === 'function') {
+        isPkg = ConflictValidator.isPackage(item);
+      } else {
+        const c = String(item.code || item.id || item.PackageCode || item.PackageID || '').toUpperCase();
+        const n = String(item.name || item.TestName || item.PackageName || '').toUpperCase();
+        isPkg = (
+          item.type === 'package' ||
+          item.PackageID ||
+          item.PackageCode ||
+          c.startsWith('PKG') ||
+          c.startsWith('PACK') ||
+          c.startsWith('SCDP') ||
+          n.includes('PACKAGE') ||
+          n.includes('HEALTH') ||
+          n.includes('WELLNESS') ||
+          n.includes('CHECK')
+        );
+      }
+
+      let fullPkgData = null;
+      if (isPkg && typeof ConflictValidator !== 'undefined' && typeof ConflictValidator.findFullPackageFromSheet === 'function') {
+        fullPkgData = ConflictValidator.findFullPackageFromSheet(item);
+      }
+
+      return {
+        ...item,
+        ...(fullPkgData || {}),
+        id: item.id || item.TestID || item.PackageID || `PAID_${idx}`,
+        TestID: item.TestID || item.id || null,
+        PackageID: item.PackageID || (isPkg ? (item.id || item.code || item.PackageCode) : null),
+        TestCode: item.TestCode || item.code || null,
+        PackageCode: item.PackageCode || (isPkg ? (item.code || item.id || item.PackageID) : null),
+        name: item.name || item.TestName || item.PackageName || (isPkg ? 'Health Package' : 'Diagnostic Test'),
+        TestName: item.TestName || item.name || item.PackageName,
+        PackageName: item.PackageName || (isPkg ? (item.name || item.TestName) : null),
+        code: item.code || item.TestCode || item.PackageCode || (isPkg ? 'PKG' : 'TEST'),
+        originalPrice: Number(item.price || item.OfferPrice || item.originalPrice || 0),
+        price: 0,
+        type: isPkg ? 'package' : 'test',
+        isPackage: isPkg,
+        patientId: pId,
+        isExistingLocked: true,
+        isExistingBookingItem: true,
+        removable: false
+      };
+    });
 
     const addonLockData = {
       ...booking,
       targetSlide: 1,
       addonMode: 'TESTS_ONLY',
       isLockedExistingBooking: true,
-      lockedPatientId: activePatient ? activePatient.id : (booking.patientId || 'self'),
+      lockedPatientId: pId,
       lockedPatientName: activePatient ? activePatient.name : (booking.patientName || 'Self'),
       lockedRelation: activePatient ? activePatient.relation : (booking.relation || 'Self'),
       lockedCollectionType: booking.collectionType || 'home',
@@ -620,6 +904,7 @@ const BookingsPage = {
       lockedTimeSlot: booking.timeSlot || '',
       lockedAddress: booking.address || '',
       lockedExistingItems: existingItems,
+      items: existingItems,
       permissions: {
         canAddTests: true,
         canRemoveExistingTests: false,
@@ -631,6 +916,7 @@ const BookingsPage = {
     };
 
     sessionStorage.setItem('selfcare_addon_booking', JSON.stringify(addonLockData));
+    sessionStorage.setItem('selfcare_target_patient_id', String(pId));
     localStorage.setItem('selfcare_active_addon_booking_id', booking.bookingId);
     localStorage.setItem('selfcare_active_addon_booking_data', JSON.stringify(addonLockData));
 

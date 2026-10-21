@@ -1,6 +1,6 @@
 /* file: assets/js/offline-sync.js */
 /**
- * Selfcare Diagnostics - Real-Time Offline Synchronization v5.0.0
+ * Selfcare Diagnostics - Real-Time Offline Synchronization v5.1.0
  * Instant 0ms Local-First load with Seamless Background Google Sheets updates.
  * Auto-sanitizes TestID and PackageID to prevent IndexedDB keyPath errors.
  */
@@ -24,8 +24,26 @@ const OfflineSync = {
         if (!needSync) return null;
       }
 
-      const rawTests = await Api.getTests();
-      if (rawTests && Array.isArray(rawTests) && rawTests.length > 0) {
+      if (typeof Api === 'undefined' || typeof Api.getTests !== 'function') {
+        console.warn('Api.getTests is not defined in window context');
+        return null;
+      }
+
+      const res = await Api.getTests();
+      
+      // Robust array extraction (Direct Array, res.data, res.tests, res.result)
+      let rawTests = [];
+      if (Array.isArray(res)) {
+        rawTests = res;
+      } else if (res && Array.isArray(res.data)) {
+        rawTests = res.data;
+      } else if (res && Array.isArray(res.tests)) {
+        rawTests = res.tests;
+      } else if (res && Array.isArray(res.result)) {
+        rawTests = res.result;
+      }
+
+      if (rawTests.length > 0) {
         // Sanitize every row so IndexedDB keyPath will NEVER throw error
         const tests = rawTests.map((t, idx) => {
           const tid = String(t.TestID || t.TestCode || t.id || ('T' + String(idx + 1).padStart(4, '0'))).trim();
@@ -42,6 +60,8 @@ const OfflineSync = {
         localStorage.setItem('cache_tests', JSON.stringify(tests));
         localStorage.setItem('selfcare_tests_db', JSON.stringify(tests));
         return tests;
+      } else {
+        console.warn('API returned empty or invalid tests structure:', res);
       }
     } catch (error) {
       console.warn('Sync tests failed (offline or network error):', error);
@@ -56,8 +76,26 @@ const OfflineSync = {
         if (!needSync) return null;
       }
 
-      const rawPackages = await Api.getPackages();
-      if (rawPackages && Array.isArray(rawPackages) && rawPackages.length > 0) {
+      if (typeof Api === 'undefined' || typeof Api.getPackages !== 'function') {
+        console.warn('Api.getPackages is not defined in window context');
+        return null;
+      }
+
+      const res = await Api.getPackages();
+
+      // Robust array extraction
+      let rawPackages = [];
+      if (Array.isArray(res)) {
+        rawPackages = res;
+      } else if (res && Array.isArray(res.data)) {
+        rawPackages = res.data;
+      } else if (res && Array.isArray(res.packages)) {
+        rawPackages = res.packages;
+      } else if (res && Array.isArray(res.result)) {
+        rawPackages = res.result;
+      }
+
+      if (rawPackages.length > 0) {
         const packages = rawPackages.map((p, idx) => {
           const pid = String(p.PackageID || p.PackageCode || p.id || ('PKG' + String(idx + 1).padStart(3, '0'))).trim();
           return {
@@ -73,6 +111,8 @@ const OfflineSync = {
         localStorage.setItem('cache_packages', JSON.stringify(packages));
         localStorage.setItem('selfcare_packages_db', JSON.stringify(packages));
         return packages;
+      } else {
+        console.warn('API returned empty or invalid packages structure:', res);
       }
     } catch (error) {
       console.warn('Sync packages failed (offline or network error):', error);

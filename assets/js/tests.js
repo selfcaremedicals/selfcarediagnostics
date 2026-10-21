@@ -1,19 +1,21 @@
 /* file: assets/js/tests.js */
 /**
- * Selfcare Diagnostics - Tests Page JS (Zero-Fail Edition) v6.4.0
+ * Selfcare Diagnostics - Tests Page JS (Zero-Fail Edition) v6.5.0
  * Features:
  * 1. Multi-Patient Isolated Conflict Validation.
- * 2. Target Patient Context Detection via URL & sessionStorage (targetPatientId).
- * 3. Patient-Isolated Cart Existence Checker (isItemInCart).
- * 4. Multi-tenant Vault-Aware Cart Isolation.
- * 5. Dedicated Category Switcher.
- * 6. Native Web Speech Recognition API Integration (Real-time voice search).
- * 7. Parameters Count Badge on outside card box.
- * 8. Natural Language Symptom Search Engine (Full 40 Symptoms Mapping).
- * 9. Fly-to-Cart Animation & 3D detail modal.
- * 10. Smooth 5s Auto-Slider with Touch/Hover Pause & Interval Leak Protection.
- * 11. Native Web Share API with App Box Card Frame & Detailed Parameters List.
- * 12. Clean Base URL Engine (Zero URL Duplication Bug - Direct domain linking).
+ * 2. Add-on Booking Lock Guard: Strictly blocks re-adding booked packages, duplicate tests,
+ *    and covered sub-parameters from active appointments.
+ * 3. Target Patient Context Detection via URL & sessionStorage (targetPatientId).
+ * 4. Patient-Isolated Cart Existence Checker (isItemInCart).
+ * 5. Multi-tenant Vault-Aware Cart Isolation.
+ * 6. Dedicated Category Switcher.
+ * 7. Native Web Speech Recognition API Integration (Real-time voice search).
+ * 8. Parameters Count Badge on outside card box.
+ * 9. Natural Language Symptom Search Engine (Full 40 Symptoms Mapping).
+ * 10. Fly-to-Cart Animation & 3D detail modal with Locked Status Badge.
+ * 11. Interactive Finger Touch-Swipe + Real-time Drag Physics + 5s Auto-Slider.
+ * 12. Native Web Share API with App Box Card Frame & Detailed Parameters List.
+ * 13. Clean Base URL Engine (Zero URL Duplication Bug - Direct domain linking).
  */
 
 const TestsPage = {
@@ -85,6 +87,17 @@ const TestsPage = {
   },
 
   /**
+   * Helper: Normalized Patient ID Comparison (Case-Insensitive & 'self' alias aware)
+   */
+  isPatientMatch(patientIdA, patientIdB) {
+    const a = String(patientIdA || 'SELF').trim().toLowerCase();
+    const b = String(patientIdB || 'SELF').trim().toLowerCase();
+    if (a === b) return true;
+    if ((a === 'self' || a === 'patient_self') && (b === 'self' || b === 'patient_self')) return true;
+    return false;
+  },
+
+  /**
    * Identifies the current active patient context
    */
   getTargetPatientId() {
@@ -101,10 +114,61 @@ const TestsPage = {
       if (storedId && storedId.trim()) {
         return storedId.trim();
       }
+
+      // Check if active addon booking specifies a locked patient
+      const addonRaw = sessionStorage.getItem('selfcare_addon_booking') || localStorage.getItem('selfcare_active_addon_booking_data');
+      if (addonRaw) {
+        const addon = JSON.parse(addonRaw);
+        if (addon && (addon.lockedPatientId || addon.patientId)) {
+          return String(addon.lockedPatientId || addon.patientId).trim();
+        }
+      }
     } catch (e) {
       console.warn('Error resolving targetPatientId:', e);
     }
     return 'SELF';
+  },
+
+  /**
+   * Checks if an item is already paid and locked in an active booking appointment
+   */
+  isItemLockedInBooking(testId, testCode, testName) {
+    try {
+      const addonRaw = sessionStorage.getItem('selfcare_addon_booking') || localStorage.getItem('selfcare_active_addon_booking_data');
+      if (!addonRaw) return false;
+      const addon = JSON.parse(addonRaw);
+      if (!addon || !Array.isArray(addon.lockedExistingItems) || addon.lockedExistingItems.length === 0) return false;
+
+      const targetPatientId = this.getTargetPatientId();
+      const lockedPatientId = addon.lockedPatientId || addon.patientId || 'SELF';
+      if (!this.isPatientMatch(targetPatientId, lockedPatientId)) return false;
+
+      const sId = String(testId || '').trim().toLowerCase();
+      const sCode = String(testCode || '').trim().toLowerCase();
+      const sName = String(testName || '').trim().toLowerCase();
+
+      return addon.lockedExistingItems.some(item => {
+        const iId = String(item.TestID || item.PackageID || item.id || item.code || '').trim().toLowerCase();
+        const iCode = String(item.TestCode || item.PackageCode || item.code || '').trim().toLowerCase();
+        const iName = String(item.TestName || item.PackageName || item.name || '').trim().toLowerCase();
+        return (sId && iId === sId) || (sCode && iCode === sCode) || (sName && iName === sName);
+      });
+    } catch (e) {
+      return false;
+    }
+  },
+
+  showLockedNotice(itemName, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const name = itemName || 'This item';
+    if (typeof Utils !== 'undefined' && Utils.showToast) {
+      Utils.showToast(`🔒 "${name}" is already paid & booked in this appointment!`, 'info');
+    } else {
+      alert(`"${name}" is already paid & booked in this appointment!`);
+    }
   },
 
   async loadTestsCatalogue() {
@@ -144,33 +208,95 @@ const TestsPage = {
 
   /**
    * Multi-tenant Isolated Cart Reader
+   * CRITICAL FIX: Automatically merges locked items from an existing booking
+   * so ConflictValidator can inspect previously paid packages & tests.
    */
   getCart() {
-    if (typeof localStorage === 'undefined') return [];
-    try {
-      const activeUser = localStorage.getItem('selfcare_active_user');
-      let raw = null;
+    let cart = [];
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const activeUser = localStorage.getItem('selfcare_active_user');
+        let raw = null;
 
-      if (activeUser) {
-        raw = localStorage.getItem(`selfcare_cart_${activeUser}`);
-      }
+        if (activeUser) {
+          raw = localStorage.getItem(`selfcare_cart_${activeUser}`);
+        }
 
-      if (raw === null) {
-        raw = localStorage.getItem('selfcare_cart') ?? localStorage.getItem('cart');
-      }
+        if (raw === null) {
+          raw = localStorage.getItem('selfcare_cart') ?? localStorage.getItem('cart');
+        }
 
-      if (raw !== null) {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
+        if (raw !== null) {
+          const parsed = JSON.parse(raw);
+          cart = Array.isArray(parsed) ? parsed : [];
+        }
+      } catch (err) {
+        console.error('Cart parse error:', err);
       }
-    } catch (err) {
-      console.error('Cart parse error:', err);
     }
-    return [];
+
+    // 🛡️ CRITICAL FIX: Merge locked existing booking items into cart array for deep conflict checks
+    try {
+      const addonRaw = sessionStorage.getItem('selfcare_addon_booking') || localStorage.getItem('selfcare_active_addon_booking_data');
+      if (addonRaw) {
+        const addonData = JSON.parse(addonRaw);
+        if (addonData && Array.isArray(addonData.lockedExistingItems)) {
+          const lockedTargetPatientId = addonData.lockedPatientId || addonData.patientId || 'SELF';
+
+          addonData.lockedExistingItems.forEach(lockedItem => {
+            const isPkg = (
+              lockedItem.type === 'package' ||
+              lockedItem.PackageID ||
+              lockedItem.PackageCode ||
+              String(lockedItem.code || lockedItem.id || '').toUpperCase().startsWith('PKG') ||
+              String(lockedItem.TestCode || '').toUpperCase().startsWith('PKG') ||
+              String(lockedItem.name || lockedItem.TestName || '').toUpperCase().includes('PACKAGE')
+            );
+
+            const lockedItemNormalized = {
+              ...lockedItem,
+              id: lockedItem.TestID || lockedItem.PackageID || lockedItem.id || lockedItem.code,
+              TestID: lockedItem.TestID || lockedItem.id || null,
+              PackageID: lockedItem.PackageID || (isPkg ? (lockedItem.id || lockedItem.code) : null),
+              TestCode: lockedItem.TestCode || lockedItem.code || null,
+              PackageCode: lockedItem.PackageCode || (isPkg ? (lockedItem.code || lockedItem.id) : null),
+              code: lockedItem.TestCode || lockedItem.PackageCode || lockedItem.code || lockedItem.id,
+              name: lockedItem.TestName || lockedItem.PackageName || lockedItem.name,
+              TestName: lockedItem.TestName || lockedItem.name,
+              PackageName: lockedItem.PackageName || (isPkg ? lockedItem.name : null),
+              type: isPkg ? 'package' : 'test',
+              isPackage: isPkg,
+              patientId: lockedTargetPatientId,
+              isExistingLocked: true
+            };
+
+            const lCode = String(lockedItemNormalized.code || '').trim().toLowerCase();
+            const lId = String(lockedItemNormalized.id || '').trim().toLowerCase();
+            const lName = String(lockedItemNormalized.name || '').trim().toLowerCase();
+
+            const alreadyPresent = cart.some(c => {
+              const cCode = String(c.TestCode || c.PackageCode || c.code || c.id || '').trim().toLowerCase();
+              const cId = String(c.TestID || c.PackageID || c.id || '').trim().toLowerCase();
+              const cName = String(c.TestName || c.PackageName || c.name || '').trim().toLowerCase();
+              return (lCode && cCode === lCode) || (lId && cId === lId) || (lName && cName === lName);
+            });
+
+            if (!alreadyPresent) {
+              cart.push(lockedItemNormalized);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Addon booking inspection notice:', e);
+    }
+
+    return cart;
   },
 
   updateCartBadgeUI() {
-    const cart = this.getCart();
+    // Only count newly added items in the badge (ignore pre-existing locked appointment items)
+    const cart = this.getCart().filter(i => !i.isExistingLocked);
     const count = cart.length;
     const badges = document.querySelectorAll('.cart-badge');
     badges.forEach(b => {
@@ -196,7 +322,7 @@ const TestsPage = {
 
     return cart.some(item => {
       const itemPatientId = item.patientId || 'SELF';
-      if (itemPatientId !== targetPatientId) {
+      if (!this.isPatientMatch(itemPatientId, targetPatientId)) {
         return false;
       }
 
@@ -269,6 +395,12 @@ const TestsPage = {
     const testCode = test.TestCode || 'TEST';
     const testId = test.TestID || testCode;
     const testName = test.TestName || '';
+
+    // 🛡️ BLOCK ACTION IF ITEM IS ALREADY PAID IN LOCKED BOOKING
+    if (this.isItemLockedInBooking(testId, testCode, testName)) {
+      this.showLockedNotice(testName, event);
+      return;
+    }
     
     let cart = this.getCart();
     const isAdded = this.isItemInCart(testId, testCode, testName);
@@ -291,7 +423,7 @@ const TestsPage = {
     if (!isAdded) {
       if (typeof ConflictValidator !== 'undefined') {
         try {
-          const patientOnlyCart = cart.filter(i => (i.patientId || 'SELF') === targetPatientId);
+          const patientOnlyCart = cart.filter(i => this.isPatientMatch(i.patientId, targetPatientId));
           const conflict = ConflictValidator.checkConflict(testItemWithMeta, patientOnlyCart);
           if (conflict && conflict.hasConflict) {
             if (typeof Utils !== 'undefined') {
@@ -313,9 +445,11 @@ const TestsPage = {
     }
 
     if (isAdded) {
+      // Remove item only if it is NOT a pre-existing locked item
       cart = cart.filter(i => {
+        if (i.isExistingLocked) return true;
         const itemPatientId = i.patientId || 'SELF';
-        if (itemPatientId !== targetPatientId) {
+        if (!this.isPatientMatch(itemPatientId, targetPatientId)) {
           return true;
         }
 
@@ -336,7 +470,9 @@ const TestsPage = {
       }
     }
 
-    const cartStr = JSON.stringify(cart);
+    // Save ONLY newly added items into localStorage (Preserve locked items in appointment store)
+    const newlyAddedOnly = cart.filter(i => !i.isExistingLocked);
+    const cartStr = JSON.stringify(newlyAddedOnly);
     localStorage.setItem('cart', cartStr);
     localStorage.setItem('selfcare_cart', cartStr);
 
@@ -346,12 +482,12 @@ const TestsPage = {
     }
 
     if (typeof App !== 'undefined') {
-      App.cart = cart;
-      if (typeof App.saveCart === 'function') App.saveCart(cart);
+      App.cart = newlyAddedOnly;
+      if (typeof App.saveCart === 'function') App.saveCart(newlyAddedOnly);
       if (typeof App.updateCartBadge === 'function') App.updateCartBadge();
     }
     if (typeof OfflineDB !== 'undefined' && typeof OfflineDB.saveCart === 'function') {
-      OfflineDB.saveCart(cart);
+      OfflineDB.saveCart(newlyAddedOnly);
     }
 
     this.updateCartBadgeUI();
@@ -625,13 +761,19 @@ const TestsPage = {
     container.innerHTML = tests.map(test => {
       const testCode = test.TestCode || 'TEST';
       const testId = test.TestID || testCode;
+      const isLocked = this.isItemLockedInBooking(testId, testCode, test.TestName);
       const alreadyAdded = this.isItemInCart(testId, testCode, test.TestName);
       const fastingInfo = this.getFastingDetails(test);
       const paramCount = this.getTestParameterCount(test);
 
-      const actionButton = alreadyAdded 
-        ? `<button class="book-btn added-btn" onclick="TestsPage.toggleCartById('${Utils.escapeHtml(testId)}', event)">Remove</button>`
-        : `<button class="book-btn add-cart-btn" onclick="TestsPage.toggleCartById('${Utils.escapeHtml(testId)}', event)">🛒 Add To Cart</button>`;
+      let actionButton = '';
+      if (isLocked) {
+        actionButton = `<button type="button" class="book-btn locked-btn" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; cursor:not-allowed;" onclick="TestsPage.showLockedNotice('${Utils.escapeHtml(test.TestName)}', event)">🔒 Already Booked</button>`;
+      } else if (alreadyAdded) {
+        actionButton = `<button type="button" class="book-btn added-btn" onclick="TestsPage.toggleCartById('${Utils.escapeHtml(testId)}', event)">Remove</button>`;
+      } else {
+        actionButton = `<button type="button" class="book-btn add-cart-btn" onclick="TestsPage.toggleCartById('${Utils.escapeHtml(testId)}', event)">🛒 Add To Cart</button>`;
+      }
 
       return `
         <div class="test-card glass-card animate-fade" style="position: relative;">
@@ -848,7 +990,7 @@ const TestsPage = {
   },
 
   /**
-   * Premium 3D Promo Slider Engine
+   * Premium 3D Promo Slider Engine (Finger Touch-Swipe + Real-time Drag Physics + Auto-Slide)
    */
   setupAutoSlideCarousel() {
     const track = document.getElementById('singleSliderTrack');
@@ -863,22 +1005,92 @@ const TestsPage = {
     const totalSlides = track.children.length;
     if (totalSlides <= 1) return;
 
+    const sliderBox = track.closest('.single-slider-box') || track.parentElement;
+    track.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
+    track.style.touchAction = 'pan-y';
+
+    const goToSlideIndex = (index) => {
+      currentSlide = (index + totalSlides) % totalSlides;
+      track.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
+      track.style.transform = `translateX(-${currentSlide * 100}%)`;
+    };
+
     const startSliding = () => {
       if (this.sliderIntervalId) clearInterval(this.sliderIntervalId);
       this.sliderIntervalId = setInterval(() => {
-        currentSlide = (currentSlide + 1) % totalSlides;
-        track.style.transform = `translateX(-${currentSlide * 100}%)`;
+        goToSlideIndex(currentSlide + 1);
       }, 5000);
     };
 
     startSliding();
 
-    const sliderBox = track.closest('.single-slider-box');
-    if (sliderBox) {
+    if (sliderBox && !sliderBox.dataset.swipeBound) {
+      sliderBox.dataset.swipeBound = 'true';
+
+      let startX = 0;
+      let startY = 0;
+      let currentDeltaX = 0;
+      let isDragging = false;
+      let isHorizontalSwipe = null;
+
+      sliderBox.addEventListener('touchstart', (e) => {
+        if (!e.touches || e.touches.length === 0) return;
+        clearInterval(this.sliderIntervalId);
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        currentDeltaX = 0;
+        isDragging = true;
+        isHorizontalSwipe = null;
+        track.style.transition = 'none';
+      }, { passive: true });
+
+      sliderBox.addEventListener('touchmove', (e) => {
+        if (!isDragging || !e.touches || e.touches.length === 0) return;
+        const moveX = e.touches[0].clientX;
+        const moveY = e.touches[0].clientY;
+        const diffX = moveX - startX;
+        const diffY = moveY - startY;
+
+        if (isHorizontalSwipe === null) {
+          if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
+            isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
+          }
+        }
+
+        if (isHorizontalSwipe) {
+          currentDeltaX = diffX;
+          const boxWidth = sliderBox.offsetWidth || 320;
+          const dragPercent = (currentDeltaX / boxWidth) * 100;
+          track.style.transform = `translateX(calc(-${currentSlide * 100}% + ${dragPercent}%))`;
+        }
+      }, { passive: true });
+
+      const finishTouchSwipe = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        const boxWidth = sliderBox.offsetWidth || 320;
+        const threshold = Math.min(45, boxWidth * 0.15);
+
+        if (isHorizontalSwipe && Math.abs(currentDeltaX) > threshold) {
+          if (currentDeltaX < 0) {
+            goToSlideIndex(currentSlide + 1);
+          } else {
+            goToSlideIndex(currentSlide - 1);
+          }
+        } else {
+          goToSlideIndex(currentSlide);
+        }
+
+        currentDeltaX = 0;
+        isHorizontalSwipe = null;
+        startSliding();
+      };
+
+      sliderBox.addEventListener('touchend', finishTouchSwipe, { passive: true });
+      sliderBox.addEventListener('touchcancel', finishTouchSwipe, { passive: true });
+
       sliderBox.addEventListener('mouseenter', () => clearInterval(this.sliderIntervalId));
       sliderBox.addEventListener('mouseleave', () => startSliding());
-      sliderBox.addEventListener('touchstart', () => clearInterval(this.sliderIntervalId), { passive: true });
-      sliderBox.addEventListener('touchend', () => startSliding(), { passive: true });
     }
   },
 
@@ -910,11 +1122,17 @@ const TestsPage = {
     const formattedParams = this.formatParameters(test);
     const paramCount = this.getTestParameterCount(test);
     const fastingInfo = this.getFastingDetails(test);
+    const isLocked = this.isItemLockedInBooking(actualId, test.TestCode, test.TestName);
     const alreadyAdded = this.isItemInCart(actualId, test.TestCode, test.TestName);
 
-    const actionBtn = alreadyAdded
-      ? `<button class="modal-action-btn remove-btn" onclick="TestsPage.toggleCartById('${Utils.escapeHtml(actualId)}', event); TestsPage.showTestDetails('${Utils.escapeHtml(actualId)}');">🗑️ Remove from Cart</button>`
-      : `<button class="modal-action-btn add-btn" onclick="TestsPage.toggleCartById('${Utils.escapeHtml(actualId)}', event); TestsPage.showTestDetails('${Utils.escapeHtml(actualId)}');">🛒 Add to Cart</button>`;
+    let actionBtn = '';
+    if (isLocked) {
+      actionBtn = `<button type="button" class="modal-action-btn locked-btn" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1; cursor:not-allowed;" onclick="TestsPage.showLockedNotice('${Utils.escapeHtml(test.TestName)}', event)">🔒 Already Included in Booked Appointment</button>`;
+    } else if (alreadyAdded) {
+      actionBtn = `<button class="modal-action-btn remove-btn" onclick="TestsPage.toggleCartById('${Utils.escapeHtml(actualId)}', event); TestsPage.showTestDetails('${Utils.escapeHtml(actualId)}');">🗑️ Remove from Cart</button>`;
+    } else {
+      actionBtn = `<button class="modal-action-btn add-btn" onclick="TestsPage.toggleCartById('${Utils.escapeHtml(actualId)}', event); TestsPage.showTestDetails('${Utils.escapeHtml(actualId)}');">🛒 Add to Cart</button>`;
+    }
 
     let modal = document.getElementById('test-detail-modal');
     if (!modal) {

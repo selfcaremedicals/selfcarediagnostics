@@ -1,35 +1,23 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v6.5.0
- * Features:
- * - Mandatory Profile Onboarding for New Users
- * - Blood Connect Integration (Addresses removed)
- * - Progressive 10% Referral Engine (Up to 100% Free Health Checkup)
- * - Strict Self-Only Cart Reward Flag
+ * Selfcare Diagnostics - My Account Controller v6.7.0
+ * Streamlined Edition:
+ * - Direct navigation to blood.html & refer.html
+ * - Mandatory profile setup completely removed
+ * - Family Directory Vault preserved
  */
 
 const ProfilePage = {
   currentUser: null,
   familyMembers: [],
-  completedReferralsCount: 0,
-  isMandatorySetup: false,
 
   async init() {
     try {
       this.loadAccountData();
       this.updateCartBadgeUI();
-      this.checkReferralStatus();
 
       const loader = document.getElementById('profile-loading-overlay') || document.getElementById('page-loader');
       if (loader) loader.style.display = 'none';
-
-      // Check if user is redirected for mandatory onboarding
-      const urlParams = new URLSearchParams(window.location.search);
-      const isParamSetup = urlParams.get('setup') === 'mandatory' || urlParams.get('setup') === '1';
-
-      if (isParamSetup || !this.isProfileFullyComplete()) {
-        this.triggerMandatoryProfileSetup();
-      }
 
       if (navigator.onLine) {
         setTimeout(() => {
@@ -39,36 +27,6 @@ const ProfilePage = {
     } catch (err) {
       console.error('ProfilePage init error:', err);
     }
-  },
-
-  isProfileFullyComplete() {
-    if (!this.currentUser) return false;
-    const u = this.currentUser;
-    const nameValid = Boolean(u.name && u.name.trim() !== '' && u.name.trim().toLowerCase() !== 'customer account' && u.name.trim().toLowerCase() !== 'valued customer');
-    const ageValid = Boolean(u.age && Number(u.age) > 0);
-    const genderValid = Boolean(u.gender && u.gender.trim() !== '');
-    const addressValid = Boolean(u.address && u.address.trim() !== '' && u.address.toLowerCase() !== 'address not provided');
-    return Boolean(nameValid && ageValid && genderValid && addressValid);
-  },
-
-  triggerMandatoryProfileSetup() {
-    this.isMandatorySetup = true;
-    this.openMyProfileModal();
-    this.toggleSelfEditMode(true);
-
-    const closeBtn = document.getElementById('my-profile-close-btn');
-    if (closeBtn) closeBtn.style.display = 'none';
-
-    const cancelBtn = document.getElementById('self-edit-cancel-btn');
-    if (cancelBtn) cancelBtn.style.display = 'none';
-
-    const alertBanner = document.getElementById('mandatory-setup-alert');
-    if (alertBanner) alertBanner.style.display = 'flex';
-
-    const saveBtn = document.getElementById('self-edit-save-btn');
-    if (saveBtn) saveBtn.textContent = 'Save & Proceed to Dashboard ➔';
-
-    this.safeShowToast('Welcome! Please complete your profile details to continue.', 'info');
   },
 
   safeShowToast(message, type = 'info') {
@@ -158,10 +116,6 @@ const ProfilePage = {
       this.familyMembers = [];
     }
 
-    // Load Completed Referrals Count (0 to 10 cycle)
-    const savedCount = localStorage.getItem(`selfcare_referral_completed_${currentMobile}`) || localStorage.getItem('selfcare_completed_referrals') || '0';
-    this.completedReferralsCount = Math.min(Math.max(parseInt(savedCount, 10) || 0, 0), 10);
-
     this.renderSelfProfile();
     this.populateFormInputs();
     this.renderFamilyCards();
@@ -194,12 +148,6 @@ const ProfilePage = {
           location: p.location || p.Location || this.currentUser.location
         };
 
-        if (res.completedReferrals !== undefined) {
-          this.completedReferralsCount = Math.min(Math.max(parseInt(res.completedReferrals, 10) || 0, 0), 10);
-          localStorage.setItem(`selfcare_referral_completed_${activeMobile}`, String(this.completedReferralsCount));
-          this.checkReferralStatus();
-        }
-
         const serialized = JSON.stringify(this.currentUser);
         localStorage.setItem(`selfcare_profile_${activeMobile}`, serialized);
         localStorage.setItem('selfcare_customer_profile', serialized);
@@ -213,25 +161,10 @@ const ProfilePage = {
     }
   },
 
-  checkReferralStatus() {
-    const badge = document.getElementById('referral-reward-badge');
-    const discount = this.completedReferralsCount * 10;
-    if (badge) {
-      if (discount > 0) {
-        badge.textContent = `${discount}% OFF Unlocked`;
-        badge.style.display = 'inline-block';
-      } else {
-        badge.style.display = 'none';
-      }
-    }
-  },
-
   openMyProfileModal() {
     this.renderSelfProfile();
     this.populateFormInputs();
-    if (!this.isMandatorySetup) {
-      this.toggleSelfEditMode(false);
-    }
+    this.toggleSelfEditMode(false);
     this.openModal('modal-my-profile');
   },
 
@@ -246,7 +179,7 @@ const ProfilePage = {
     const addressEl = document.getElementById('self-view-address');
     const locEl = document.getElementById('self-view-location');
 
-    const displayName = (u.name && u.name.trim()) ? u.name : 'Profile Incomplete';
+    const displayName = (u.name && u.name.trim()) ? u.name : 'Customer Account';
     if (nameEl) nameEl.textContent = displayName;
     if (avatarEl) avatarEl.textContent = displayName.charAt(0).toUpperCase();
     if (mobileEl) mobileEl.textContent = u.mobile ? `+91 ${u.mobile}` : '+91 7010174890';
@@ -255,9 +188,6 @@ const ProfilePage = {
     if (bloodEl) bloodEl.textContent = u.bloodGroup || 'O+';
     if (addressEl) addressEl.textContent = u.address || 'Address not provided';
     if (locEl) locEl.textContent = u.location || 'Not set';
-
-    const bgConnectDisplay = document.getElementById('blood-connect-display-bg');
-    if (bgConnectDisplay) bgConnectDisplay.textContent = u.bloodGroup || 'O+';
   },
 
   populateFormInputs() {
@@ -300,21 +230,9 @@ const ProfilePage = {
     const address = document.getElementById('self-edit-address').value.trim();
     const location = document.getElementById('self-edit-location').value.trim();
 
-    if (!name || name.toLowerCase() === 'customer account' || name.toLowerCase() === 'valued customer') {
-      this.safeShowToast('Please enter your full name', 'error');
+    if (!name) {
+      this.safeShowToast('Please enter your name', 'error');
       document.getElementById('self-edit-name').focus();
-      return;
-    }
-
-    if (!rawAge || Number(rawAge) <= 0) {
-      this.safeShowToast('Please enter a valid age', 'error');
-      document.getElementById('self-edit-age').focus();
-      return;
-    }
-
-    if (!address) {
-      this.safeShowToast('Please provide your pickup address for sample collection', 'error');
-      document.getElementById('self-edit-address').focus();
       return;
     }
 
@@ -365,111 +283,7 @@ const ProfilePage = {
 
     this.renderSelfProfile();
     this.safeShowToast('Profile details saved successfully!', 'success');
-
-    if (this.isMandatorySetup) {
-      this.isMandatorySetup = false;
-      setTimeout(() => {
-        window.location.href = 'customer.html';
-      }, 700);
-      return;
-    }
-
     this.toggleSelfEditMode(false);
-  },
-
-  /* ================= BLOOD CONNECT MODAL ================= */
-  openBloodConnectModal() {
-    this.renderSelfProfile();
-    this.openModal('modal-blood-connect');
-  },
-
-  registerAsBloodDonor() {
-    this.safeShowToast('Thank you! Donor registration module will be active shortly.', 'success');
-  },
-
-  requestEmergencyBloodHelp() {
-    const bg = (this.currentUser && this.currentUser.bloodGroup) || 'Any';
-    const addr = (this.currentUser && this.currentUser.address) || 'Chennai';
-    const msg = `🚨 *URGENT BLOOD REQUEST - CHENNAI*\nBlood Group Needed: *${bg}*\nLocation: ${addr}\nPlease check available donors and connect immediately.`;
-    window.open(`https://wa.me/917010174890?text=${encodeURIComponent(msg)}`, '_blank');
-  },
-
-  /* ================= REFER & EARN PROGRESSIVE ENGINE ================= */
-  openReferEarnModal() {
-    const userMobile = this.currentUser && this.currentUser.mobile ? this.currentUser.mobile : '7010174890';
-    const referCode = `SC${userMobile.slice(-4)}`;
-    
-    const codeEl = document.getElementById('user-refer-code');
-    if (codeEl) codeEl.textContent = referCode;
-
-    this.renderReferralProgress();
-    this.openModal('modal-refer-earn');
-  },
-
-  renderReferralProgress() {
-    const count = this.completedReferralsCount; // 0 to 10
-    const discount = count * 10; // 0% to 100%
-
-    const countDisplay = document.getElementById('referral-count-display');
-    const barFill = document.getElementById('referral-bar-fill');
-    const discountDisplay = document.getElementById('referral-unlocked-discount');
-
-    if (countDisplay) countDisplay.textContent = `${count} / 10 Completed`;
-    if (barFill) barFill.style.width = `${count * 10}%`;
-    if (discountDisplay) {
-      discountDisplay.textContent = discount === 100 ? '100% FREE CHECKUP 🎉' : `${discount}% OFF`;
-    }
-
-    const container = document.getElementById('earned-coupons-container');
-    if (!container) return;
-
-    if (discount === 0) {
-      container.innerHTML = `
-        <div style="padding:12px; background:#F9FAFB; border:1px dashed #D1D5DB; border-radius:10px; font-size:11.5px; color:#6B7280; text-align:center;">
-          Refer your friends to unlock rewards! Each completed referral earns <strong>10% OFF</strong>, reaching <strong>100% FREE</strong> checkup at 10 referrals.
-        </div>
-      `;
-      return;
-    }
-
-    const couponCode = `REF${count * 10}FREE`;
-    const isFree = discount === 100;
-
-    container.innerHTML = `
-      <div class="coupon-reward-card ${isFree ? 'gold-reward' : ''}">
-        <div class="coupon-info-wrap">
-          <span class="coupon-code-badge">🏷️ ${couponCode} (${discount}% OFF)</span>
-          <span class="coupon-note">
-            ${isFree ? '🌟 100% FREE Comprehensive Health Checkup Unlocked!' : `🎉 ${count} referral booking(s) completed! Enjoy ${discount}% OFF.`}
-          </span>
-          <small style="font-size: 9.5px; color: #DC2626; font-weight: 700; margin-top: 2px;">
-            ⚠️ Valid strictly for Primary Account User only (Self)
-          </small>
-        </div>
-        <button type="button" class="apply-coupon-btn" onclick="ProfilePage.applyReferralBonusToCart(${discount}, '${couponCode}')">
-          🛒 Apply to Cart
-        </button>
-      </div>
-    `;
-  },
-
-  applyReferralBonusToCart(discountPercent, couponCode) {
-    localStorage.setItem('selfcare_applied_coupon', couponCode);
-    localStorage.setItem('selfcare_coupon_discount_percent', String(discountPercent));
-    localStorage.setItem('selfcare_coupon_applicable_for', 'self_only');
-
-    this.safeShowToast(`${discountPercent}% Referral Reward Applied to Cart!`, 'success');
-    this.closeModal('modal-refer-earn');
-
-    setTimeout(() => {
-      window.location.href = 'cart.html';
-    }, 600);
-  },
-
-  shareReferralWhatsApp() {
-    const code = document.getElementById('user-refer-code').textContent;
-    const msg = `Book certified clinical lab tests at doorstep with Selfcare Diagnostics! Use my referral code *${code}* during checkout to book your health tests: https://selfcarediagnostics.in`;
-    window.open(`https://wa.me/917010174890?text=${encodeURIComponent(msg)}`, '_blank');
   },
 
   /* ================= FAMILY DIRECTORY ================= */
@@ -726,10 +540,6 @@ const ProfilePage = {
   },
 
   closeModal(id) {
-    if (this.isMandatorySetup && id === 'modal-my-profile') {
-      this.safeShowToast('Please save your profile details to proceed', 'error');
-      return;
-    }
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   },
