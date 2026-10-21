@@ -1,14 +1,26 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - API Gateway v6.0.0 (Direct Booking & Razorpay Gateway)
+ * Selfcare Diagnostics - API Gateway v6.1.0 (Turbo Speed & Memory Cache Edition)
  * Features:
- * - Direct Booking and Cash Collection API endpoints.
- * - Razorpay order creation and server-side HMAC signature verification.
- * - Fail-fast dynamic timeouts and request deduplication.
+ * - High-speed In-Memory TTL Response Caching for Instant UI updates (Zero GAS delay)
+ * - Automatic cache invalidation on write/update mutations
+ * - Dedicated endpoints for Family Vault (getFamilyMembers, saveFamilyMember, deleteFamilyMember)
+ * - Concurrent In-Flight request deduplication
+ * - Dynamic fail-fast timeouts & AbortController integration
  */
 
 const Api = {
   activeRequests: new Map(),
+  responseCache: new Map(),
+
+  // Default Cache Durations (Milliseconds)
+  CACHE_TTL: {
+    getFamilyMembers: 45000, // 45 seconds
+    getProfile: 45000,
+    getTests: 180000,        // 3 minutes
+    getPackages: 180000,
+    defaultRead: 30000       // 30 seconds
+  },
 
   /**
    * Action-specific timeout resolver (Milliseconds)
@@ -22,6 +34,7 @@ const Api = {
       'searchTests',
       'searchPackages',
       'getProfile',
+      'getFamilyMembers',
       'getBookingsByPatient',
       'getBookingDetails',
       'getAdminTests',
@@ -47,13 +60,35 @@ const Api = {
   },
 
   /**
-   * Core fetch wrapper with deduplication and adaptive timeout
+   * Clears in-memory cache for specific action keys on mutation
    */
-  async request(action, params = {}, useCache = true, customTimeout = null) {
-    const requestKey = `${action}_${JSON.stringify(params)}`;
+  invalidateCache(actionPrefix) {
+    for (const key of this.responseCache.keys()) {
+      if (key.startsWith(actionPrefix)) {
+        this.responseCache.delete(key);
+      }
+    }
+  },
 
-    if (useCache && this.activeRequests.has(requestKey)) {
-      return this.activeRequests.get(requestKey);
+  /**
+   * Core fetch wrapper with Deduplication, Memory Caching and Adaptive Timeout
+   */
+  async request(action, params = {}, allowCache = false, customTimeout = null) {
+    const cacheKey = `${action}_${JSON.stringify(params)}`;
+
+    // 1. Instant Cache hit (Zero Network Latency)
+    if (allowCache && this.responseCache.has(cacheKey)) {
+      const cached = this.responseCache.get(cacheKey);
+      const ttl = this.CACHE_TTL[action] || this.CACHE_TTL.defaultRead;
+      if (Date.now() - cached.timestamp < ttl) {
+        return cached.data;
+      }
+      this.responseCache.delete(cacheKey);
+    }
+
+    // 2. In-flight request deduplication (prevents duplicate parallel fetches)
+    if (this.activeRequests.has(cacheKey)) {
+      return this.activeRequests.get(cacheKey);
     }
 
     const promise = (async () => {
@@ -106,24 +141,31 @@ const Api = {
         }
 
         const data = await response.json();
-        
+
         if (data && data.status === 'error') {
           throw new Error(data.message || 'Unknown server error');
         }
 
-        return (data && data.data !== undefined) ? data.data : data;
+        const result = (data && data.data !== undefined) ? data.data : data;
+
+        // Cache successful read response
+        if (allowCache) {
+          this.responseCache.set(cacheKey, {
+            data: result,
+            timestamp: Date.now()
+          });
+        }
+
+        return result;
       } catch (error) {
         console.warn(`API [${action}] Notice:`, error.message || error);
         throw error;
       } finally {
-        this.activeRequests.delete(requestKey);
+        this.activeRequests.delete(cacheKey);
       }
     })();
 
-    if (useCache) {
-      this.activeRequests.set(requestKey, promise);
-    }
-
+    this.activeRequests.set(cacheKey, promise);
     return promise;
   },
 
@@ -144,11 +186,33 @@ const Api = {
   },
 
   async getProfile(userId) {
-    return this.request('getProfile', { userId, mobile: userId }, false);
+    return this.request('getProfile', { userId, mobile: userId }, true);
   },
 
   async updateProfile(profileData) {
+    this.invalidateCache('getProfile');
     return this.request('updateProfile', profileData, false);
+  },
+
+  // ==========================================================
+  // FAMILY VAULT DIRECTORY APIS
+  // ==========================================================
+
+  async getFamilyMembers(primaryMobile) {
+    return this.request('getFamilyMembers', {
+      mobile: primaryMobile,
+      primaryMobile: primaryMobile
+    }, true);
+  },
+
+  async saveFamilyMember(memberPayload) {
+    this.invalidateCache('getFamilyMembers');
+    return this.request('saveFamilyMember', memberPayload, false);
+  },
+
+  async deleteFamilyMember(payload) {
+    this.invalidateCache('getFamilyMembers');
+    return this.request('deleteFamilyMember', payload, false);
   },
 
   // ==========================================================
@@ -156,31 +220,31 @@ const Api = {
   // ==========================================================
 
   async getTests() {
-    return this.request('getTests', {}, false);
+    return this.request('getTests', {}, true);
   },
 
   async getTestById(testId) {
-    return this.request('getTestById', { testId }, false);
+    return this.request('getTestById', { testId }, true);
   },
 
   async searchTests(query) {
-    return this.request('searchTests', { query }, false);
+    return this.request('searchTests', { query }, true);
   },
 
   async getPackages() {
-    return this.request('getPackages', {}, false);
+    return this.request('getPackages', {}, true);
   },
 
   async getPackageById(packageId) {
-    return this.request('getPackageById', { packageId }, false);
+    return this.request('getPackageById', { packageId }, true);
   },
 
   async searchPackages(query) {
-    return this.request('searchPackages', { query }, false);
+    return this.request('searchPackages', { query }, true);
   },
 
   async aiSearch(query) {
-    return this.request('aiSearch', { query }, false);
+    return this.request('aiSearch', { query }, true);
   },
 
   // ==========================================================
@@ -212,6 +276,7 @@ const Api = {
   // ==========================================================
 
   async createBooking(bookingData) {
+    this.invalidateCache('getBookingsByPatient');
     return this.request('createBooking', bookingData, false);
   },
 
@@ -220,7 +285,7 @@ const Api = {
   },
 
   async getBookingsByPatient(patientPhone) {
-    return this.request('getBookingsByPatient', { patientPhone }, false);
+    return this.request('getBookingsByPatient', { patientPhone }, true);
   },
 
   // ==========================================================
