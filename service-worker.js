@@ -1,6 +1,6 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v10.1.1
+ * Selfcare Diagnostics - Service Worker v10.1.2
  * Features:
  * - Upgraded Cache Version to purge stale cart scripts
  * - Network-First for core App Shell (HTML, JS, CSS) with cache fallback
@@ -8,7 +8,7 @@
  * - ignoreSearch cache matching for versioned asset URLs (?v=...)
  */
 
-const CACHE_NAME = 'selfcare-cache-v10.1.1';
+const CACHE_NAME = 'selfcare-cache-v10.1.2';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -63,7 +63,7 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache and Auto Skip-Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing updated version v10.1.1...');
+  console.log('[Selfcare SW] Installing updated version v10.1.2...');
   self.skipWaiting();
 
   event.waitUntil(
@@ -93,7 +93,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purges obsolete caches and claims all open clients
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating version v10.1.1 and purging old caches...');
+  console.log('[Selfcare SW] Activating version v10.1.2 and purging old caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -105,7 +105,7 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      console.log('[Selfcare SW] Claiming clients for v10.1.1...');
+      console.log('[Selfcare SW] Claiming clients for v10.1.2...');
       return self.clients.claim();
     })
   );
