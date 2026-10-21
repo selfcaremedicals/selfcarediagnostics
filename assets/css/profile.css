@@ -1,11 +1,11 @@
 /* file: assets/css/profile.css */
 /**
- * Selfcare Diagnostics - My Account Page CSS v5.9.0
+ * Selfcare Diagnostics - My Account Page CSS v6.3.0
  * Features:
+ * - 3D Tactile Bounce & Press Feedback on all buttons/cards (:active)
+ * - Anti-multi-click disabled visual state
  * - Clean List Menu matching BloodOxy reference layout
  * - Dual-View Family Members Management
- * - Top-Right Add Member Action
- * - Complete Individual Member Cards (Name, Relation, Age, Mobile) with Edit/Remove
  */
 
 :root {
@@ -36,6 +36,55 @@ body {
   position: relative;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   BUTTON TACTILE PRESS & BOUNCE FEEL (GLOBAL TO ACCOUNT PAGE)
+   ========================================================================== */
+button,
+.modal-action-btn,
+.add-member-top-btn,
+.card-btn-edit,
+.card-btn-delete,
+.cancel-btn,
+.gps-btn,
+.menu-item-row,
+.sia-close-btn,
+.support-channel-card,
+.whatsapp-share-btn,
+.apply-coupon-btn {
+  transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.12s ease, filter 0.12s ease !important;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  cursor: pointer;
+}
+
+/* Button-ah press pannum pothu amungi mela varum physical feel */
+button:active,
+.modal-action-btn:active,
+.add-member-top-btn:active,
+.card-btn-edit:active,
+.card-btn-delete:active,
+.cancel-btn:active,
+.gps-btn:active,
+.menu-item-row:active,
+.sia-close-btn:active,
+.support-channel-card:active,
+.whatsapp-share-btn:active,
+.apply-coupon-btn:active {
+  transform: scale(0.95) translateY(2px) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+  filter: brightness(0.92);
+}
+
+/* Save aagum pothu disabled state */
+button:disabled,
+.modal-action-btn:disabled {
+  opacity: 0.65 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
 }
 
 /* ==========================================================================
@@ -149,10 +198,6 @@ body {
   border-bottom: none;
 }
 
-.menu-item-row:active {
-  background: #F9FAFB;
-}
-
 .menu-left {
   display: flex;
   align-items: center;
@@ -178,17 +223,6 @@ body {
   font-size: 20px;
   color: #111827;
   font-weight: 400;
-}
-
-.refer-badge-pill {
-  background: #ECFDF5;
-  color: #065F46;
-  border: 1px solid #A7F3D0;
-  font-size: 9.5px;
-  font-weight: 800;
-  padding: 2px 7px;
-  border-radius: 6px;
-  letter-spacing: 0.3px;
 }
 
 /* ==========================================================================
@@ -229,11 +263,6 @@ body {
   align-items: center;
   gap: 6px;
   box-shadow: 0 3px 10px rgba(7, 136, 102, 0.25);
-  transition: transform 0.1s ease;
-}
-
-.add-member-top-btn:active {
-  transform: scale(0.95);
 }
 
 .family-cards-scroll {
@@ -313,10 +342,6 @@ body {
   gap: 4px;
 }
 
-.card-btn-edit:active {
-  transform: scale(0.92);
-}
-
 .card-btn-delete {
   background: #FEF2F2;
   border: 1px solid #FECACA;
@@ -326,10 +351,6 @@ body {
   padding: 4px 8px;
   border-radius: 6px;
   cursor: pointer;
-}
-
-.card-btn-delete:active {
-  transform: scale(0.92);
 }
 
 .member-card-body-grid {
@@ -686,133 +707,6 @@ body {
   cursor: pointer;
 }
 
-/* Refer & Earn */
-.refer-invite-box {
-  text-align: center;
-}
-
-.gift-icon-bubble {
-  font-size: 38px;
-  margin: 4px auto 6px;
-}
-
-.refer-invite-box h4 {
-  font-size: 15px;
-  color: #045D49;
-  font-weight: 800;
-  margin-bottom: 4px;
-}
-
-.refer-invite-box p {
-  font-size: 11.5px;
-  color: #536E66;
-  line-height: 1.4;
-}
-
-.referral-code-pill {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #F3F4F6;
-  border: 1px dashed var(--primary-purple);
-  padding: 10px 16px;
-  border-radius: 10px;
-  margin: 12px 0;
-  font-size: 11px;
-}
-
-.referral-code-pill strong {
-  font-size: 15px;
-  letter-spacing: 1px;
-  color: var(--primary-purple);
-}
-
-.whatsapp-share-btn {
-  width: 100%;
-  padding: 12px;
-  background: #25D366;
-  color: #ffffff;
-  border: none;
-  border-radius: 10px;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.reward-section-title {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--dark-green);
-  margin-bottom: 8px;
-}
-
-.earned-coupons-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.coupon-reward-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, #ECFDF5, #F0FDF4);
-  border: 1px solid #A7F3D0;
-  border-radius: 10px;
-}
-
-.coupon-info-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.coupon-code-badge {
-  font-size: 12px;
-  font-weight: 800;
-  color: #065F46;
-  letter-spacing: 0.3px;
-}
-
-.coupon-note {
-  font-size: 10px;
-  color: #047857;
-  font-weight: 600;
-}
-
-.apply-coupon-btn {
-  background: var(--primary-green);
-  color: #ffffff;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(7, 136, 102, 0.2);
-}
-
-.apply-coupon-btn:active {
-  transform: scale(0.92);
-}
-
-.demo-simulate-btn {
-  background: transparent;
-  border: 1px dashed #9CA3AF;
-  color: #6B7280;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .support-channel-card {
   display: flex;
   align-items: center;
@@ -877,294 +771,4 @@ body {
   font-size: 11px;
   color: #4B5563;
   line-height: 1.35;
-}
-/* ==========================================================================
-   BLOOD CONNECT & PROGRESSIVE REFERRAL UI STYLES (v6.2.0)
-   ========================================================================== */
-
-/* Blood Connect Pill & Header */
-.blood-badge-pill {
-  background: #FEE2E2;
-  color: #B91C1C;
-  border: 1px solid #FECACA;
-  font-size: 9.5px;
-  font-weight: 800;
-  padding: 2px 7px;
-  border-radius: 6px;
-  letter-spacing: 0.3px;
-}
-
-.blood-header {
-  background: linear-gradient(135deg, #991B1B, #DC2626) !important;
-}
-
-.blood-connect-hero {
-  text-align: center;
-  padding: 8px 10px;
-}
-
-.blood-drop-circle {
-  font-size: 36px;
-  margin-bottom: 6px;
-}
-
-.blood-connect-hero h4 {
-  font-size: 15px;
-  font-weight: 800;
-  color: #991B1B;
-  margin-bottom: 4px;
-}
-
-.blood-connect-hero p {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-.user-blood-group-card {
-  background: #FEF2F2;
-  border: 1.5px solid #F87171;
-  border-radius: 12px;
-  padding: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.user-blood-group-card .sub-lbl {
-  font-size: 11px;
-  font-weight: 700;
-  color: #991B1B;
-}
-
-.blood-type-val {
-  font-size: 20px;
-  font-weight: 900;
-  color: #DC2626;
-}
-
-.verified-tag {
-  font-size: 10px;
-  color: #065F46;
-  background: #D1FAE5;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 800;
-}
-
-.blood-features-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.blood-feature-item {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  background: #F9FAFB;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #E5E7EB;
-}
-
-.blood-feature-item .feat-icon {
-  font-size: 18px;
-}
-
-.blood-feature-item strong {
-  font-size: 12px;
-  color: #1F2937;
-  display: block;
-}
-
-.blood-feature-item p {
-  font-size: 10.5px;
-  color: #6B7280;
-}
-
-.blood-action-box {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.blood-register-btn {
-  width: 100%;
-  padding: 12px;
-  background: linear-gradient(135deg, #DC2626, #B91C1C);
-  color: #ffffff;
-  border: none;
-  border-radius: 10px;
-  font-size: 12.5px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.blood-emergency-btn {
-  width: 100%;
-  padding: 11px;
-  background: #25D366;
-  color: #ffffff;
-  border: none;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* Mandatory Setup Alert */
-.mandatory-setup-box {
-  background: #FEF3C7;
-  border: 1.5px solid #F59E0B;
-  border-radius: 12px;
-  padding: 10px 12px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.mandatory-setup-box .alert-icon {
-  font-size: 22px;
-}
-
-.mandatory-setup-box strong {
-  font-size: 12px;
-  color: #92400E;
-  display: block;
-}
-
-.mandatory-setup-box p {
-  font-size: 10.5px;
-  color: #78350F;
-  line-height: 1.35;
-  margin-top: 2px;
-}
-
-/* Refer & Earn Progressive Milestone UI */
-.referral-instructions-card {
-  background: #F0FDF4;
-  border: 1px solid #BBF7D0;
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.instruction-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.instruction-header h4 {
-  font-size: 13px;
-  font-weight: 800;
-  color: #14532D;
-}
-
-.instruction-steps-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
-.inst-step {
-  background: #FFFFFF;
-  border: 1px solid #DCFCE7;
-  border-radius: 8px;
-  padding: 8px 6px;
-  text-align: center;
-}
-
-.inst-step .step-badge {
-  display: inline-block;
-  font-size: 9.5px;
-  font-weight: 800;
-  background: #E0E7FF;
-  color: #3730A3;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-bottom: 4px;
-}
-
-.inst-step p {
-  font-size: 10px;
-  color: #374151;
-  line-height: 1.3;
-}
-
-.highlight-step {
-  border: 1.5px solid #16A34A;
-  background: #F0FDF4;
-}
-
-.highlight-step .step-badge {
-  background: #16A34A;
-  color: #FFFFFF;
-}
-
-.restriction-notice-pill {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  background: #FEF2F2;
-  border: 1px solid #FECACA;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 10px;
-  color: #991B1B;
-  line-height: 1.35;
-}
-
-.referral-live-tracker-card {
-  background: #F9FAFB;
-  border: 1px solid #E5E7EB;
-  border-radius: 12px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.tracker-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #374151;
-}
-
-.tracker-bar-bg {
-  width: 100%;
-  height: 9px;
-  background: #E5E7EB;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.tracker-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #10B981, #059669);
-  transition: width 0.4s ease;
-}
-
-.tracker-reward-summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
-}
-
-.highlight-discount {
-  color: #059669;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.gold-reward {
-  border: 1.5px solid #F59E0B !important;
-  background: linear-gradient(135deg, #FEF3C7, #FFFBEB) !important;
 }
