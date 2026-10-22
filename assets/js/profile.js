@@ -1,14 +1,16 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v6.8.6
+ * Selfcare Diagnostics - My Account Controller v8.0.0
  * Features:
- * - Added Cloud Sync for Family Vault (fetches backend members across devices & networks)
- * - Auto background sync on page load and modal open
+ * - Dynamic VIP Crown 👑 Engine: Displays crown on User & paid Family Members only
+ * - Automatic Expiry Awareness: Crown disappears automatically once 1-year pass expires
+ * - Seamless Cloud Sync for Profile & Family Vault across devices & browsers
+ * - Auto-hydrates Family Members from getProfile & getFamilyMembers
+ * - Dual Array & Object response compatibility
  * - Anti-multi-click execution lock & dynamic button state
- * - Strict duplicate member prevention
+ * - Strict duplicate member prevention & preserves Membership status across edits
  * - Binds primaryUserId, primaryUserName & primaryMobile to backend Family Vault
  * - Mobile Haptic feedback (vibration on click)
- * - Family Directory Vault preserved offline and revalidated online
  */
 
 const ProfilePage = {
@@ -25,6 +27,7 @@ const ProfilePage = {
       const loader = document.getElementById('profile-loading-overlay') || document.getElementById('page-loader');
       if (loader) loader.style.display = 'none';
 
+      // Puthu device-il login pannum pothu cloud sheet data-vai sync seigirathu
       if (navigator.onLine) {
         setTimeout(() => {
           this.syncLiveCloudProfile().catch(e => console.warn('[Profile] Background profile sync notice:', e));
@@ -46,7 +49,7 @@ const ProfilePage = {
 
   triggerHaptic() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(25); // Physical click vibration
+      navigator.vibrate(25);
     }
   },
 
@@ -90,10 +93,10 @@ const ProfilePage = {
 
     const storedUser = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
     const rawAge = storedUser.age || storedUser.Age || vaultProfile.age || vaultProfile.Age || storedUser.dob || vaultProfile.dob || '';
-    const resolvedMobile = activeMobile || storedUser.mobile || vaultProfile.mobile || '7010174890';
+    const resolvedMobile = activeMobile || storedUser.mobile || vaultProfile.mobile || '';
 
     this.currentUser = {
-      userId: storedUser.userId || storedUser.UserID || vaultProfile.userId || vaultProfile.UserID || ('SCD_' + resolvedMobile),
+      userId: storedUser.userId || storedUser.UserID || vaultProfile.userId || vaultProfile.UserID || (resolvedMobile ? 'SCD_' + resolvedMobile : ''),
       name: storedUser.name || vaultProfile.name || '',
       mobile: resolvedMobile,
       email: storedUser.email || vaultProfile.email || '',
@@ -101,12 +104,14 @@ const ProfilePage = {
       gender: storedUser.gender || storedUser.Gender || vaultProfile.gender || vaultProfile.Gender || 'Male',
       bloodGroup: storedUser.bloodGroup || storedUser.BloodGroup || vaultProfile.bloodGroup || vaultProfile.BloodGroup || 'O+',
       address: storedUser.address || storedUser.Address || vaultProfile.address || '',
-      location: storedUser.location || storedUser.Location || vaultProfile.location || ''
+      location: storedUser.location || storedUser.Location || vaultProfile.location || '',
+      membership: storedUser.membership || vaultProfile.membership || 'Regular',
+      membershipExpiry: storedUser.membershipExpiry || vaultProfile.membershipExpiry || ''
     };
 
     const currentMobile = this.currentUser.mobile;
 
-    // Load Family Members from local cache
+    // Local cache-il irunthu family members load seithal
     try {
       let savedFam = null;
       if (currentMobile) {
@@ -118,7 +123,7 @@ const ProfilePage = {
       const parsedFam = savedFam ? JSON.parse(savedFam) : [];
       this.familyMembers = parsedFam.map(m => ({
         id: m.id || m.MemberID || m.memberId,
-        primaryUserId: m.primaryUserId || m.PrimaryUserID || ('SCD_' + currentMobile),
+        primaryUserId: m.primaryUserId || m.PrimaryUserID || (currentMobile ? 'SCD_' + currentMobile : ''),
         primaryUserName: m.primaryUserName || m.PrimaryUserName || this.currentUser.name,
         name: m.name || m.Name || 'Member',
         relation: m.relation || m.Relation || 'Relative',
@@ -127,7 +132,8 @@ const ProfilePage = {
         gender: m.gender || m.Gender || '',
         bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
         address: m.address || m.Address || '',
-        location: m.location || m.Location || ''
+        location: m.location || m.Location || '',
+        membership: m.membership || m.Membership || 'Regular'
       }));
     } catch (e) {
       this.familyMembers = [];
@@ -163,7 +169,9 @@ const ProfilePage = {
           bloodGroup: p.bloodGroup || p.BloodGroup || this.currentUser.bloodGroup,
           email: p.email || p.Email || this.currentUser.email,
           address: p.address || p.Address || this.currentUser.address,
-          location: p.location || p.Location || this.currentUser.location
+          location: p.location || p.Location || this.currentUser.location,
+          membership: p.membership || this.currentUser.membership || 'Regular',
+          membershipExpiry: p.membershipExpiry || this.currentUser.membershipExpiry || ''
         };
 
         const serialized = JSON.stringify(this.currentUser);
@@ -173,6 +181,12 @@ const ProfilePage = {
 
         this.renderSelfProfile();
         this.populateFormInputs();
+
+        // Profile API kooda familyMembers vanthaal athaiyum udanadiyaaga cache & render seigirom
+        const incomingFam = res.familyMembers || res.members;
+        if (Array.isArray(incomingFam) && incomingFam.length > 0) {
+          this.hydrateFamilyMembers(incomingFam, activeMobile);
+        }
       }
     } catch (err) {
       console.warn('[Profile] Background profile sync notice:', err);
@@ -196,33 +210,48 @@ const ProfilePage = {
         }, false);
       }
 
-      if (res && (res.status === 'success' || res.success)) {
-        const incomingList = res.familyMembers || res.members || res.data || [];
-        if (Array.isArray(incomingList)) {
-          this.familyMembers = incomingList.map(m => ({
-            id: m.id || m.MemberID || m.memberId || ('FAM_' + Date.now()),
-            primaryUserId: m.primaryUserId || m.PrimaryUserID || ('SCD_' + activeMobile),
-            primaryUserName: m.primaryUserName || m.PrimaryUserName || (this.currentUser && this.currentUser.name) || '',
-            name: m.name || m.Name || 'Member',
-            relation: m.relation || m.Relation || 'Relative',
-            mobile: m.mobile || m.Mobile || '',
-            age: this.calculateAge(m.age || m.Age),
-            gender: m.gender || m.Gender || '',
-            bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
-            address: m.address || m.Address || '',
-            location: m.location || m.Location || ''
-          }));
+      let incomingList = [];
+      if (Array.isArray(res)) {
+        incomingList = res;
+      } else if (res && (res.status === 'success' || res.success)) {
+        incomingList = res.familyMembers || res.members || res.data || [];
+      } else if (res && Array.isArray(res.data)) {
+        incomingList = res.data;
+      }
 
-          const serialized = JSON.stringify(this.familyMembers);
-          localStorage.setItem('selfcare_family_members', serialized);
-          localStorage.setItem(`selfcare_family_${activeMobile}`, serialized);
-
-          this.renderFamilyCards();
-        }
+      if (Array.isArray(incomingList)) {
+        this.hydrateFamilyMembers(incomingList, activeMobile);
       }
     } catch (err) {
       console.warn('[Profile] Background family sync notice:', err);
     }
+  },
+
+  hydrateFamilyMembers(list, activeMobile) {
+    if (!Array.isArray(list)) return;
+
+    this.familyMembers = list.map(m => ({
+      id: m.id || m.MemberID || m.memberId || ('FAM_' + Date.now()),
+      primaryUserId: m.primaryUserId || m.PrimaryUserID || ('SCD_' + activeMobile),
+      primaryUserName: m.primaryUserName || m.PrimaryUserName || (this.currentUser && this.currentUser.name) || '',
+      name: m.name || m.Name || 'Member',
+      relation: m.relation || m.Relation || 'Relative',
+      mobile: m.mobile || m.Mobile || '',
+      age: this.calculateAge(m.age || m.Age),
+      gender: m.gender || m.Gender || '',
+      bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
+      address: m.address || m.Address || '',
+      location: m.location || m.Location || '',
+      membership: m.membership || m.Membership || 'Regular'
+    }));
+
+    const serialized = JSON.stringify(this.familyMembers);
+    localStorage.setItem('selfcare_family_members', serialized);
+    if (activeMobile) {
+      localStorage.setItem(`selfcare_family_${activeMobile}`, serialized);
+    }
+
+    this.renderFamilyCards();
   },
 
   openMyProfileModal() {
@@ -233,10 +262,14 @@ const ProfilePage = {
     this.openModal('modal-my-profile');
   },
 
+  /**
+   * Primary User Profile Render (Crown 👑 appears only if user has active VIP pass)
+   */
   renderSelfProfile() {
     const u = this.currentUser || {};
     const nameEl = document.getElementById('self-display-name');
     const avatarEl = document.getElementById('self-avatar-letter');
+    const relationSubEl = document.getElementById('self-display-relation');
     const mobileEl = document.getElementById('self-view-mobile');
     const emailEl = document.getElementById('self-view-email');
     const ageGenderEl = document.getElementById('self-view-age-gender');
@@ -245,9 +278,26 @@ const ProfilePage = {
     const locEl = document.getElementById('self-view-location');
 
     const displayName = (u.name && u.name.trim()) ? u.name : 'Customer Account';
-    if (nameEl) nameEl.textContent = displayName;
+
+    // 👑 Crown only for active membership (disappears automatically on expiry)
+    const formattedName = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function') 
+      ? Utils.formatVIPName(displayName, 'SELF') 
+      : Utils.escapeHtml(displayName);
+
+    const isSelfVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function')
+      ? Utils.isPatientVIP('SELF')
+      : false;
+
+    if (nameEl) nameEl.innerHTML = formattedName;
     if (avatarEl) avatarEl.textContent = displayName.charAt(0).toUpperCase();
-    if (mobileEl) mobileEl.textContent = u.mobile ? `+91 ${u.mobile}` : '+91 7010174890';
+
+    if (relationSubEl) {
+      relationSubEl.innerHTML = isSelfVip 
+        ? 'Account Primary (Self) • <span style="color:#D97706; font-weight:800;">⭐ CarePass VIP Member</span>' 
+        : 'Account Primary (Self)';
+    }
+
+    if (mobileEl) mobileEl.textContent = u.mobile ? `+91 ${u.mobile}` : 'Not provided';
     if (emailEl) emailEl.textContent = u.email || 'Not provided';
     if (ageGenderEl) ageGenderEl.textContent = `${u.age ? u.age + ' Yrs' : 'Age not set'} • ${u.gender || 'Male'}`;
     if (bloodEl) bloodEl.textContent = u.bloodGroup || 'O+';
@@ -384,12 +434,14 @@ const ProfilePage = {
     this.closeMemberForm();
     this.openModal('modal-family-members');
 
-    // On-demand re-sync if empty or reopening modal online
     if (navigator.onLine) {
       this.syncLiveCloudFamilyMembers().catch(e => console.warn('[Profile] Modal open sync notice:', e));
     }
   },
 
+  /**
+   * Family Member Cards Render (Crown 👑 appears only for paid family members)
+   */
   renderFamilyCards() {
     const countEl = document.getElementById('family-total-count');
     const container = document.getElementById('family-cards-container');
@@ -412,39 +464,51 @@ const ProfilePage = {
       return;
     }
 
-    container.innerHTML = this.familyMembers.map(m => `
-      <div class="member-display-card">
-        <div class="member-card-header">
-          <div class="member-title-group">
-            <span class="member-name-text">${Utils.escapeHtml(m.name)}</span>
-            <span class="member-relation-badge">${Utils.escapeHtml(m.relation || 'Relative')}</span>
-          </div>
-          <div class="member-actions-group">
-            <button type="button" class="card-btn-edit" onclick="ProfilePage.editFamilyMember('${m.id}')">✏️ Edit</button>
-            <button type="button" class="card-btn-delete" onclick="ProfilePage.deleteFamilyMember('${m.id}')">🗑️</button>
-          </div>
-        </div>
+    container.innerHTML = this.familyMembers.map(m => {
+      // Expiry-aware VIP check
+      const isMemberVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function') 
+        ? Utils.isPatientVIP(m.id) 
+        : (m.membership === 'Membership');
 
-        <div class="member-card-body-grid">
-          <div class="member-info-item">
-            <span class="info-label">Mobile Number</span>
-            <span class="info-val mobile-highlight">${m.mobile ? '+91 ' + m.mobile : 'Not provided'}</span>
+      const memberTitleWithCrown = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function')
+        ? Utils.formatVIPName(m.name, m.id)
+        : Utils.escapeHtml(m.name);
+
+      return `
+        <div class="member-display-card" style="${isMemberVip ? 'border-color:#FCD34D; background:#FFFDF7;' : ''}">
+          <div class="member-card-header">
+            <div class="member-title-group">
+              <span class="member-name-text">${memberTitleWithCrown}</span>
+              <span class="member-relation-badge">${Utils.escapeHtml(m.relation || 'Relative')}</span>
+              ${isMemberVip ? '<span style="background:#FEF3C7; color:#92400E; font-size:9.5px; font-weight:800; padding:2px 6px; border-radius:4px; border:1px solid #FCD34D;">👑 VIP</span>' : ''}
+            </div>
+            <div class="member-actions-group">
+              <button type="button" class="card-btn-edit" onclick="ProfilePage.editFamilyMember('${m.id}')">✏️ Edit</button>
+              <button type="button" class="card-btn-delete" onclick="ProfilePage.deleteFamilyMember('${m.id}')">🗑️</button>
+            </div>
           </div>
-          <div class="member-info-item">
-            <span class="info-label">Age & Gender</span>
-            <span class="info-val">${m.age ? m.age + ' Yrs' : 'Age not set'} • ${m.gender || 'Not specified'}</span>
-          </div>
-          <div class="member-info-item">
-            <span class="info-label">Blood Group</span>
-            <span class="info-val">${m.bloodGroup || 'O+'}</span>
-          </div>
-          <div class="member-info-item">
-            <span class="info-label">Pickup Address</span>
-            <span class="info-val" style="font-size:10.5px;">${Utils.escapeHtml(m.address || 'Same as primary')}</span>
+
+          <div class="member-card-body-grid">
+            <div class="member-info-item">
+              <span class="info-label">Mobile Number</span>
+              <span class="info-val mobile-highlight">${m.mobile ? '+91 ' + m.mobile : 'Not provided'}</span>
+            </div>
+            <div class="member-info-item">
+              <span class="info-label">Age & Gender</span>
+              <span class="info-val">${m.age ? m.age + ' Yrs' : 'Age not set'} • ${m.gender || 'Not specified'}</span>
+            </div>
+            <div class="member-info-item">
+              <span class="info-label">Blood Group</span>
+              <span class="info-val">${m.bloodGroup || 'O+'}</span>
+            </div>
+            <div class="member-info-item">
+              <span class="info-label">Pickup Address</span>
+              <span class="info-val" style="font-size:10.5px;">${Utils.escapeHtml(m.address || 'Same as primary')}</span>
+            </div>
           </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   },
 
   openMemberForm(memberId = null) {
@@ -507,7 +571,6 @@ const ProfilePage = {
   async saveFamilyMember() {
     this.triggerHaptic();
 
-    // Prevent duplicate rapid clicks
     if (this._isSavingMember) return;
 
     const saveBtn = document.getElementById('family-save-btn') || document.querySelector('#family-form-view .modal-action-btn');
@@ -541,26 +604,37 @@ const ProfilePage = {
         saveBtn.innerHTML = 'Saving Member... ⏳';
       }
 
-      // Logged-in Primary User Identification
-      const activeMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user') || '7010174890';
+      const activeMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
+      if (!activeMobile) {
+        this.safeShowToast('User session expired. Please re-login.', 'error');
+        return;
+      }
+
       const activeName = (this.currentUser && this.currentUser.name && this.currentUser.name.trim()) ? this.currentUser.name : 'Customer Account';
       const activeUserId = (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile);
 
       const finalMemberId = editId || `FAM_${Date.now()}`;
       const calculatedAge = this.calculateAge(rawAge);
 
+      // Preserve existing VIP membership status across edits
+      let existingMembership = 'Regular';
+      if (editId) {
+        const existingTarget = this.familyMembers.find(m => m.id === editId);
+        if (existingTarget && existingTarget.membership) {
+          existingMembership = existingTarget.membership;
+        }
+      }
+
       const memberPayload = {
         id: finalMemberId,
         memberId: finalMemberId,
         MemberID: finalMemberId,
-        // Primary Account Binding
         primaryUserId: activeUserId,
         PrimaryUserID: activeUserId,
         primaryUserName: activeName,
         PrimaryUserName: activeName,
         primaryMobile: activeMobile,
         PrimaryMobile: activeMobile,
-        // Member Details
         name,
         relation,
         bloodGroup,
@@ -570,13 +644,13 @@ const ProfilePage = {
         email,
         address,
         location,
+        membership: existingMembership,
         updatedAt: new Date().toISOString()
       };
 
       if (editId) {
         this.familyMembers = this.familyMembers.map(m => (m.id === editId ? memberPayload : m));
       } else {
-        // Prevent duplicate entry on multiple rapid submits
         const alreadyExists = this.familyMembers.some(m => m.name.toLowerCase() === name.toLowerCase() && m.mobile === mobile);
         if (!alreadyExists) {
           this.familyMembers.push(memberPayload);
@@ -585,9 +659,7 @@ const ProfilePage = {
 
       const serialized = JSON.stringify(this.familyMembers);
       localStorage.setItem('selfcare_family_members', serialized);
-      if (activeMobile) {
-        localStorage.setItem(`selfcare_family_${activeMobile}`, serialized);
-      }
+      localStorage.setItem(`selfcare_family_${activeMobile}`, serialized);
 
       if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
         try {
@@ -620,7 +692,7 @@ const ProfilePage = {
     const serialized = JSON.stringify(this.familyMembers);
     localStorage.setItem('selfcare_family_members', serialized);
 
-    const currentMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user') || '7010174890';
+    const currentMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
     if (currentMobile) localStorage.setItem(`selfcare_family_${currentMobile}`, serialized);
 
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {

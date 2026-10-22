@@ -1,7 +1,9 @@
 /* file: assets/js/utils.js */
 /**
- * Selfcare Diagnostics - Dynamic 2-Tier Sheet Inspection Engine v12.5.0
+ * Selfcare Diagnostics - Dynamic 2-Tier Sheet Inspection Engine v13.0.0
  * Verified against live database export:
+ * - VIP Membership Expiry Engine & Per-Person Crown (👑) Validator
+ * - Individual Patient 10% Discount Resolver
  * - Test IDs: CBC (SCDT0001/T0001), Lipid (SCDT0002/T0002), LFT (SCDT0003/T0003),
  *             RFT (SCDT0004/T0004), Thyroid (SCDT0005/T0005), Iron (SCDT0006/T0006),
  *             Hemoglobin (SCDT0008/T0008), PCV (SCDT0009/T0009), RBC (SCDT0010/T0010),
@@ -75,6 +77,114 @@ const Utils = {
 
   isOnline() {
     return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  },
+
+  // ==========================================================
+  // VIP MEMBERSHIP STRICT VALIDITY & EXPIRY CHECKER
+  // ==========================================================
+  isPatientVIP(patientIdOrObj) {
+    try {
+      const activeMobile = (typeof localStorage !== 'undefined' && localStorage.getItem('selfcare_active_user')) || '';
+      let membershipData = null;
+      if (activeMobile) {
+        const raw = localStorage.getItem(`selfcare_membership_${activeMobile}`);
+        if (raw) {
+          try { membershipData = JSON.parse(raw); } catch (e) {}
+        }
+      }
+
+      // 1. Strict Expiry Date Check: Expiry ஆகிவிட்டால் Crown மற்றும் 10% Discount இரண்டும் தானாக ரத்தாகும்
+      let isMembershipActive = false;
+      if (membershipData && (membershipData.status === 'Membership' || membershipData.isMember) && membershipData.expiryDate) {
+        const exp = new Date(membershipData.expiryDate);
+        if (!isNaN(exp.getTime()) && exp.getTime() > Date.now()) {
+          isMembershipActive = true;
+        }
+      }
+
+      // Local customer profile fallback check
+      if (!isMembershipActive && activeMobile) {
+        try {
+          const pRaw = localStorage.getItem(`selfcare_profile_${activeMobile}`) || localStorage.getItem('selfcare_customer_profile');
+          if (pRaw) {
+            const p = JSON.parse(pRaw);
+            if (p.membership === 'Membership' && p.membershipExpiry) {
+              const exp = new Date(p.membershipExpiry);
+              if (!isNaN(exp.getTime()) && exp.getTime() > Date.now()) {
+                isMembershipActive = true;
+              }
+            }
+          }
+        } catch (e) {}
+      }
+
+      // காலாவதியாகிவிட்டால் (Expired) யாருக்குமே VIP சலுகை கிடையாது
+      if (!isMembershipActive) {
+        return false;
+      }
+
+      // 2. Patient Specific Matching (User vs Family Member)
+      let targetId = 'SELF';
+      if (typeof patientIdOrObj === 'object' && patientIdOrObj !== null) {
+        targetId = patientIdOrObj.id || patientIdOrObj.patientId || patientIdOrObj.MemberID || 'SELF';
+      } else if (patientIdOrObj) {
+        targetId = String(patientIdOrObj);
+      }
+
+      const cleanId = String(targetId).trim().toUpperCase();
+
+      // Primary Account Holder (User)
+      if (
+        cleanId === 'SELF' ||
+        cleanId === 'PATIENT_SELF' ||
+        cleanId === '' ||
+        (activeMobile && (cleanId === activeMobile || cleanId === 'SCD_' + activeMobile))
+      ) {
+        return true;
+      }
+
+      // Family Member Check: இந்த குடும்ப உறுப்பினருக்கு ₹99 செலுத்தி VIP வாங்கப்பட்டதா?
+      if (membershipData && Array.isArray(membershipData.coveredFamilyIds)) {
+        const isCovered = membershipData.coveredFamilyIds.some(id => String(id).trim().toUpperCase() === cleanId);
+        if (isCovered) return true;
+      }
+
+      // Check Family Vault directory storage
+      let famList = [];
+      try {
+        const famRaw = localStorage.getItem(`selfcare_family_${activeMobile}`) || localStorage.getItem('selfcare_family_members');
+        if (famRaw) famList = JSON.parse(famRaw);
+      } catch (e) {}
+
+      const matchedMember = famList.find(m => String(m.id || m.MemberID).trim().toUpperCase() === cleanId);
+      if (matchedMember && matchedMember.membership === 'Membership') {
+        return true;
+      }
+
+      return false; // VIP வாங்காத குடும்ப உறுப்பினர் (Regular)
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
+   * செல்லுபடியாகும் VIP மெம்பர்ஷிப் இருந்தால் மட்டுமே 👑 கிரவுன் காட்டும்
+   */
+  formatVIPName(name, patientIdOrObj = 'SELF') {
+    if (!name) return '';
+    const isVip = this.isPatientVIP(patientIdOrObj);
+    const safeName = this.escapeHtml(name);
+    if (isVip) {
+      return `${safeName} <span class="vip-crown-badge" title="Active VIP Member (10% OFF & Free Collection)">👑</span>`;
+    }
+    return safeName;
+  },
+
+  /**
+   * அந்த நபருக்கு 10% தள்ளுபடியா (10) அல்லது இல்லையா (0) என்பதைத் தரும்
+   */
+  getPatientDiscountPercent(patientIdOrObj = 'SELF') {
+    return this.isPatientVIP(patientIdOrObj) ? 10 : 0;
   }
 };
 
@@ -171,7 +281,6 @@ const ConflictValidator = {
 
     if (sample.includes('URINE')) return true;
     if (name.includes('URINE') || name.includes('URINARY')) return true;
-    // Accurate Urine Codes from your database
     if (code === 'T0028' || code === 'SCDT0028' || code === 'T0029' || code === 'SCDT0029') return true;
     return false;
   },
@@ -184,7 +293,6 @@ const ConflictValidator = {
     const name = String(item.TestName || item.name || '').toUpperCase();
     const code = String(item.TestCode || item.code || item.TestID || item.id || '').toUpperCase().replace(/[\s\-_]/g, '');
 
-    // Aligned strictly with your database: T0018=FBS, T0019=PPBS, T0020=RBS
     const codes = {
       rbs: ['T0020', 'SCDT0020', 'RBS', 'RANDOMBLOODSUGAR', 'RANDOMGLUCOSE', 'BLOODSUGARRANDOM'],
       fbs: ['T0018', 'SCDT0018', 'FBS', 'FASTINGBLOODSUGAR', 'FASTINGBLOODGLUCOSE', 'FASTINGGLUCOSE', 'BLOODSUGARFASTING'],
@@ -339,7 +447,6 @@ const ConflictValidator = {
       }
     });
 
-    // Real Package Constitution as defined in your database
     const cleanPkgName = this.cleanStr(fullPkg.PackageName || fullPkg.TestName || fullPkg.name || pkg.name || '');
     if (cleanPkgName.includes('basic health')) {
       items.push(
@@ -446,7 +553,6 @@ const ConflictValidator = {
       }
     }
 
-    // Exact sub-parameter fallbacks verified against Selfcare Catalog
     if (cClean.includes('cbc') || cClean.includes('hemogram') || (matchedTest && String(matchedTest.TestCode || '').toUpperCase() === 'T0001')) {
       subParams.push(
         'Hemoglobin', 'Hb', 'Total WBC', 'TLC', 'WBC', 'Total WBC Count',

@@ -1,11 +1,15 @@
 /* file: assets/js/cart.js */
 /**
- * Selfcare Diagnostics - Direct Booking Cart Engine v12.3.0 (Zero-Fail Addon Merge Edition)
+ * Selfcare Diagnostics - Direct Booking Cart Engine v13.0.0
  * Features:
- * 1. Normalized Patient ID Engine: Case-insensitive 'self' & 'SELF' handling prevents silent checkout bypass.
- * 2. Guaranteed Addon Cart Loader: Always loads existing booked items alongside newly added tests.
- * 3. 2-Step Fast Addon Checkout: Addon mode automatically skips locked address/date slides straight to confirmation.
- * 4. Multi-Tenant Deep Persistence: Merges updated items locally & remotely to survive cloud syncs.
+ * 1. Per-Person VIP Membership Engine: Calculates 10% discount strictly for VIP holders only.
+ * 2. Non-VIP members pay standard price (No discount).
+ * 3. Free Home Sample Collection for active VIP members.
+ * 4. Dynamic Crown 👑 Badge rendered on Member names (Disappears automatically on expiry).
+ * 5. Normalized Patient ID Engine: Case-insensitive 'self' & 'SELF' handling prevents silent checkout bypass.
+ * 6. Guaranteed Addon Cart Loader: Always loads existing booked items alongside newly added tests.
+ * 7. 2-Step Fast Addon Checkout: Addon mode automatically skips locked address/date slides straight to confirmation.
+ * 8. Multi-Tenant Deep Persistence: Merges updated items locally & remotely to survive cloud syncs.
  */
 
 const CartPage = {
@@ -203,7 +207,7 @@ const CartPage = {
   },
 
   navigateToAddItems(patientId, type) {
-    const targetId = 'SELF';
+    const targetId = patientId || 'SELF';
     sessionStorage.setItem('selfcare_target_patient_id', targetId);
     sessionStorage.setItem('selfcare_cart_slide', '1');
 
@@ -312,7 +316,9 @@ const CartPage = {
       nextBtn.textContent = this.isAddonMode ? 'Review & Confirm ➔' : 'Select Collection ➔';
       nextBtn.disabled = false;
     } else if (this.currentSlide === 4) {
-      nextBtn.textContent = this.isAddonMode ? 'Confirm & Add to Visit ➔' : (this.selectedPaymentMode === 'online' ? 'Pay Online & Confirm ➔' : 'Confirm Booking ➔');
+      nextBtn.textContent = this.isAddonMode 
+        ? 'Confirm & Add to Visit ➔' 
+        : (this.selectedPaymentMode === 'online' ? 'Pay Online & Confirm ➔' : 'Confirm Booking ➔');
       nextBtn.disabled = !this.collectionType;
     }
   },
@@ -343,7 +349,6 @@ const CartPage = {
           window.location.href = 'tests.html';
           return;
         }
-        // Direct jump in addon mode: Schedule & Address are already fixed
         this.goToSlide(3);
         return;
       }
@@ -440,9 +445,15 @@ const CartPage = {
     return 100;
   },
 
-  updateHomeCollectionBadge(subtotalNewTests) {
+  updateHomeCollectionBadge(subtotalNewTests, isVipFree = false) {
     const badge = document.getElementById('home-collection-badge-tag');
     if (!badge) return;
+
+    if (isVipFree) {
+      badge.textContent = 'Collection Charge: FREE (👑 VIP Pass Benefit)';
+      badge.classList.add('free-tag');
+      return;
+    }
 
     if (this.isAddonMode) {
       badge.textContent = 'Doorstep Collection: FREE (Clubbed Visit)';
@@ -469,23 +480,53 @@ const CartPage = {
     }
   },
 
+  /**
+   * =========================================================================
+   * PER-PERSON 10% VIP DISCOUNT & BILL CALCULATION ENGINE
+   * =========================================================================
+   */
   calculateBillSummary() {
-    let totalMrp = 0;
-    let subtotalNewTests = 0;
+    let totalGrossMrp = 0;
+    let totalGrossPrice = 0;
+    let totalVipDiscount = 0;
+    let anyPatientHasVip = false;
 
+    // Item-by-item calculation based on the individual patient's VIP status
     this.cart.forEach(item => {
       if (!item || item.isExistingBookingItem || item.isExistingLocked) return;
-      const offer = Number(item.price || item.OfferPrice || 0);
-      const mrp = Number(item.mrp || item.MRP || offer);
-      subtotalNewTests += offer;
-      totalMrp += mrp;
+
+      const pId = item.patientId || 'SELF';
+      const isItemVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function') 
+        ? Utils.isPatientVIP(pId) 
+        : false;
+
+      if (isItemVip) anyPatientHasVip = true;
+
+      const itemPrice = Number(item.price || item.OfferPrice || 0);
+      const mrp = Number(item.mrp || item.MRP || itemPrice);
+
+      totalGrossPrice += itemPrice;
+      totalGrossMrp += mrp;
+
+      // 10% Discount applies strictly if this specific patient is a VIP Member
+      if (isItemVip) {
+        const itemDiscount = Math.round(itemPrice * 0.10);
+        totalVipDiscount += itemDiscount;
+      }
     });
 
-    const labSavings = Math.max(0, totalMrp - subtotalNewTests);
-    this.doorstepCharge = this.calculateDoorstepCharge(subtotalNewTests);
-    this.updateHomeCollectionBadge(subtotalNewTests);
+    const subtotalAfterVip = Math.max(0, totalGrossPrice - totalVipDiscount);
 
-    const finalPayable = Math.max(0, subtotalNewTests + this.doorstepCharge);
+    // Free Home Collection if ANY patient in this booking has active VIP pass
+    if (anyPatientHasVip || this.isAddonMode || this.collectionType === 'lab') {
+      this.doorstepCharge = 0;
+    } else {
+      this.doorstepCharge = this.calculateDoorstepCharge(subtotalAfterVip);
+    }
+
+    this.updateHomeCollectionBadge(subtotalAfterVip, anyPatientHasVip);
+
+    const finalPayable = Math.max(0, subtotalAfterVip + this.doorstepCharge);
 
     const stickyPayableEl = document.getElementById('sticky-payable-amount');
     if (stickyPayableEl) stickyPayableEl.textContent = this.formatMoney(finalPayable);
@@ -497,12 +538,40 @@ const CartPage = {
     const chargeVal = document.getElementById('bill-collection-charge-val');
     const finalPayableEl = document.getElementById('bill-final-payable');
 
-    if (totalMrpEl) totalMrpEl.textContent = this.formatMoney(totalMrp);
-    if (subtotalPriceEl) subtotalPriceEl.textContent = this.formatMoney(subtotalNewTests);
-    if (labSavingsEl) labSavingsEl.textContent = `- ${this.formatMoney(labSavings)}`;
+    if (totalMrpEl) totalMrpEl.textContent = this.formatMoney(totalGrossMrp);
+    if (subtotalPriceEl) subtotalPriceEl.textContent = this.formatMoney(totalGrossPrice);
+
+    const standardSavings = Math.max(0, totalGrossMrp - totalGrossPrice);
+    if (labSavingsEl) labSavingsEl.textContent = `- ${this.formatMoney(standardSavings)}`;
+
+    // Render or update VIP Discount Row
+    let vipRow = document.getElementById('bill-vip-discount-row');
+    if (!vipRow && totalVipDiscount > 0) {
+      vipRow = document.createElement('div');
+      vipRow.id = 'bill-vip-discount-row';
+      vipRow.className = 'bill-row';
+      vipRow.style.cssText = 'display:flex; justify-content:space-between; color:#047857; font-weight:700; margin:6px 0; font-size:12.5px;';
+      const subtotalRow = document.getElementById('bill-subtotal-price')?.parentElement;
+      if (subtotalRow && subtotalRow.parentNode) {
+        subtotalRow.parentNode.insertBefore(vipRow, subtotalRow.nextSibling);
+      }
+    }
+
+    if (vipRow) {
+      if (totalVipDiscount > 0) {
+        vipRow.style.display = 'flex';
+        vipRow.innerHTML = `<span>👑 VIP 10% Member Discount:</span><span style="color:#047857;">- ${this.formatMoney(totalVipDiscount)}</span>`;
+      } else {
+        vipRow.style.display = 'none';
+      }
+    }
 
     if (chargeVal) {
-      if (this.isAddonMode) {
+      if (anyPatientHasVip) {
+        chargeVal.textContent = 'FREE (👑 VIP Benefit)';
+        chargeVal.classList.add('green-val');
+        if (chargeLabel) chargeLabel.textContent = 'Doorstep Sample Collection:';
+      } else if (this.isAddonMode) {
         chargeVal.textContent = 'FREE (₹0 - Clubbed)';
         chargeVal.classList.add('green-val');
         if (chargeLabel) chargeLabel.textContent = 'Doorstep Sample Collection:';
@@ -524,8 +593,6 @@ const CartPage = {
               : 'Doorstep Sample Collection:';
           }
         }
-      } else {
-        chargeVal.textContent = 'FREE (₹0 - Order ₹500+)';
       }
     }
 
@@ -632,11 +699,17 @@ const CartPage = {
 
     if (tagsContainer) {
       tagsContainer.style.display = 'flex';
-      tagsContainer.innerHTML = activeList.map(m => `
-        <span class="patient-overview-tag">
-          👤 ${this.safeEscape(m.name)} (${this.safeEscape(m.relation || 'Member')})
-        </span>
-      `).join('');
+      tagsContainer.innerHTML = activeList.map(m => {
+        const formattedTag = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function')
+          ? Utils.formatVIPName(m.name, m.id)
+          : this.safeEscape(m.name);
+
+        return `
+          <span class="patient-overview-tag">
+            👤 ${formattedTag} (${this.safeEscape(m.relation || 'Member')})
+          </span>
+        `;
+      }).join('');
     }
   },
 
@@ -650,9 +723,13 @@ const CartPage = {
     }
 
     if (this.isAddonMode) {
+      const formattedSelf = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function')
+        ? Utils.formatVIPName(this.selectedPatientName, this.selectedPatientId)
+        : this.safeEscape(this.selectedPatientName);
+
       container.innerHTML = `
         <div class="patient-chip active" style="cursor: default;">
-          <span class="chip-name">${this.safeEscape(this.selectedPatientName)}</span>
+          <span class="chip-name">${formattedSelf}</span>
           <span class="chip-relation-tag">${this.safeEscape(this.selectedPatientRelation)} (Locked)</span>
         </div>
       `;
@@ -663,9 +740,13 @@ const CartPage = {
     container.innerHTML = members.map(p => {
       if (!p) return '';
       const isSelected = this.selectedPatientIds.some(id => String(id).toUpperCase() === String(p.id).toUpperCase());
+      const pName = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function') 
+        ? Utils.formatVIPName(p.name, p.id) 
+        : this.safeEscape(p.name);
+
       return `
         <div class="patient-chip ${isSelected ? 'active' : ''}" onclick="CartPage.togglePatient('${p.id}')">
-          <span class="chip-name">${this.safeEscape(p.name)}</span>
+          <span class="chip-name">${pName}</span>
           <span class="chip-relation-tag">${this.safeEscape(p.relation || 'Member')}</span>
         </div>
       `;
@@ -740,6 +821,10 @@ const CartPage = {
     effectiveMembers.forEach(member => {
       if (!member) return;
       const memId = String(member.id).toUpperCase();
+      const isMemberVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function')
+        ? Utils.isPatientVIP(member.id)
+        : false;
+
       const memberItems = this.cart
         .map((item, idx) => ({ ...item, originalIndex: idx }))
         .filter(item => item && String(item.patientId || fallbackPatientId).toUpperCase() === memId);
@@ -755,19 +840,23 @@ const CartPage = {
             const isPaidItem = Boolean(item.isExistingBookingItem || item.isExistingLocked);
             const isPackage = item.type === 'package' || String(item.PackageID || item.PackageCode || '').startsWith('PKG');
             const name = item.name || item.TestName || item.PackageName || 'Diagnostic Item';
-            const offerPrice = isPaidItem ? 0 : Number(item.price || item.OfferPrice || 0);
-            const mrp = isPaidItem ? Number(item.originalPrice || 0) : Number(item.mrp || item.MRP || offerPrice);
+            const originalOfferPrice = isPaidItem ? 0 : Number(item.price || item.OfferPrice || 0);
+            const mrp = isPaidItem ? Number(item.originalPrice || 0) : Number(item.mrp || item.MRP || originalOfferPrice);
+
+            // VIP Member-ஆக இருந்தால் மட்டுமே 10% தள்ளுபடி!
+            const itemVipDiscount = (!isPaidItem && isMemberVip) ? Math.round(originalOfferPrice * 0.10) : 0;
+            const finalItemPrice = originalOfferPrice - itemVipDiscount;
 
             const lockedBadgeHtml = isPaidItem 
               ? '<span class="paid-tag" style="background:#078866; color:#ffffff; padding:2px 6px; border-radius:4px; font-size:9px; font-weight:800; letter-spacing:0.3px;">🔒 ALREADY BOOKED</span>'
               : '';
 
-            const mrpStrikeHtml = (!isPaidItem && mrp > offerPrice) 
-              ? '<span class="item-mrp-strike">' + this.formatMoney(mrp) + '</span>' 
-              : '';
+            const mrpStrikeHtml = (!isPaidItem && isMemberVip && itemVipDiscount > 0)
+              ? `<span class="item-mrp-strike" style="text-decoration:line-through; color:#9CA3AF; margin-right:6px; font-size:11px;">${this.formatMoney(originalOfferPrice)}</span>`
+              : ((!isPaidItem && mrp > originalOfferPrice) ? `<span class="item-mrp-strike">${this.formatMoney(mrp)}</span>` : '');
 
-            const paidNoteHtml = isPaidItem 
-              ? '<span class="item-paid-note" style="color:#078866; font-size:10.5px; font-weight:700; margin-left:6px;">(Paid: ' + this.formatMoney(item.originalPrice || 0) + ')</span>' 
+            const vipTagHtml = (!isPaidItem && isMemberVip)
+              ? `<span style="font-size:9.5px; background:#FEF3C7; color:#92400E; padding:2px 6px; border-radius:4px; font-weight:800; border:1px solid #FCD34D;">10% VIP OFF</span>`
               : '';
 
             const cardStyle = isPaidItem 
@@ -776,7 +865,7 @@ const CartPage = {
 
             const lockedClass = isPaidItem ? 'existing-locked-item' : '';
             const itemCodeText = this.safeEscape(item.code || item.TestCode || item.PackageCode || '');
-            const displayPriceText = isPaidItem ? '₹0' : this.formatMoney(offerPrice);
+            const displayPriceText = isPaidItem ? '₹0' : this.formatMoney(finalItemPrice);
 
             let reassignSelectHtml = '';
             if (!isPaidItem && effectiveMembers.length > 1) {
@@ -800,13 +889,13 @@ const CartPage = {
                       ${isPackage ? 'PACKAGE' : 'TEST'}
                     </span>
                     <span class="item-code-tag">${itemCodeText}</span>
+                    ${vipTagHtml}
                     ${lockedBadgeHtml}
                   </div>
                   <h4 class="item-title">${this.safeEscape(name)}</h4>
                   <div class="item-price-row">
                     ${mrpStrikeHtml}
-                    <span class="item-offer-price">${displayPriceText}</span>
-                    ${paidNoteHtml}
+                    <span class="item-offer-price" style="${isMemberVip ? 'color:#078866; font-weight:900;' : ''}">${displayPriceText}</span>
                   </div>
                 </div>
 
@@ -822,13 +911,18 @@ const CartPage = {
         ? `<button type="button" class="patient-action-btn add-pkg-sub-btn" onclick="CartPage.navigateToAddItems('${member.id}', 'packages')">📦 + Add Packages</button>` 
         : '';
 
+      const memberTitleWithCrown = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function')
+        ? Utils.formatVIPName(member.name, member.id)
+        : this.safeEscape(member.name);
+
       groupedHtml += `
-        <div class="patient-tests-group-card glass-panel-3d animate-3d-card">
+        <div class="patient-tests-group-card glass-panel-3d animate-3d-card" style="${isMemberVip ? 'border:1.5px solid #FCD34D;' : ''}">
           <div class="patient-group-header">
             <div>
               <span class="patient-group-name">
-                👤 ${this.safeEscape(member.name)} (${this.safeEscape(member.relation || 'Member')})
+                👤 ${memberTitleWithCrown} (${this.safeEscape(member.relation || 'Member')})
               </span>
+              ${isMemberVip ? '<span style="display:block; font-size:10px; color:#D97706; font-weight:800; margin-top:2px;">⭐ 10% CarePass VIP Active</span>' : ''}
             </div>
             <span class="patient-tests-badge">
               ${memberItems.length} Items
@@ -892,9 +986,6 @@ const CartPage = {
     this.existingBookingItems = [];
   },
 
-  /**
-   * GUARANTEED MERGE: Always loads both booked items + newly added tests
-   */
   loadCartData() {
     try {
       let existingMarked = [];
@@ -959,7 +1050,7 @@ const CartPage = {
       }
 
       newItems.forEach(i => {
-        i.patientId = 'SELF';
+        if (!i.patientId) i.patientId = 'SELF';
       });
 
       if (this.isAddonMode) {
@@ -1030,7 +1121,8 @@ const CartPage = {
             age: this.calculateAge(mAgeRaw),
             gender: m.gender || m.Gender || '',
             address: m.address || m.Address || '',
-            location: m.location || m.Location || ''
+            location: m.location || m.Location || '',
+            membership: m.membership || 'Regular'
           };
         })
       ];
@@ -1228,7 +1320,7 @@ const CartPage = {
   },
 
   /**
-   * ZERO-FAIL CHECKOUT ENGINE
+   * ZERO-FAIL CHECKOUT ENGINE (WITH PER-PATIENT DISCOUNT PRESERVATION)
    */
   async handleProceedToCheckout() {
     if (this.isProcessingCheckout) return;
@@ -1259,13 +1351,25 @@ const CartPage = {
     }
 
     const newItems = this.cart.filter(i => i && !i.isExistingBookingItem && !i.isExistingLocked);
-    let subtotalNew = 0;
+    let subtotalNewGross = 0;
+    let totalVipDiscount = 0;
+
     newItems.forEach(item => {
-      subtotalNew += Number(item.price || item.OfferPrice || 0);
+      const pId = item.patientId || 'SELF';
+      const isItemVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function') 
+        ? Utils.isPatientVIP(pId) 
+        : false;
+
+      const basePrice = Number(item.price || item.OfferPrice || 0);
+      subtotalNewGross += basePrice;
+
+      if (isItemVip) {
+        totalVipDiscount += Math.round(basePrice * 0.10);
+      }
     });
 
-    const doorstepCharge = this.isAddonMode ? 0 : this.doorstepCharge;
-    const finalPayable = Math.max(0, subtotalNew + doorstepCharge);
+    const doorstepCharge = this.doorstepCharge;
+    const finalPayable = Math.max(0, (subtotalNewGross - totalVipDiscount) + doorstepCharge);
 
     const targetDate = new Date();
     if (this.selectedSlotDay === 'Tomorrow') {
@@ -1286,13 +1390,12 @@ const CartPage = {
       ? this.addonBookingId 
       : `SCDBOOK${Math.floor(100000 + Math.random() * 900000)}`;
 
-    // Merges existing booked items with newly added items
     const combinedItems = this.isAddonMode 
       ? [...this.existingBookingItems, ...newItems] 
       : newItems;
 
     const existingTotal = this.existingBookingItems.reduce((sum, it) => sum + Number(it.originalPrice || it.price || 0), 0);
-    const finalTotalWithExisting = existingTotal + subtotalNew + doorstepCharge;
+    const finalTotalWithExisting = existingTotal + (subtotalNewGross - totalVipDiscount) + doorstepCharge;
 
     const bookingPayload = {
       bookingId: baseBookingId,
@@ -1304,21 +1407,34 @@ const CartPage = {
       patientPhone: this.selectedPatientPhone,
       patientEmail: this.selectedPatientEmail || '',
       relation: this.selectedPatientRelation || 'Self',
-      items: combinedItems.map(i => ({
-        id: i.id || i.TestID || i.PackageID || '',
-        name: i.name || i.TestName || i.PackageName || '',
-        code: i.code || i.TestCode || i.PackageCode || '',
-        price: Number(i.originalPrice || i.price || i.OfferPrice || 0),
-        patientId: 'SELF',
-        patientName: this.selectedPatientName || 'Valued Customer',
-        relation: this.selectedPatientRelation || 'Self'
-      })),
+      items: combinedItems.map(i => {
+        const itemPatientId = i.patientId || 'SELF';
+        const isItemVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function')
+          ? Utils.isPatientVIP(itemPatientId)
+          : false;
+
+        const original = Number(i.originalPrice || i.price || i.OfferPrice || 0);
+        const itemDiscount = (!i.isExistingBookingItem && isItemVip) ? Math.round(original * 0.10) : 0;
+
+        return {
+          id: i.id || i.TestID || i.PackageID || '',
+          name: i.name || i.TestName || i.PackageName || '',
+          code: i.code || i.TestCode || i.PackageCode || '',
+          originalPrice: original,
+          discount: itemDiscount,
+          price: original - itemDiscount,
+          patientId: itemPatientId,
+          patientName: this.selectedPatientName || 'Valued Customer',
+          relation: this.selectedPatientRelation || 'Self'
+        };
+      }),
       collectionType: this.collectionType,
       address: finalAddress,
       location: { link: finalLocation },
       collectionDate: collectionDateStr,
       timeSlot: this.selectedTimeSlot,
-      subtotal: existingTotal + subtotalNew,
+      subtotal: existingTotal + subtotalNewGross,
+      vipDiscount: totalVipDiscount,
       doorstepCharge: doorstepCharge,
       finalAmount: finalTotalWithExisting,
       paymentMode: (this.selectedPaymentMode === 'online') ? 'ONLINE_RAZORPAY' : 'CASH',
@@ -1351,7 +1467,7 @@ const CartPage = {
         });
 
         this.saveBookedSlot(collectionDateStr, this.selectedTimeSlot);
-        this.safeShowToast('Tests added to your visit successfully!', 'success');
+        this.safeShowToast('Tests booked successfully with VIP discount!', 'success');
         this.finalizeConfirmedMultiBooking([bookingPayload]);
       } catch (err) {
         console.error('Booking confirmation failed:', err);
@@ -1383,11 +1499,11 @@ const CartPage = {
       }
 
       const rzpOptions = {
-        key: rzpOrder.keyId,
+        key: rzpOrder.keyId || Config.RAZORPAY_KEY_ID || 'rzp_live_Tq9S3sQhh5B3hW',
         amount: rzpOrder.amount,
         currency: rzpOrder.currency || 'INR',
         name: 'Selfcare Diagnostics',
-        description: `Addon Tests #${baseBookingId}`,
+        description: `Booking #${baseBookingId}`,
         image: 'assets/images/logo.png',
         order_id: rzpOrder.orderId,
         handler: async (response) => {
@@ -1420,7 +1536,7 @@ const CartPage = {
 
               this.persistConfirmedBookingLocally(confirmedData);
               this.saveBookedSlot(collectionDateStr, this.selectedTimeSlot);
-              this.safeShowToast('Payment successful! Booking updated.', 'success');
+              this.safeShowToast('Payment successful! Booking confirmed.', 'success');
               this.finalizeConfirmedMultiBooking([confirmedData]);
             } else {
               throw new Error('Payment signature verification failed.');
@@ -1460,7 +1576,6 @@ const CartPage = {
   finalizeConfirmedMultiBooking(patientBookingsData) {
     this.clearPersistedWizardState();
     
-    // Clear addon storage keys
     localStorage.removeItem('selfcare_active_addon_booking_id');
     localStorage.removeItem('selfcare_active_addon_booking_data');
     sessionStorage.removeItem('selfcare_addon_booking');
