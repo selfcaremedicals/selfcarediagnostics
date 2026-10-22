@@ -1,16 +1,17 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v10.2.0 (VIP Engine Edition)
+ * Selfcare Diagnostics - Service Worker v10.3.0 (VIP Universal Crown Engine Edition)
  * Features:
- * - Upgraded Cache Version to purge stale assets (v10.2.0)
- * - Added membership.html, membership.css & membership.js to core precache
+ * - Upgraded Cache Version to purge stale assets (v10.3.0)
+ * - Forces cache clearance for updated reports.js & bookings.js VIP Crown logic
+ * - Precache for membership shell, profile vault, and real-time tracking
  * - Stale-While-Revalidate (SWR) for JS/CSS (Zero network delay)
  * - Network-First for HTML documents with immediate offline fallback
  * - Automatic skipWaiting() and immediate client takeover (clients.claim())
  * - Cache-first with background revalidation for images and icons
  */
 
-const CACHE_NAME = 'selfcare-cache-v10.2.0';
+const CACHE_NAME = 'selfcare-cache-v10.3.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -68,7 +69,7 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Fast Precache and Immediate Skip-Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Turbo version v10.2.0 with VIP module...');
+  console.log('[Selfcare SW] Installing Turbo version v10.3.0 with VIP Universal Crown module...');
   self.skipWaiting();
 
   event.waitUntil(
@@ -98,7 +99,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purge old caches and instantly claim clients
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v10.2.0 and purging old caches...');
+  console.log('[Selfcare SW] Activating v10.3.0 and purging old caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
