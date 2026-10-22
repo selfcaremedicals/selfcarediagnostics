@@ -1,11 +1,11 @@
 /* file: assets/js/reports.js */
 /**
- * Selfcare Diagnostics - Real Health Records Engine v5.0.0
+ * Selfcare Diagnostics - Real Health Records Engine v5.1.0
  * Features:
  * 1. STRICT STAGE 5 FILTER: Reports appear in the Reports tab ONLY when 
  *    the booking reaches "Certified NABL Report Ready" (Stage 5 / Completed / Report Ready).
  * 2. ZERO DUMMY/MOCK DATA: Strictly blocks premature/fake medical parameters when sample is not tested.
- * 3. Multi-tenant Family Vault Awareness (selfcare_family_${mobile}).
+ * 3. Multi-tenant Family Vault Awareness with VIP Membership & 👑 Crown Engine.
  * 4. Automatic clean empty state when no verified reports exist for the selected patient.
  * 5. Live Google Sheets Backend Sync via Api.getBookingsByPatient.
  */
@@ -42,6 +42,21 @@ const ReportsPage = {
   },
 
   /**
+   * Helper: Check if specific patient or primary user has active VIP status
+   */
+  isVipPatient(patient) {
+    if (!patient) return false;
+    if (typeof App !== 'undefined' && App.isVipActive) {
+      return App.isVipActive(patient);
+    }
+    if (patient.isVip) return true;
+    if (patient.membership === 'Membership') {
+      return !patient.expiryDate || new Date(patient.expiryDate) > new Date();
+    }
+    return false;
+  },
+
+  /**
    * Helper: Determines if a booking has ACTUALLY reached Certified NABL Report Ready status
    */
   isReportCertifiedReady(booking) {
@@ -52,7 +67,6 @@ const ReportsPage = {
     const rStatus = String(booking.reportStatus || '').toUpperCase();
     const hasReportUrl = Boolean(booking.reportUrl && String(booking.reportUrl).trim() !== '');
 
-    // Strictly check if report is ready / completed / published by lab
     return (
       stage === 5 ||
       bStatus === 'COMPLETED' ||
@@ -70,12 +84,16 @@ const ReportsPage = {
     let selfName = 'Customer (Self)';
     let selfGender = 'Not Specified';
     let currentMobile = '';
+    let selfMembership = 'Regular';
+    let selfExpiry = null;
 
     const storedUser = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || null;
     if (storedUser) {
       if (storedUser.name) selfName = storedUser.name;
       if (storedUser.gender) selfGender = storedUser.gender;
       currentMobile = storedUser.mobile || storedUser.phone || '';
+      selfMembership = storedUser.membership || 'Regular';
+      selfExpiry = storedUser.vipExpiry || storedUser.membershipExpiry || null;
     } else {
       try {
         const p = localStorage.getItem('selfcare_customer_profile');
@@ -84,6 +102,8 @@ const ReportsPage = {
           if (parsed.name || parsed.FullName) selfName = parsed.name || parsed.FullName;
           if (parsed.gender || parsed.Gender) selfGender = parsed.gender || parsed.Gender;
           currentMobile = parsed.mobile || '';
+          selfMembership = parsed.membership || 'Regular';
+          selfExpiry = parsed.vipExpiry || parsed.membershipExpiry || null;
         }
       } catch (e) {}
     }
@@ -92,18 +112,39 @@ const ReportsPage = {
       currentMobile = localStorage.getItem('selfcare_active_user') || '';
     }
 
-    // 1. Initialize primary real customer
+    // Primary User VIP verification
+    let isPrimaryVip = false;
+    if (typeof App !== 'undefined' && App.isVipActive) {
+      isPrimaryVip = App.isVipActive();
+    } else {
+      const isFlag = localStorage.getItem('selfcare_is_vip_member') === 'true';
+      const rawMem = currentMobile ? localStorage.getItem(`selfcare_membership_${currentMobile}`) : null;
+      if (rawMem) {
+        try {
+          const m = JSON.parse(rawMem);
+          isPrimaryVip = m && m.status === 'Membership' && (!m.expiryDate || new Date(m.expiryDate) > new Date());
+          if (m && m.expiryDate) selfExpiry = m.expiryDate;
+        } catch (e) {}
+      } else {
+        isPrimaryVip = isFlag || (selfMembership === 'Membership');
+      }
+    }
+
+    // 1. Initialize primary real customer with VIP status
     const realPatients = [
       {
         id: 'self',
         name: selfName,
         relation: 'Self',
         gender: selfGender,
+        membership: isPrimaryVip ? 'Membership' : 'Regular',
+        expiryDate: selfExpiry,
+        isVip: isPrimaryVip,
         reports: []
       }
     ];
 
-    // 2. Read real family members from storage
+    // 2. Read real family members from storage with VIP status
     try {
       let famStored = null;
       if (currentMobile) {
@@ -118,11 +159,15 @@ const ReportsPage = {
         if (Array.isArray(famList)) {
           famList.forEach((fm, idx) => {
             if (fm && fm.name) {
+              const isFamVip = fm.membership === 'Membership' && (!fm.expiryDate || new Date(fm.expiryDate) > new Date());
               realPatients.push({
                 id: fm.id || `fam_${idx}`,
                 name: fm.name,
                 relation: fm.relation || 'Family',
                 gender: fm.gender || 'Not Specified',
+                membership: fm.membership || 'Regular',
+                expiryDate: fm.expiryDate || null,
+                isVip: Boolean(isFamVip),
                 reports: []
               });
             }
@@ -152,7 +197,6 @@ const ReportsPage = {
 
     // 4. Attach reports ONLY IF the booking has reached Certified NABL Report Ready
     uniqueBookings.forEach(booking => {
-      // 🛑 CRITICAL GUARD: If the test is in progress (Stage 1, 2, 3, 4), DO NOT show in Reports page!
       if (!this.isReportCertifiedReady(booking)) {
         return;
       }
@@ -173,6 +217,8 @@ const ReportsPage = {
           name: booking.patientName || 'Member',
           relation: booking.relation || 'Member',
           gender: booking.gender || 'Not Specified',
+          membership: 'Regular',
+          isVip: false,
           reports: []
         };
         realPatients.push(targetPatient);
@@ -188,7 +234,6 @@ const ReportsPage = {
           ? itemsList.map(i => i.name || i.TestName || i.PackageName).join(' + ')
           : 'Diagnostic Health Checkup';
 
-        // ONLY genuine clinical parameters attached by lab/admin. No fabricated fake numbers!
         const parameters = Array.isArray(booking.parameters) ? booking.parameters : [];
 
         targetPatient.reports.push({
@@ -204,7 +249,6 @@ const ReportsPage = {
       }
     });
 
-    // Sort each patient's reports chronologically (latest first)
     realPatients.forEach(p => {
       p.reports.sort((a, b) => b.timestamp - a.timestamp);
     });
@@ -212,9 +256,6 @@ const ReportsPage = {
     this.patientsList = realPatients;
   },
 
-  /**
-   * Live Cloud Sync: Fetches real test bookings from Google Sheets
-   */
   async syncLiveCloudReports() {
     if (!navigator.onLine || typeof Api === 'undefined') return;
     const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
@@ -256,13 +297,23 @@ const ReportsPage = {
 
     container.innerHTML = this.patientsList.map((p, idx) => {
       const initial = (p.name || 'P').charAt(0).toUpperCase();
+      const hasVipCrown = this.isVipPatient(p);
+
       return `
         <div class="patient-chip ${idx === this.selectedPatientIndex ? 'active' : ''}" 
              onclick="ReportsPage.selectPatient(${idx})">
-          <div class="chip-avatar">${initial}</div>
+          <div class="chip-avatar" style="position: relative;">
+            ${initial}
+            ${hasVipCrown ? '<span class="crown-avatar-badge" style="position:absolute; top:-7px; right:-7px; font-size:13px; filter:drop-shadow(0 1px 2px rgba(245,158,11,0.6));" title="VIP Member">👑</span>' : ''}
+          </div>
           <div class="chip-info">
-            <span class="chip-name">${this.safeEscape(p.name)}</span>
-            <span class="chip-relation">${this.safeEscape(p.relation)}</span>
+            <span class="chip-name">
+              ${this.safeEscape(p.name)}
+              ${hasVipCrown ? '<span class="vip-crown-badge" style="margin-left:4px; font-size:13px;" title="VIP Member">👑</span>' : ''}
+            </span>
+            <span class="chip-relation">
+              ${hasVipCrown ? '⭐ VIP Member' : this.safeEscape(p.relation)}
+            </span>
           </div>
         </div>
       `;
@@ -275,15 +326,11 @@ const ReportsPage = {
     this.evaluatePatientRecords();
   },
 
-  /**
-   * Health Records Evaluation: Displays ONLY verified NABL completed reports
-   */
   evaluatePatientRecords() {
     const patient = this.patientsList[this.selectedPatientIndex];
     const recordsView = document.getElementById('patient-records-view');
     const emptyState = document.getElementById('patient-empty-state');
 
-    // 🛑 If patient has no Stage 5 completed reports, show clean empty state!
     if (!patient || !patient.reports || patient.reports.length === 0) {
       if (recordsView) recordsView.style.display = 'none';
       if (emptyState) {

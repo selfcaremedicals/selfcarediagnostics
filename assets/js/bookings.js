@@ -1,16 +1,15 @@
 /* file: assets/js/bookings.js */
 /**
- * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v6.5.0
+ * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v6.6.0
  * Features:
  * 1. Strict 3-Hour Slot Window: "Add Tests" box appears ONLY up to 3 hours after the appointment slot.
  * 2. Add Tests Box Layout: Rendered strictly between Booking Meta Card and Live Diagnostic Progress.
- * 3. User Deduplication: Merges same user records into ONE clean chip (No duplicate Self / Member chips).
- * 4. Membership Crown (👑): Dynamically displays Prime Crown on the user's avatar & name if membership is active.
- * 5. Clean Human-Readable Date & Time: Replaces ugly ISO timestamps with "Today, 21 Oct 2026 • 06:30 AM - 07:00 AM".
- * 6. Chronological Date Sorter: Newest bookings first (Today -> Yesterday -> Older dates).
- * 7. Doorstep Fee Auto-Sync: Reflects ₹100 collection fee for orders below ₹500 (e.g. ₹350 + ₹100 = ₹450).
- * 8. Deep Add-On Booking Serializer: Correctly identifies Health Packages (like 'SELFCARE BASIC HEALTH'),
- *    expands all package sheet constituents & parameters, and syncs target patient context to prevent re-adding duplicate/covered tests.
+ * 3. User Deduplication: Merges same user records into ONE clean chip.
+ * 4. Universal VIP Membership Crown (👑): Dynamically displays Prime Crown on avatar & name 
+ *    for BOTH Primary Account Holder AND Family Members whenever VIP is active.
+ * 5. Clean Human-Readable Date & Time: "Today, 21 Oct 2026 • 06:30 AM - 07:00 AM".
+ * 6. Chronological Date Sorter: Newest bookings first.
+ * 7. Doorstep Fee Auto-Sync: ₹100 collection fee for orders below ₹500.
  */
 
 const BookingsPage = {
@@ -20,7 +19,6 @@ const BookingsPage = {
   selectedPatientIndex: 0,
   currentActiveBooking: null,
 
-  // Cutoff window: Allowed up to 3 hours from the scheduled slot end time
   ADD_TESTS_WINDOW_HOURS: 3,
 
   async init() {
@@ -59,38 +57,46 @@ const BookingsPage = {
   },
 
   /**
-   * Checks if user has an active Care Membership
+   * Universal Membership Check: Handles both specific patient object or primary account
    */
-  isMembershipActive() {
+  isMembershipActive(patient = null) {
     try {
-      const mem = localStorage.getItem('selfcare_membership') || localStorage.getItem('selfcare_is_member');
-      if (mem === 'true' || mem === 'active') return true;
-      if (mem) {
-        const p = JSON.parse(mem);
-        if (p && (p.isActive || p.status === 'active' || p.plan)) return true;
-      }
-      const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
-      if (user && (user.isMember || user.membership === 'active' || user.hasMembership || user.role === 'member')) {
-        return true;
+      // 1. If patient object provided (e.g., in patient chip loop)
+      if (patient) {
+        if (typeof App !== 'undefined' && App.isVipActive) {
+          return App.isVipActive(patient);
+        }
+        if (patient.isVip) return true;
+        if (patient.membership === 'Membership') {
+          return !patient.expiryDate || new Date(patient.expiryDate) > new Date();
+        }
+        return false;
       }
 
-      // Check if any booking contains annual membership item
-      const bookings = this.allBookings || [];
-      const hasMemBooking = bookings.some(b => {
-        let bItems = b.items;
-        if (typeof bItems === 'string') {
-          try { bItems = JSON.parse(bItems); } catch (e) { bItems = []; }
+      // 2. Global Primary Account Check
+      if (typeof App !== 'undefined' && App.isVipActive) {
+        return App.isVipActive();
+      }
+
+      const activeMobile = localStorage.getItem('selfcare_active_user') || '';
+      if (localStorage.getItem('selfcare_is_vip_member') === 'true') return true;
+
+      if (activeMobile) {
+        const rawMem = localStorage.getItem(`selfcare_membership_${activeMobile}`);
+        if (rawMem) {
+          const mem = JSON.parse(rawMem);
+          if (mem && mem.status === 'Membership') {
+            return !mem.expiryDate || new Date(mem.expiryDate) > new Date();
+          }
         }
-        return Array.isArray(bItems) && bItems.some(it => String(it.name || it.TestName || '').toUpperCase().includes('MEMBERSHIP'));
-      });
-      if (hasMemBooking) return true;
+      }
+
+      const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+      if (user && (user.membership === 'Membership' || user.isMember)) return true;
     } catch (e) {}
     return false;
   },
 
-  /**
-   * Converts any raw date string (ISO / YYYY-MM-DD) into a clean Date object
-   */
   parseDateClean(dateStr) {
     if (!dateStr) return new Date();
     if (dateStr instanceof Date) return dateStr;
@@ -108,9 +114,6 @@ const BookingsPage = {
     return isNaN(d2.getTime()) ? new Date() : d2;
   },
 
-  /**
-   * Formats dates as: "Today, 21 Oct 2026", "Yesterday, 20 Oct 2026", or "21 Oct 2026"
-   */
   formatFriendlyDate(rawDate, includeYear = true) {
     if (!rawDate) return 'Today';
     try {
@@ -150,15 +153,9 @@ const BookingsPage = {
     }
   },
 
-  /**
-   * STRICT 3-HOUR WINDOW:
-   * Example: If slot is 11:30 AM - 12:00 PM today, customer has up to 3 hours
-   * from 12:00 PM (i.e. until Today 3:00 PM) to add tests.
-   */
   isWithinAddTestsTimeWindow(booking) {
     if (!booking) return false;
 
-    // 1. If report already completed/delivered, sample is finished
     const stage = this.getBookingStage(booking);
     if (stage >= 5) return false;
 
@@ -172,7 +169,6 @@ const BookingsPage = {
       let slotMinute = 0;
 
       if (timeSlot && typeof timeSlot === 'string') {
-        // e.g. "11:30 AM - 12:00 PM" -> Extract end time "12:00 PM"
         const parts = timeSlot.split(/[-–to]/i);
         const targetTimePart = (parts.length > 1 ? parts[1] : parts[0]).trim();
         
@@ -191,15 +187,9 @@ const BookingsPage = {
       }
 
       slotDateObj.setHours(slotHour, slotMinute, 0, 0);
-
-      // Cutoff time: Exactly 3 hours after the slot ends
       const cutoffTimeMs = slotDateObj.getTime() + (this.ADD_TESTS_WINDOW_HOURS * 60 * 60 * 1000);
-      const nowMs = Date.now();
-
-      // Current time must be within cutoff limit
-      return nowMs <= cutoffTimeMs;
+      return Date.now() <= cutoffTimeMs;
     } catch (e) {
-      console.warn('Error evaluating add tests time window:', e);
       return false;
     }
   },
@@ -210,11 +200,15 @@ const BookingsPage = {
 
     let selfName = 'Customer (Self)';
     let currentMobile = '';
+    let selfMembership = 'Regular';
+    let selfExpiry = null;
 
     const storedUser = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || null;
     if (storedUser) {
       if (storedUser.name) selfName = storedUser.name;
       currentMobile = storedUser.mobile || storedUser.phone || '';
+      selfMembership = storedUser.membership || 'Regular';
+      selfExpiry = storedUser.vipExpiry || storedUser.membershipExpiry || null;
     } else {
       try {
         const selfProfile = localStorage.getItem('selfcare_customer_profile');
@@ -226,6 +220,8 @@ const BookingsPage = {
           if (parsed && (parsed.mobile || parsed.phone)) {
             currentMobile = parsed.mobile || parsed.phone;
           }
+          selfMembership = parsed.membership || 'Regular';
+          selfExpiry = parsed.vipExpiry || parsed.membershipExpiry || null;
         }
       } catch (e) {}
     }
@@ -261,95 +257,97 @@ const BookingsPage = {
       }
     } catch (e) {}
 
-    const isLoggedIn = typeof Auth !== 'undefined' && Auth.isLoggedIn && Auth.isLoggedIn();
-    const shouldSkipMock = skipMockSeeding || isLoggedIn;
+    const isPrimaryVip = this.isMembershipActive();
 
-    if (savedBookings.length === 0 && !shouldSkipMock) {
-      savedPatients = [
-        { id: 'self', name: selfName !== 'Customer (Self)' ? selfName : 'Valued Customer', relation: 'Self', isSelf: true }
-      ];
-    } else {
-      const patientMap = new Map();
-      const cleanMobile = currentMobile ? String(currentMobile).replace(/\D/g, '').slice(-10) : '';
-      const normalizedSelfName = selfName.trim().toLowerCase();
+    const patientMap = new Map();
+    const cleanMobile = currentMobile ? String(currentMobile).replace(/\D/g, '').slice(-10) : '';
+    const normalizedSelfName = selfName.trim().toLowerCase();
 
-      // Base Primary User Record (Single Self Chip)
-      patientMap.set('self', {
-        id: 'self',
-        name: selfName,
-        relation: 'Self',
-        isSelf: true
-      });
+    // Primary Account User
+    patientMap.set('self', {
+      id: 'self',
+      name: selfName,
+      relation: 'Self',
+      membership: isPrimaryVip ? 'Membership' : selfMembership,
+      expiryDate: selfExpiry,
+      isVip: isPrimaryVip,
+      isSelf: true
+    });
 
-      // Strict Deduplication Helper: Detects if record belongs to Self
-      const isSelfIdentifier = (id, name, relation) => {
-        const sId = String(id || '').trim().toLowerCase();
-        const sName = String(name || '').trim().toLowerCase();
-        const sRel = String(relation || '').trim().toLowerCase();
+    const isSelfIdentifier = (id, name, relation) => {
+      const sId = String(id || '').trim().toLowerCase();
+      const sName = String(name || '').trim().toLowerCase();
+      const sRel = String(relation || '').trim().toLowerCase();
 
-        if (sId === 'self' || sId === 'patient_self') return true;
-        if (cleanMobile && (sId === cleanMobile || sId === `scd_${cleanMobile}`)) return true;
-        if (sRel === 'self') return true;
-        if (sName === normalizedSelfName || sName === 'customer (self)' || sName === 'valued customer') return true;
-        return false;
-      };
+      if (sId === 'self' || sId === 'patient_self') return true;
+      if (cleanMobile && (sId === cleanMobile || sId === `scd_${cleanMobile}`)) return true;
+      if (sRel === 'self') return true;
+      if (sName === normalizedSelfName || sName === 'customer (self)' || sName === 'valued customer') return true;
+      return false;
+    };
 
-      // Add registered family members (Skipping self duplication)
-      familyMembers.forEach((fm, idx) => {
-        if (!fm) return;
-        if (isSelfIdentifier(fm.id, fm.name, fm.relation)) return;
+    // Family Members with individual VIP verification
+    familyMembers.forEach((fm, idx) => {
+      if (!fm) return;
+      if (isSelfIdentifier(fm.id, fm.name, fm.relation)) return;
 
-        const key = String(fm.name || fm.id || `fam_${idx}`).trim().toLowerCase();
-        if (!patientMap.has(key)) {
-          patientMap.set(key, {
-            id: fm.id || key,
-            name: fm.name || `Member ${idx + 1}`,
-            relation: fm.relation || 'Family',
-            isSelf: false
-          });
-        }
-      });
+      const key = String(fm.name || fm.id || `fam_${idx}`).trim().toLowerCase();
+      const isFamVip = fm.membership === 'Membership' && (!fm.expiryDate || new Date(fm.expiryDate) > new Date());
 
-      // Add members from bookings (Skipping duplicates by name)
-      savedBookings.forEach(b => {
-        const pName = b.patientName || selfName;
-        const pId = b.patientId || pName;
-        const pRel = b.relation || 'Member';
+      if (!patientMap.has(key)) {
+        patientMap.set(key, {
+          id: fm.id || key,
+          name: fm.name || `Member ${idx + 1}`,
+          relation: fm.relation || 'Family',
+          membership: fm.membership || 'Regular',
+          expiryDate: fm.expiryDate || null,
+          isVip: Boolean(isFamVip),
+          isSelf: false
+        });
+      }
+    });
 
-        if (isSelfIdentifier(pId, pName, pRel)) return;
+    // Members from Bookings
+    savedBookings.forEach(b => {
+      const pName = b.patientName || selfName;
+      const pId = b.patientId || pName;
+      const pRel = b.relation || 'Member';
 
-        const key = String(pName).trim().toLowerCase();
-        if (!patientMap.has(key)) {
-          patientMap.set(key, {
-            id: pId,
-            name: pName,
-            relation: pRel,
-            isSelf: false
-          });
-        }
+      if (isSelfIdentifier(pId, pName, pRel)) return;
 
-        if (b.selectedPatients && Array.isArray(b.selectedPatients)) {
-          b.selectedPatients.forEach(sp => {
-            if (!sp) return;
-            if (isSelfIdentifier(sp.id, sp.name, sp.relation)) return;
+      const key = String(pName).trim().toLowerCase();
+      if (!patientMap.has(key)) {
+        patientMap.set(key, {
+          id: pId,
+          name: pName,
+          relation: pRel,
+          membership: 'Regular',
+          isVip: false,
+          isSelf: false
+        });
+      }
 
-            const spKey = String(sp.name || sp.id).trim().toLowerCase();
-            if (!patientMap.has(spKey)) {
-              patientMap.set(spKey, {
-                id: sp.id || spKey,
-                name: sp.name,
-                relation: sp.relation || 'Member',
-                isSelf: false
-              });
-            }
-          });
-        }
-      });
+      if (b.selectedPatients && Array.isArray(b.selectedPatients)) {
+        b.selectedPatients.forEach(sp => {
+          if (!sp) return;
+          if (isSelfIdentifier(sp.id, sp.name, sp.relation)) return;
 
-      savedPatients = Array.from(patientMap.values());
-    }
+          const spKey = String(sp.name || sp.id).trim().toLowerCase();
+          if (!patientMap.has(spKey)) {
+            patientMap.set(spKey, {
+              id: sp.id || spKey,
+              name: sp.name,
+              relation: sp.relation || 'Member',
+              membership: 'Regular',
+              isVip: false,
+              isSelf: false
+            });
+          }
+        });
+      }
+    });
 
-    this.patientsList = savedPatients;
+    this.patientsList = Array.from(patientMap.values());
     this.allBookings = savedBookings;
   },
 
@@ -398,28 +396,26 @@ const BookingsPage = {
       return;
     }
 
-    const isMember = this.isMembershipActive();
-
     container.innerHTML = this.patientsList.map((p, idx) => {
-      const isSelf = p.id === 'self' || p.isSelf || String(p.relation).toLowerCase() === 'self';
-      const showCrown = isSelf && isMember;
+      // Check if this patient (Primary OR Family Member) has active VIP
+      const showCrown = this.isMembershipActive(p);
       const initial = (p.name || 'U').charAt(0).toUpperCase();
 
       return `
         <div class="patient-chip ${idx === this.selectedPatientIndex ? 'active' : ''}" 
              id="chip-${idx}" 
              onclick="BookingsPage.selectPatientByIndex(${idx})">
-          <div class="chip-avatar">
+          <div class="chip-avatar" style="position: relative;">
             ${initial}
-            ${showCrown ? '<span class="crown-avatar-badge" title="Active Care Member">👑</span>' : ''}
+            ${showCrown ? '<span class="crown-avatar-badge" style="position:absolute; top:-7px; right:-7px; font-size:13px; filter:drop-shadow(0 1px 2px rgba(245,158,11,0.6));" title="Active Care VIP">👑</span>' : ''}
           </div>
           <div class="chip-info">
             <span class="chip-name">
               ${this.safeEscape(p.name)}
-              ${showCrown ? '<span class="crown-inline-badge" title="Care Member">👑</span>' : ''}
+              ${showCrown ? '<span class="vip-crown-badge" style="margin-left:4px; font-size:13px;" title="Care VIP">👑</span>' : ''}
             </span>
             <span class="chip-relation">
-              ${showCrown ? '⭐ Care Member' : this.safeEscape(p.relation)}
+              ${showCrown ? '⭐ VIP Member' : this.safeEscape(p.relation)}
             </span>
           </div>
         </div>
@@ -503,7 +499,6 @@ const BookingsPage = {
       return false;
     });
 
-    // CHRONOLOGICAL SORTING: Newest bookings first (Today -> Yesterday -> Older)
     return filtered.sort((a, b) => {
       const timeA = this.parseDateClean(a.collectionDate || a.createdAt || a.bookingDate).getTime();
       const timeB = this.parseDateClean(b.collectionDate || b.createdAt || b.bookingDate).getTime();
@@ -595,7 +590,6 @@ const BookingsPage = {
         subnav.style.display = 'flex';
         let selectedBId = preferredBookingId || patientBookings[0].bookingId;
 
-        // Clean Date-wise Labels: SCDBOOK583132 (Today, 21 Oct)
         subnav.innerHTML = patientBookings.map(b => {
           const friendlyDate = this.formatFriendlyDate(b.collectionDate, false);
           const isSelected = b.bookingId === selectedBId;
@@ -650,6 +644,7 @@ const BookingsPage = {
 
     const isLab = booking.collectionType === 'lab' || String(booking.address || '').includes('Direct Lab');
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
+    const isVip = this.isMembershipActive(activePatient);
 
     if (idEl) idEl.textContent = booking.bookingId;
     if (modeEl) {
@@ -658,10 +653,9 @@ const BookingsPage = {
     }
 
     if (patientEl && activePatient) {
-      patientEl.textContent = `${activePatient.name} (${activePatient.relation || 'Self'})`;
+      patientEl.innerHTML = `${this.safeEscape(activePatient.name)} ${isVip ? '<span title="VIP Member" style="color:#F59E0B; margin-left:3px;">👑</span>' : ''} (${this.safeEscape(activePatient.relation || 'Self')})`;
     }
 
-    // CLEAN SCHEDULED SLOT FORMATTING: "Today, 21 Oct 2026 • 06:30 AM - 07:00 AM"
     if (slotEl) {
       const friendlyDate = this.formatFriendlyDate(booking.collectionDate, true);
       const slotTime = booking.timeSlot || '07:30 AM - 08:00 AM';
@@ -687,11 +681,9 @@ const BookingsPage = {
       }
     }
 
-    // ACCURATE TOTAL CALCULATION (Tests Price + Doorstep Charge)
     const patientItems = this.getPatientItemsForBooking(booking);
     const patientSum = patientItems.reduce((acc, it) => acc + Number(it.price || it.OfferPrice || 0), 0);
     
-    // Auto-derive doorstep fee if order subtotal < 500 and mode is home pickup
     let doorstepCharge = Number(booking.doorstepCharge || 0);
     if (doorstepCharge === 0 && !isLab && patientSum > 0 && patientSum < 500) {
       doorstepCharge = 100;
@@ -704,16 +696,11 @@ const BookingsPage = {
 
     if (amtEl) amtEl.textContent = this.safeFormatCurrency(finalDisplayTotal);
 
-    // RENDER ADD TESTS BANNER (BETWEEN META CARD & LIVE PROGRESS)
     this.renderAddTestsCenterBanner(booking);
-
     this.renderTimelineStepper(booking);
     this.renderBookedTests(booking, doorstepCharge);
   },
 
-  /**
-   * Renders the Add Tests Box between Booking Reference & Live Diagnostic Progress
-   */
   renderAddTestsCenterBanner(booking) {
     const bannerBox = document.getElementById('disp-add-tests-box');
     if (!bannerBox) return;
@@ -809,7 +796,6 @@ const BookingsPage = {
       </div>
     `).join('');
 
-    // HOME COLLECTION CHARGE ROW DISPLAY (FOR ORDERS < ₹500)
     if (!isLab && doorstepCharge > 0) {
       html += `
         <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 8px; border-bottom:1px solid #f1f5f9; background:#fff7ed; border-radius:8px; margin-top:8px;">
@@ -832,7 +818,6 @@ const BookingsPage = {
       return;
     }
 
-    // STRICT 3-HOUR TIME WINDOW VALIDATION
     if (!this.isWithinAddTestsTimeWindow(booking)) {
       this.safeShowToast('⚠️ Add-on tests window has expired (Allowed only within 3 hours of appointment slot).', 'error');
       return;

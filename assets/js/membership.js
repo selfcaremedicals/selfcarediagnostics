@@ -1,13 +1,11 @@
 /* file: assets/js/membership.js */
 /**
- * Selfcare Diagnostics - VIP Membership & Razorpay Controller v1.2.0
+ * Selfcare Diagnostics - VIP Membership & Razorpay Controller v2.0.0
  * Features:
- * - 1 Year validity calculation
- * - Strictly Online Payment via Razorpay Live Gateway
- * - Auto-creates backend Razorpay Order ID before checkout modal
- * - Primary User (₹99) + Selected Family Members (₹99 each)
- * - Sets 'Membership' status in Customers & FamilyMembers backend sheets
- * - Sets 'Regular' for non-purchased members
+ * - Dynamic Paid / Unpaid Status with Date & Time display
+ * - Checkbox only for unpaid members (No mandatory tick)
+ * - Selective Primary User billing
+ * - Instant 👑 Crown reflection & Broadcast
  */
 
 const MembershipPage = {
@@ -15,7 +13,9 @@ const MembershipPage = {
   currentUser: null,
   familyMembers: [],
   selectedMemberIds: new Set(),
-  activeMembership: null,
+  isPrimarySelected: false,
+  isPrimaryVip: false,
+  primaryExpiry: null,
 
   async init() {
     this.loadUserData();
@@ -28,7 +28,6 @@ const MembershipPage = {
   loadUserData() {
     const activeMobile = localStorage.getItem('selfcare_active_user') || '';
 
-    // Primary User Load
     let storedUser = null;
     try {
       const rawUser = localStorage.getItem(`selfcare_profile_${activeMobile}`) || localStorage.getItem('selfcare_permanent_user');
@@ -43,7 +42,6 @@ const MembershipPage = {
       membership: (storedUser && storedUser.membership) || 'Regular'
     };
 
-    // Family Members Load from Profile Vault
     try {
       let rawFam = localStorage.getItem(`selfcare_family_${activeMobile}`) || localStorage.getItem('selfcare_family_members');
       this.familyMembers = rawFam ? JSON.parse(rawFam) : [];
@@ -63,22 +61,75 @@ const MembershipPage = {
         if (mem && mem.status === 'Membership') {
           const exp = new Date(mem.expiryDate);
           if (exp > new Date()) {
-            this.activeMembership = mem;
+            this.isPrimaryVip = true;
+            this.primaryExpiry = exp;
+
             const banner = document.getElementById('already-member-banner');
             const validText = document.getElementById('membership-validity-text');
             if (banner) banner.style.display = 'flex';
-            if (validText) validText.textContent = `Valid until: ${exp.toLocaleDateString('en-GB')}`;
+            if (validText) validText.textContent = `Valid until: ${this.formatDateTime(exp)}`;
           }
         }
       } catch (e) {}
     }
   },
 
+  formatDateTime(dateObj) {
+    if (!dateObj) return '';
+    const d = new Date(dateObj);
+    const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateStr} at ${timeStr}`;
+  },
+
   renderPrimaryUser() {
-    const nameEl = document.getElementById('primary-user-name');
-    const phoneEl = document.getElementById('primary-user-phone');
-    if (nameEl) nameEl.textContent = this.currentUser.name;
-    if (phoneEl) phoneEl.textContent = this.currentUser.mobile ? `+91 ${this.currentUser.mobile}` : 'Active Account';
+    const container = document.getElementById('primary-user-container');
+    if (!container) return;
+
+    const safeName = (typeof Utils !== 'undefined' && Utils.escapeHtml) 
+      ? Utils.escapeHtml(this.currentUser.name) 
+      : this.currentUser.name;
+
+    if (this.isPrimaryVip) {
+      container.innerHTML = `
+        <div class="member-select-row vip-active-card">
+          <div class="vip-badge-icon">👑</div>
+          <div class="member-row-info">
+            <div class="name-line">
+              <strong>${safeName}</strong>
+              <span class="relation-tag vip-tag">Primary (You) • VIP</span>
+            </div>
+            <span class="member-sub">${this.currentUser.mobile ? '+91 ' + this.currentUser.mobile : 'Active Account'}</span>
+            <span class="validity-time-green">✔ Active • Valid till: ${this.formatDateTime(this.primaryExpiry)}</span>
+          </div>
+          <div class="paid-status-text">PAID</div>
+        </div>
+      `;
+    } else {
+      container.innerHTML = `
+        <div class="member-select-row ${this.isPrimarySelected ? 'selected' : ''}" onclick="MembershipPage.togglePrimarySelect()">
+          <label class="custom-checkbox" onclick="event.stopPropagation()">
+            <input type="checkbox" id="chk_primary" ${this.isPrimarySelected ? 'checked' : ''} onchange="MembershipPage.togglePrimarySelect()">
+            <span class="checkmark"></span>
+          </label>
+          <div class="member-row-info">
+            <div class="name-line">
+              <strong>${safeName}</strong>
+              <span class="relation-tag self-tag">Primary (You)</span>
+            </div>
+            <span class="member-sub">${this.currentUser.mobile ? '+91 ' + this.currentUser.mobile : 'Active Account'}</span>
+          </div>
+          <div class="row-price">₹99</div>
+        </div>
+      `;
+    }
+  },
+
+  togglePrimarySelect() {
+    if (this.isPrimaryVip) return;
+    this.isPrimarySelected = !this.isPrimarySelected;
+    this.renderPrimaryUser();
+    this.calculateTotal();
   },
 
   renderFamilyOptions() {
@@ -87,7 +138,7 @@ const MembershipPage = {
 
     if (!this.familyMembers || this.familyMembers.length === 0) {
       container.innerHTML = `
-        <div style="font-size:11px; color:#6B7280; padding:6px 0;">
+        <div style="font-size:12px; color:#6B7280; padding:10px 0; text-align:center;">
           No family members saved yet. Click below to add.
         </div>
       `;
@@ -95,25 +146,43 @@ const MembershipPage = {
     }
 
     container.innerHTML = this.familyMembers.map(m => {
+      const isVip = m.membership === 'Membership' && m.expiryDate && new Date(m.expiryDate) > new Date();
       const isSelected = this.selectedMemberIds.has(m.id);
-      const isAlreadyVip = m.membership === 'Membership';
+      const safeName = (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(m.name) : m.name;
 
-      return `
-        <div class="member-select-row ${isSelected ? 'selected' : ''}" onclick="MembershipPage.toggleFamilySelect('${m.id}')">
-          <label class="custom-checkbox" onclick="event.stopPropagation()">
-            <input type="checkbox" id="chk_${m.id}" ${isSelected ? 'checked' : ''} onchange="MembershipPage.toggleFamilySelect('${m.id}')">
-            <span class="checkmark"></span>
-          </label>
-          <div class="member-row-info">
-            <div class="name-line">
-              <strong>${Utils.escapeHtml(m.name)}</strong>
-              <span class="relation-tag ${isAlreadyVip ? 'vip-tag' : ''}">${Utils.escapeHtml(m.relation || 'Member')} ${isAlreadyVip ? '• VIP' : ''}</span>
+      if (isVip) {
+        return `
+          <div class="member-select-row vip-active-card">
+            <div class="vip-badge-icon">👑</div>
+            <div class="member-row-info">
+              <div class="name-line">
+                <strong>${safeName}</strong>
+                <span class="relation-tag vip-tag">${m.relation || 'Member'} • VIP</span>
+              </div>
+              <span class="member-sub">${m.age ? m.age + ' Yrs • ' : ''}${m.mobile ? '+91 ' + m.mobile : 'Same address'}</span>
+              <span class="validity-time-green">✔ Active • Valid till: ${this.formatDateTime(m.expiryDate)}</span>
             </div>
-            <span class="member-sub">${m.age ? m.age + ' Yrs • ' : ''}${m.mobile ? '+91 ' + m.mobile : 'Same address'}</span>
+            <div class="paid-status-text">PAID</div>
           </div>
-          <div class="row-price">+₹99</div>
-        </div>
-      `;
+        `;
+      } else {
+        return `
+          <div class="member-select-row ${isSelected ? 'selected' : ''}" onclick="MembershipPage.toggleFamilySelect('${m.id}')">
+            <label class="custom-checkbox" onclick="event.stopPropagation()">
+              <input type="checkbox" id="chk_${m.id}" ${isSelected ? 'checked' : ''} onchange="MembershipPage.toggleFamilySelect('${m.id}')">
+              <span class="checkmark"></span>
+            </label>
+            <div class="member-row-info">
+              <div class="name-line">
+                <strong>${safeName}</strong>
+                <span class="relation-tag">${m.relation || 'Member'}</span>
+              </div>
+              <span class="member-sub">${m.age ? m.age + ' Yrs • ' : ''}${m.mobile ? '+91 ' + m.mobile : 'Same address'}</span>
+            </div>
+            <div class="row-price">+₹99</div>
+          </div>
+        `;
+      }
     }).join('');
   },
 
@@ -128,15 +197,21 @@ const MembershipPage = {
   },
 
   calculateTotal() {
+    const isPrimaryBilled = !this.isPrimaryVip && this.isPrimarySelected;
+    const primaryCount = isPrimaryBilled ? 1 : 0;
     const familyCount = this.selectedMemberIds.size;
-    const totalCount = 1 + familyCount;
+    const totalCount = primaryCount + familyCount;
     const totalAmount = totalCount * this.PER_HEAD_PRICE;
 
+    const primaryBillRow = document.getElementById('bill-primary-row');
     const famRow = document.getElementById('bill-family-row');
     const famCountEl = document.getElementById('bill-family-count');
     const famAmtEl = document.getElementById('bill-family-amount');
     const grandTotalEl = document.getElementById('bill-grand-total');
+    const ctaBtn = document.getElementById('pay-razorpay-btn');
     const ctaText = document.getElementById('cta-btn-text');
+
+    if (primaryBillRow) primaryBillRow.style.display = isPrimaryBilled ? 'flex' : 'none';
 
     if (familyCount > 0) {
       if (famRow) famRow.style.display = 'flex';
@@ -147,10 +222,18 @@ const MembershipPage = {
     }
 
     if (grandTotalEl) grandTotalEl.textContent = `₹${totalAmount}`;
-    if (ctaText) ctaText.textContent = `Pay ₹${totalAmount} Online & Activate VIP`;
+
+    if (ctaBtn && ctaText) {
+      if (totalCount === 0) {
+        ctaBtn.disabled = true;
+        ctaText.textContent = 'Select a member to activate VIP';
+      } else {
+        ctaBtn.disabled = false;
+        ctaText.textContent = `Pay ₹${totalAmount} Online & Activate VIP`;
+      }
+    }
   },
 
-  // Razorpay Gateway - Live Online Checkout with Backend Order ID
   async initiatePayment() {
     const activeMobile = this.currentUser.mobile;
     if (!activeMobile) {
@@ -159,10 +242,16 @@ const MembershipPage = {
       return;
     }
 
-    const totalMembers = 1 + this.selectedMemberIds.size;
+    const isPrimaryBilled = !this.isPrimaryVip && this.isPrimarySelected;
+    const totalMembers = (isPrimaryBilled ? 1 : 0) + this.selectedMemberIds.size;
     const totalAmount = totalMembers * this.PER_HEAD_PRICE;
-    const selectedFamilyList = this.familyMembers.filter(m => this.selectedMemberIds.has(m.id));
 
+    if (totalMembers === 0) {
+      alert('Please select at least one member to activate VIP.');
+      return;
+    }
+
+    const selectedFamilyList = this.familyMembers.filter(m => this.selectedMemberIds.has(m.id));
     const payBtn = document.getElementById('pay-razorpay-btn');
     const originalBtnContent = payBtn ? payBtn.innerHTML : '';
 
@@ -172,11 +261,6 @@ const MembershipPage = {
         payBtn.innerHTML = '<span>⏳ Preparing Secure Payment...</span>';
       }
 
-      if (typeof Razorpay === 'undefined') {
-        throw new Error('Razorpay Gateway loading failed. Please check internet connection.');
-      }
-
-      // 1. Backend vazhi Razorpay Order ID undakkunnu
       let orderRes = null;
       if (typeof Api !== 'undefined' && typeof Api.createRazorpayOrder === 'function') {
         orderRes = await Api.createRazorpayOrder({
@@ -194,10 +278,9 @@ const MembershipPage = {
 
       const orderId = orderRes && (orderRes.orderId || orderRes.id);
 
-      // 2. Razorpay Live Modal Options
       const options = {
         key: razorpayKey,
-        amount: totalAmount * 100, // paise
+        amount: totalAmount * 100,
         currency: "INR",
         name: "Selfcare Diagnostics",
         description: `CarePass 1-Year VIP Membership (${totalMembers} Members)`,
@@ -211,7 +294,7 @@ const MembershipPage = {
           color: "#4A154B"
         },
         handler: async (response) => {
-          await MembershipPage.handlePaymentSuccess(response, totalAmount, selectedFamilyList);
+          await MembershipPage.handlePaymentSuccess(response, totalAmount, selectedFamilyList, isPrimaryBilled);
         },
         modal: {
           ondismiss: function() {
@@ -223,14 +306,10 @@ const MembershipPage = {
         }
       };
 
-      if (orderId) {
-        options.order_id = orderId;
-      }
+      if (orderId) options.order_id = orderId;
 
       const rzp = new Razorpay(options);
-
       rzp.on('payment.failed', function(response) {
-        console.error('Razorpay Error:', response.error);
         alert(`Payment Incomplete: ${response.error.description || 'Transaction was not completed.'}`);
         if (payBtn) {
           payBtn.disabled = false;
@@ -241,7 +320,7 @@ const MembershipPage = {
       rzp.open();
 
     } catch (err) {
-      console.error('Initiate payment error:', err);
+      console.error(err);
       alert(err.message || 'Payment could not be initialized.');
       if (payBtn) {
         payBtn.disabled = false;
@@ -250,62 +329,97 @@ const MembershipPage = {
     }
   },
 
-  async handlePaymentSuccess(razorpayResponse, amount, coveredFamily) {
+  async handlePaymentSuccess(razorpayResponse, amount, coveredFamily, primaryIncluded) {
     const activeMobile = this.currentUser.mobile;
     const today = new Date();
     const expiry = new Date();
-    expiry.setFullYear(today.getFullYear() + 1); // 1 Year validity
+    expiry.setFullYear(today.getFullYear() + 1);
 
     const selectedFamilyIds = coveredFamily.map(f => f.id);
 
-    const membershipRecord = {
-      status: 'Membership',
-      plan: 'CarePass 1 Year VIP',
-      amount: amount,
-      paymentId: razorpayResponse.razorpay_payment_id || ('PAY_' + Date.now()),
-      startDate: today.toISOString(),
-      expiryDate: expiry.toISOString(),
-      coveredFamilyIds: selectedFamilyIds
-    };
+    // 1. Primary User Update
+    if (primaryIncluded) {
+      const membershipRecord = {
+        status: 'Membership',
+        plan: 'CarePass 1 Year VIP',
+        amount: amount,
+        paymentId: razorpayResponse.razorpay_payment_id || ('PAY_' + Date.now()),
+        startDate: today.toISOString(),
+        expiryDate: expiry.toISOString()
+      };
+      localStorage.setItem(`selfcare_membership_${activeMobile}`, JSON.stringify(membershipRecord));
+      localStorage.setItem('selfcare_is_vip_member', 'true');
 
-    // 1. LocalStorage Update
-    localStorage.setItem(`selfcare_membership_${activeMobile}`, JSON.stringify(membershipRecord));
-    localStorage.setItem('selfcare_is_vip_member', 'true');
+      let storedUser = {};
+      try {
+        storedUser = JSON.parse(localStorage.getItem(`selfcare_profile_${activeMobile}`) || '{}');
+      } catch (e) {}
+      storedUser.membership = 'Membership';
+      storedUser.vipExpiry = expiry.toISOString();
+      localStorage.setItem(`selfcare_profile_${activeMobile}`, JSON.stringify(storedUser));
+    }
 
-    let storedUser = {};
-    try {
-      storedUser = JSON.parse(localStorage.getItem(`selfcare_profile_${activeMobile}`) || '{}');
-    } catch (e) {}
-    storedUser.membership = 'Membership';
-    localStorage.setItem(`selfcare_profile_${activeMobile}`, JSON.stringify(storedUser));
-
+    // 2. Family Members Update with Expiry
     this.familyMembers = this.familyMembers.map(m => {
       if (selectedFamilyIds.includes(m.id)) {
-        return { ...m, membership: 'Membership' };
+        return { 
+          ...m, 
+          membership: 'Membership', 
+          expiryDate: expiry.toISOString() 
+        };
       }
-      return m.membership ? m : { ...m, membership: 'Regular' };
+      return m;
     });
+
     localStorage.setItem('selfcare_family_members', JSON.stringify(this.familyMembers));
     localStorage.setItem(`selfcare_family_${activeMobile}`, JSON.stringify(this.familyMembers));
 
-    // 2. Google Sheets Backend Sync
+    // 3. Google Sheets Backend Sync
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
       try {
         await Api.request('saveMembership', {
           mobile: activeMobile,
           primaryUserId: this.currentUser.userId,
-          paymentId: membershipRecord.paymentId,
+          paymentId: razorpayResponse.razorpay_payment_id || ('PAY_' + Date.now()),
           amount: amount,
-          expiryDate: membershipRecord.expiryDate,
+          expiryDate: expiry.toISOString(),
+          primaryIncluded: primaryIncluded,
           familyMemberIds: JSON.stringify(selectedFamilyIds)
         }, false);
       } catch (err) {
-        console.warn('[Membership] Backend sync warning:', err);
+        console.warn('Backend sync warning:', err);
       }
     }
 
-    alert(`🎉 Congratulations! Your 1-Year Selfcare VIP Membership is now Active.\nPayment ID: ${membershipRecord.paymentId}`);
-    window.location.href = 'profile.html';
+    // 4. Trigger Instant 👑 Crown in App UI
+    if (typeof App !== 'undefined' && App.notifyVipSuccess) {
+      App.notifyVipSuccess();
+    }
+
+    // 5. Success Modal Alert
+    this.showSuccessModal(expiry);
+  },
+
+  showSuccessModal(expiry) {
+    const formattedDate = this.formatDateTime(expiry);
+    const modalHtml = `
+      <div id="vip-success-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; backdrop-filter:blur(4px);">
+        <div style="background:#fff; border-radius:18px; padding:24px; max-width:340px; width:100%; text-align:center; box-shadow:0 15px 35px rgba(0,0,0,0.3); animation: popModal 0.3s ease;">
+          <div style="font-size:48px; margin-bottom:10px; filter:drop-shadow(0 2px 5px rgba(245,158,11,0.5));">👑</div>
+          <h3 style="color:#4A154B; margin:0 0 8px 0; font-size:20px; font-weight:800;">VIP Membership Activated!</h3>
+          <p style="color:#4B5563; font-size:13px; line-height:1.5; margin:0 0 16px 0;">
+            Congratulations! VIP Crown status is now active across all member accounts.
+          </p>
+          <div style="background:#F0FDF4; border:1px solid #86EFAC; border-radius:10px; padding:10px; font-size:12px; color:#15803D; margin-bottom:20px; font-weight:600;">
+            ✔ Valid till: ${formattedDate}
+          </div>
+          <button onclick="window.location.reload();" style="width:100%; background:linear-gradient(135deg, #078866, #045D49); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; box-shadow:0 4px 12px rgba(7,136,102,0.3);">
+            Done & View Status
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
   },
 
   toggleAddMemberModal(show) {
