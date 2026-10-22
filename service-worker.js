@@ -1,8 +1,8 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v10.4.0 (VIP Live Expiry & Cloud Sync Edition)
+ * Selfcare Diagnostics - Service Worker v11.0.0 (Multi-Patient Split & Instant Cache Purge Edition)
  * Features:
- * - Upgraded Cache Version to v10.4.0 (Instantly purges stale membership.js & css cache)
+ * - Upgraded Cache Version to v11.0.0 (Instantly purges stale cart.js, bookings.js & profile.js cache)
  * - Automatic cache purge on activation & immediate client takeover (clients.claim())
  * - Fast precache with cache-busting timestamp to prevent browser HTTP disk caching
  * - Instant broadcast to all open tabs/PWA windows on update
@@ -11,7 +11,7 @@
  * - Network-First for HTML pages with seamless offline fallback
  */
 
-const CACHE_NAME = 'selfcare-cache-v10.4.0';
+const CACHE_NAME = 'selfcare-cache-v11.0.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -69,7 +69,7 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache Fresh Files & Skip Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Upgraded Engine v10.4.0 (VIP Live Expiry Edition)...');
+  console.log('[Selfcare SW] Installing Upgraded Engine v11.0.0 (Multi-Patient Split Edition)...');
   self.skipWaiting();
 
   event.waitUntil(
@@ -77,7 +77,7 @@ self.addEventListener('install', (event) => {
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
           // Cache busting query added during fetch to bypass browser disk cache
-          const bustUrl = `${url}?sw_bust=10.4.0`;
+          const bustUrl = `${url}?sw_bust=11.0.0`;
           const response = await fetch(bustUrl, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
@@ -101,7 +101,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purge All Older Caches & Claim Clients Immediately
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v10.4.0 & Purging all stale caches...');
+  console.log('[Selfcare SW] Activating v11.0.0 & Purging all stale caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -117,7 +117,7 @@ self.addEventListener('activate', (event) => {
       // Notify all open tabs/clients that new version is live
       const clients = await self.clients.matchAll({ type: 'window' });
       clients.forEach((client) => {
-        client.postMessage({ type: 'SW_UPDATED', version: 'v10.4.0' });
+        client.postMessage({ type: 'SW_UPDATED', version: 'v11.0.0' });
       });
     })
   );
