@@ -1,17 +1,17 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v10.3.0 (VIP Universal Crown Engine Edition)
+ * Selfcare Diagnostics - Service Worker v10.4.0 (VIP Live Expiry & Cloud Sync Edition)
  * Features:
- * - Upgraded Cache Version to purge stale assets (v10.3.0)
- * - Forces cache clearance for updated reports.js & bookings.js VIP Crown logic
- * - Precache for membership shell, profile vault, and real-time tracking
- * - Stale-While-Revalidate (SWR) for JS/CSS (Zero network delay)
- * - Network-First for HTML documents with immediate offline fallback
- * - Automatic skipWaiting() and immediate client takeover (clients.claim())
- * - Cache-first with background revalidation for images and icons
+ * - Upgraded Cache Version to v10.4.0 (Instantly purges stale membership.js & css cache)
+ * - Automatic cache purge on activation & immediate client takeover (clients.claim())
+ * - Fast precache with cache-busting timestamp to prevent browser HTTP disk caching
+ * - Instant broadcast to all open tabs/PWA windows on update
+ * - Strict network bypass for Google Apps Script & Central API calls
+ * - Stale-While-Revalidate (SWR) for lightning-fast JS/CSS execution
+ * - Network-First for HTML pages with seamless offline fallback
  */
 
-const CACHE_NAME = 'selfcare-cache-v10.3.0';
+const CACHE_NAME = 'selfcare-cache-v10.4.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -67,16 +67,18 @@ const ASSETS_TO_CACHE = [
   './assets/images/icon-512.png'
 ];
 
-// 1. INSTALL EVENT - Fast Precache and Immediate Skip-Waiting
+// 1. INSTALL EVENT - Precache Fresh Files & Skip Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Turbo version v10.3.0 with VIP Universal Crown module...');
+  console.log('[Selfcare SW] Installing Upgraded Engine v10.4.0 (VIP Live Expiry Edition)...');
   self.skipWaiting();
 
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
-          const response = await fetch(url, { cache: 'no-cache' });
+          // Cache busting query added during fetch to bypass browser disk cache
+          const bustUrl = `${url}?sw_bust=10.4.0`;
+          const response = await fetch(bustUrl, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
           }
@@ -89,7 +91,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// 2. MESSAGE EVENT - Immediate Client Takeover
+// 2. MESSAGE EVENT - Direct Activation & Refresh Listener
 self.addEventListener('message', (event) => {
   if (event.data && (event.data.type === 'SKIP_WAITING' || event.data.action === 'skipWaiting')) {
     console.log('[Selfcare SW] SKIP_WAITING signal received...');
@@ -97,36 +99,52 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// 3. ACTIVATE EVENT - Purge old caches and instantly claim clients
+// 3. ACTIVATE EVENT - Purge All Older Caches & Claim Clients Immediately
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v10.3.0 and purging old caches...');
+  console.log('[Selfcare SW] Activating v10.4.0 & Purging all stale caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('[Selfcare SW] Purging old cache:', cacheName);
+            console.log('[Selfcare SW] Purging old cache storage:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(async () => {
+      await self.clients.claim();
+      // Notify all open tabs/clients that new version is live
+      const clients = await self.clients.matchAll({ type: 'window' });
+      clients.forEach((client) => {
+        client.postMessage({ type: 'SW_UPDATED', version: 'v10.4.0' });
+      });
+    })
   );
 });
 
-// 4. FETCH EVENT - Optimized Caching Strategies
+// 4. FETCH EVENT - Optimized Strategy with Safe Network Bypass
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Bypass non-GET, cross-origin, and Google Apps Script API calls
-  if (url.origin !== location.origin || event.request.method !== 'GET') {
-    return;
-  }
-  if (url.pathname.includes('/exec') || url.pathname.includes('/api/')) {
+  // A. Bypass Non-GET Requests
+  if (event.request.method !== 'GET') {
     return;
   }
 
-  // Local development bypass
+  // B. Bypass API Calls & Google Apps Script Execution URLs
+  if (
+    url.origin !== location.origin ||
+    url.pathname.includes('/exec') ||
+    url.pathname.includes('/api/') ||
+    url.search.includes('action=') ||
+    url.hostname.includes('script.google.com') ||
+    url.hostname.includes('script.googleusercontent.com')
+  ) {
+    return;
+  }
+
+  // C. Local Development Mode Bypass
   const isLocalDev = Boolean(
     url.hostname === 'localhost' ||
     url.hostname === '127.0.0.1' ||
@@ -141,7 +159,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // STRATEGY A: JS & CSS Assets -> Stale-While-Revalidate (Instant Load)
+  // STRATEGY 1: JS & CSS Assets -> Stale-While-Revalidate with Auto-Background Cache Update
   if (
     event.request.destination === 'script' ||
     event.request.destination === 'style' ||
@@ -166,7 +184,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // STRATEGY B: HTML Documents -> Network-First with Fast Fallback
+  // STRATEGY 2: HTML Documents -> Network-First with Offline Fallback
   if (
     event.request.destination === 'document' ||
     url.pathname.endsWith('.html') ||
@@ -198,7 +216,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // STRATEGY C: Images, Fonts & Static Media -> Cache-First with Revalidation
+  // STRATEGY 3: Images, Media & Fonts -> Cache-First with Revalidation
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
