@@ -15,7 +15,7 @@
   <!-- Stylesheets -->
   <link rel="stylesheet" href="assets/css/global.css?v=6.0.0">
   <link rel="stylesheet" href="assets/css/profile.css?v=6.3.0">
-  <link rel="stylesheet" href="assets/css/membership.css?v=1.1.0">
+  <link rel="stylesheet" href="assets/css/membership.css?v=2.0.0">
 
   <!-- Razorpay Checkout SDK -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
@@ -92,21 +92,8 @@
       </div>
       <p class="section-hint">Choose who you want to include under this VIP membership:</p>
 
-      <!-- Primary User (Self) - Always Checked & Locked -->
-      <div class="member-select-row active-locked">
-        <label class="custom-checkbox">
-          <input type="checkbox" id="check-primary-user" checked disabled>
-          <span class="checkmark"></span>
-        </label>
-        <div class="member-row-info">
-          <div class="name-line">
-            <strong id="primary-user-name">Loading...</strong>
-            <span class="relation-tag self-tag">Primary (You)</span>
-          </div>
-          <span class="member-sub" id="primary-user-phone">+91 ----------</span>
-        </div>
-        <div class="row-price">₹99</div>
-      </div>
+      <!-- Primary User Container (Dynamic: Paid Status OR Optional Checkbox) -->
+      <div id="primary-user-container"></div>
 
       <!-- Family Members Checkbox List from Profile -->
       <div id="family-members-selection-list" class="family-selection-wrap"></div>
@@ -119,7 +106,7 @@
 
     <!-- Bill Summary Card -->
     <section class="bill-summary-card">
-      <div class="bill-row">
+      <div class="bill-row" id="bill-primary-row" style="display: none;">
         <span>Primary Account Holder:</span>
         <span id="bill-primary-amount">₹99</span>
       </div>
@@ -133,7 +120,7 @@
           <strong>Total Payable</strong>
           <small class="validity-sub">1 Year Validity • Inclusive of GST</small>
         </div>
-        <div class="final-amount" id="bill-grand-total">₹99</div>
+        <div class="final-amount" id="bill-grand-total">₹0</div>
       </div>
     </section>
 
@@ -145,7 +132,7 @@
 
       <button type="button" id="pay-razorpay-btn" class="razorpay-pay-cta" onclick="MembershipPage.initiatePayment()">
         <span class="cta-shield">🔒</span>
-        <span id="cta-btn-text">Pay ₹99 Online & Activate VIP</span>
+        <span id="cta-btn-text">Select a member to activate VIP</span>
       </button>
 
       <div class="trust-notice">
@@ -228,6 +215,7 @@
   <script src="assets/js/config.js?v=6.0.0"></script>
   <script src="assets/js/utils.js?v=6.0.0"></script>
   <script src="assets/js/api.js?v=6.0.0"></script>
-  <script src="assets/js/membership.js?v=1.1.0"></script>
+  <script src="assets/js/app.js?v=4.3.0"></script>
+  <script src="assets/js/membership.js?v=2.0.0"></script>
 </body>
 </html>

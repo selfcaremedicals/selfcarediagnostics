@@ -1,15 +1,16 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v10.1.3 (Turbo Speed Edition)
+ * Selfcare Diagnostics - Service Worker v10.2.0 (VIP Engine Edition)
  * Features:
- * - Upgraded Cache Version to purge stale assets (v10.1.3)
- * - Stale-While-Revalidate (SWR) for JS/CSS (Zero network delay on clicks)
+ * - Upgraded Cache Version to purge stale assets (v10.2.0)
+ * - Added membership.html, membership.css & membership.js to core precache
+ * - Stale-While-Revalidate (SWR) for JS/CSS (Zero network delay)
  * - Network-First for HTML documents with immediate offline fallback
  * - Automatic skipWaiting() and immediate client takeover (clients.claim())
  * - Cache-first with background revalidation for images and icons
  */
 
-const CACHE_NAME = 'selfcare-cache-v10.1.3';
+const CACHE_NAME = 'selfcare-cache-v10.2.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -25,6 +26,7 @@ const ASSETS_TO_CACHE = [
   './profile.html',
   './admin.html',
   './technician.html',
+  './membership.html',
   './manifest.json',
   './assets/css/global.css',
   './assets/css/components.css',
@@ -39,6 +41,7 @@ const ASSETS_TO_CACHE = [
   './assets/css/profile.css',
   './assets/css/admin.css',
   './assets/css/technician.css',
+  './assets/css/membership.css',
   './assets/js/config.js',
   './assets/js/api.js',
   './assets/js/utils.js',
@@ -57,6 +60,7 @@ const ASSETS_TO_CACHE = [
   './assets/js/profile.js',
   './assets/js/admin.js',
   './assets/js/technician.js',
+  './assets/js/membership.js',
   './assets/images/logo.png',
   './assets/images/icon-192.png',
   './assets/images/icon-512.png'
@@ -64,7 +68,7 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Fast Precache and Immediate Skip-Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Turbo version v10.1.3...');
+  console.log('[Selfcare SW] Installing Turbo version v10.2.0 with VIP module...');
   self.skipWaiting();
 
   event.waitUntil(
@@ -94,7 +98,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purge old caches and instantly claim clients
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v10.1.3 and claiming clients...');
+  console.log('[Selfcare SW] Activating v10.2.0 and purging old caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -113,7 +117,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Bypass non-GET, cross-origin, and API requests
+  // Bypass non-GET, cross-origin, and Google Apps Script API calls
   if (url.origin !== location.origin || event.request.method !== 'GET') {
     return;
   }
@@ -136,7 +140,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // STRATEGY A: JS & CSS Assets -> Stale-While-Revalidate (Instant Load, Zero Delay)
+  // STRATEGY A: JS & CSS Assets -> Stale-While-Revalidate (Instant Load)
   if (
     event.request.destination === 'script' ||
     event.request.destination === 'style' ||
