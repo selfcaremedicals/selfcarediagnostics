@@ -1,11 +1,13 @@
 /* file: assets/js/membership.js */
 /**
- * Selfcare Diagnostics - VIP Membership & Razorpay Controller v2.0.0
+ * Selfcare Diagnostics - VIP Membership & Razorpay Controller v2.1.0
  * Features:
+ * - Automatic Live Backend Sync (Google Sheets) on Page Load
+ * - 10-Digit Mobile Sanitization (removes +91, spaces, dashes)
  * - Dynamic Paid / Unpaid Status with Date & Time display
- * - Checkbox only for unpaid members (No mandatory tick)
+ * - Checkbox only for unpaid members (PAID members show Crown & Validity)
  * - Selective Primary User billing
- * - Instant 👑 Crown reflection & Broadcast
+ * - Family Members Cloud Sync & Instant 👑 Crown reflection
  */
 
 const MembershipPage = {
@@ -17,33 +19,48 @@ const MembershipPage = {
   isPrimaryVip: false,
   primaryExpiry: null,
 
+  // Mobile number-ai 10 digits-aaga normalize seiyum helper
+  cleanMobile(mobile) {
+    return String(mobile || '').replace(/\D/g, '').slice(-10);
+  },
+
   async init() {
     this.loadUserData();
-    this.checkExistingMembership();
+    this.checkExistingMembership(); // Local cache check (Instant UI)
     this.renderPrimaryUser();
     this.renderFamilyOptions();
     this.calculateTotal();
+
+    // Live Backend Sync from Google Sheets
+    await this.syncMembershipFromBackend();
   },
 
   loadUserData() {
-    const activeMobile = localStorage.getItem('selfcare_active_user') || '';
+    const rawActive = localStorage.getItem('selfcare_active_user') || '';
+    const activeMobile = this.cleanMobile(rawActive);
 
     let storedUser = null;
     try {
-      const rawUser = localStorage.getItem(`selfcare_profile_${activeMobile}`) || localStorage.getItem('selfcare_permanent_user');
+      const rawUser = localStorage.getItem(`selfcare_profile_${activeMobile}`) 
+                   || localStorage.getItem('selfcare_permanent_user')
+                   || localStorage.getItem(`selfcare_profile_${rawActive}`);
       if (rawUser) storedUser = JSON.parse(rawUser);
     } catch (e) {}
 
+    const userMobile = activeMobile || this.cleanMobile(storedUser && storedUser.mobile);
+
     this.currentUser = {
       name: (storedUser && storedUser.name) || 'Valued Customer',
-      mobile: activeMobile || (storedUser && storedUser.mobile) || '',
+      mobile: userMobile,
       email: (storedUser && storedUser.email) || '',
-      userId: (storedUser && storedUser.userId) || ('SCD_' + activeMobile),
+      userId: (storedUser && storedUser.userId) || ('SCD_' + userMobile),
       membership: (storedUser && storedUser.membership) || 'Regular'
     };
 
     try {
-      let rawFam = localStorage.getItem(`selfcare_family_${activeMobile}`) || localStorage.getItem('selfcare_family_members');
+      let rawFam = localStorage.getItem(`selfcare_family_${userMobile}`) 
+                || localStorage.getItem(`selfcare_family_${rawActive}`)
+                || localStorage.getItem('selfcare_family_members');
       this.familyMembers = rawFam ? JSON.parse(rawFam) : [];
     } catch (e) {
       this.familyMembers = [];
@@ -52,15 +69,17 @@ const MembershipPage = {
 
   checkExistingMembership() {
     const activeMobile = this.currentUser.mobile;
+    if (!activeMobile) return;
+
     const cacheKey = `selfcare_membership_${activeMobile}`;
     const raw = localStorage.getItem(cacheKey);
 
     if (raw) {
       try {
         const mem = JSON.parse(raw);
-        if (mem && mem.status === 'Membership') {
-          const exp = new Date(mem.expiryDate);
-          if (exp > new Date()) {
+        if (mem && (mem.status === 'Membership' || mem.membership === 'Membership')) {
+          const exp = new Date(mem.expiryDate || mem.vipExpiry);
+          if (!isNaN(exp.getTime()) && exp > new Date()) {
             this.isPrimaryVip = true;
             this.primaryExpiry = exp;
 
@@ -74,9 +93,93 @@ const MembershipPage = {
     }
   },
 
+  // GOOGLE SHEETS BACKEND-IL IRUNDHU LIVE DATA FETCH SEIYUM FUNCTION
+  async syncMembershipFromBackend() {
+    const activeMobile = this.currentUser.mobile;
+    if (!activeMobile || activeMobile.length !== 10) return;
+
+    if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
+      try {
+        const res = await Api.request('getMembershipStatus', { mobile: activeMobile }, false);
+        const data = (res && res.data) ? res.data : res;
+
+        if (data && (data.status === 'success' || data.success === true || data.isMember !== undefined)) {
+          let updated = false;
+
+          // 1. Primary User VIP Check
+          const isVip = data.isPrimaryVip || data.isMember;
+          const expiryStr = data.primaryExpiry || data.expiryDate;
+
+          if (isVip && expiryStr) {
+            const exp = new Date(expiryStr);
+            if (!isNaN(exp.getTime()) && exp > new Date()) {
+              this.isPrimaryVip = true;
+              this.primaryExpiry = exp;
+              this.currentUser.membership = 'Membership';
+              this.isPrimarySelected = false; // Already paid aagiyathaal bill panna vendam
+
+              // Local storage sync
+              localStorage.setItem(`selfcare_membership_${activeMobile}`, JSON.stringify({
+                status: 'Membership',
+                membership: 'Membership',
+                expiryDate: exp.toISOString()
+              }));
+              localStorage.setItem('selfcare_is_vip_member', 'true');
+
+              const banner = document.getElementById('already-member-banner');
+              const validText = document.getElementById('membership-validity-text');
+              if (banner) banner.style.display = 'flex';
+              if (validText) validText.textContent = `Valid until: ${this.formatDateTime(exp)}`;
+
+              updated = true;
+            }
+          }
+
+          // 2. Family Members VIP Sync
+          const paidIds = data.paidFamilyMemberIds || [];
+          const expiryMap = data.familyExpiryMap || {};
+
+          if (Array.isArray(data.familyMembers) && data.familyMembers.length > 0) {
+            this.familyMembers = data.familyMembers.map(serverMember => {
+              const localMatch = this.familyMembers.find(f => f.id === serverMember.id) || {};
+              return { ...localMatch, ...serverMember };
+            });
+            updated = true;
+          } else if (paidIds.length > 0) {
+            this.familyMembers = this.familyMembers.map(m => {
+              if (paidIds.includes(m.id)) {
+                this.selectedMemberIds.delete(m.id);
+                return {
+                  ...m,
+                  membership: 'Membership',
+                  expiryDate: expiryMap[m.id] || expiryStr
+                };
+              }
+              return m;
+            });
+            updated = true;
+          }
+
+          // UI-ai instant-aaga update seigirom
+          if (updated) {
+            localStorage.setItem('selfcare_family_members', JSON.stringify(this.familyMembers));
+            localStorage.setItem(`selfcare_family_${activeMobile}`, JSON.stringify(this.familyMembers));
+
+            this.renderPrimaryUser();
+            this.renderFamilyOptions();
+            this.calculateTotal();
+          }
+        }
+      } catch (err) {
+        console.warn('Membership backend sync warning:', err);
+      }
+    }
+  },
+
   formatDateTime(dateObj) {
     if (!dateObj) return '';
     const d = new Date(dateObj);
+    if (isNaN(d.getTime())) return '';
     const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     return `${dateStr} at ${timeStr}`;
@@ -90,6 +193,9 @@ const MembershipPage = {
       ? Utils.escapeHtml(this.currentUser.name) 
       : this.currentUser.name;
 
+    const displayMobile = this.currentUser.mobile ? '+91 ' + this.currentUser.mobile : 'Active Account';
+
+    // ALREADY PAID AANA PRIMARY USER KATCHI
     if (this.isPrimaryVip) {
       container.innerHTML = `
         <div class="member-select-row vip-active-card">
@@ -97,15 +203,16 @@ const MembershipPage = {
           <div class="member-row-info">
             <div class="name-line">
               <strong>${safeName}</strong>
-              <span class="relation-tag vip-tag">Primary (You) • VIP</span>
+              <span class="relation-tag vip-tag">PRIMARY (YOU) • VIP</span>
             </div>
-            <span class="member-sub">${this.currentUser.mobile ? '+91 ' + this.currentUser.mobile : 'Active Account'}</span>
+            <span class="member-sub">${displayMobile}</span>
             <span class="validity-time-green">✔ Active • Valid till: ${this.formatDateTime(this.primaryExpiry)}</span>
           </div>
           <div class="paid-status-text">PAID</div>
         </div>
       `;
     } else {
+      // UNPAID STATE
       container.innerHTML = `
         <div class="member-select-row ${this.isPrimarySelected ? 'selected' : ''}" onclick="MembershipPage.togglePrimarySelect()">
           <label class="custom-checkbox" onclick="event.stopPropagation()">
@@ -115,9 +222,9 @@ const MembershipPage = {
           <div class="member-row-info">
             <div class="name-line">
               <strong>${safeName}</strong>
-              <span class="relation-tag self-tag">Primary (You)</span>
+              <span class="relation-tag self-tag">PRIMARY (YOU)</span>
             </div>
-            <span class="member-sub">${this.currentUser.mobile ? '+91 ' + this.currentUser.mobile : 'Active Account'}</span>
+            <span class="member-sub">${displayMobile}</span>
           </div>
           <div class="row-price">₹99</div>
         </div>
@@ -149,7 +256,10 @@ const MembershipPage = {
       const isVip = m.membership === 'Membership' && m.expiryDate && new Date(m.expiryDate) > new Date();
       const isSelected = this.selectedMemberIds.has(m.id);
       const safeName = (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(m.name) : m.name;
+      const relationUpper = String(m.relation || 'Member').toUpperCase();
+      const memberSub = `${m.age ? m.age + ' Yrs • ' : ''}${m.mobile ? '+91 ' + m.mobile : 'Same address'}`;
 
+      // ALREADY PAID AANA FAMILY MEMBER KATCHI
       if (isVip) {
         return `
           <div class="member-select-row vip-active-card">
@@ -157,15 +267,16 @@ const MembershipPage = {
             <div class="member-row-info">
               <div class="name-line">
                 <strong>${safeName}</strong>
-                <span class="relation-tag vip-tag">${m.relation || 'Member'} • VIP</span>
+                <span class="relation-tag vip-tag">${relationUpper} • VIP</span>
               </div>
-              <span class="member-sub">${m.age ? m.age + ' Yrs • ' : ''}${m.mobile ? '+91 ' + m.mobile : 'Same address'}</span>
+              <span class="member-sub">${memberSub}</span>
               <span class="validity-time-green">✔ Active • Valid till: ${this.formatDateTime(m.expiryDate)}</span>
             </div>
             <div class="paid-status-text">PAID</div>
           </div>
         `;
       } else {
+        // UNPAID STATE
         return `
           <div class="member-select-row ${isSelected ? 'selected' : ''}" onclick="MembershipPage.toggleFamilySelect('${m.id}')">
             <label class="custom-checkbox" onclick="event.stopPropagation()">
@@ -175,9 +286,9 @@ const MembershipPage = {
             <div class="member-row-info">
               <div class="name-line">
                 <strong>${safeName}</strong>
-                <span class="relation-tag">${m.relation || 'Member'}</span>
+                <span class="relation-tag">${relationUpper}</span>
               </div>
-              <span class="member-sub">${m.age ? m.age + ' Yrs • ' : ''}${m.mobile ? '+91 ' + m.mobile : 'Same address'}</span>
+              <span class="member-sub">${memberSub}</span>
             </div>
             <div class="row-price">+₹99</div>
           </div>
@@ -187,6 +298,11 @@ const MembershipPage = {
   },
 
   toggleFamilySelect(memberId) {
+    const member = this.familyMembers.find(m => m.id === memberId);
+    if (member && member.membership === 'Membership' && member.expiryDate && new Date(member.expiryDate) > new Date()) {
+      return; // Already paid aagiyavargalai meendum select seiya koodathu
+    }
+
     if (this.selectedMemberIds.has(memberId)) {
       this.selectedMemberIds.delete(memberId);
     } else {
@@ -226,7 +342,7 @@ const MembershipPage = {
     if (ctaBtn && ctaText) {
       if (totalCount === 0) {
         ctaBtn.disabled = true;
-        ctaText.textContent = 'Select a member to activate VIP';
+        ctaText.textContent = this.isPrimaryVip ? 'All members up to date' : 'Select a member to activate VIP';
       } else {
         ctaBtn.disabled = false;
         ctaText.textContent = `Pay ₹${totalAmount} Online & Activate VIP`;
@@ -236,8 +352,8 @@ const MembershipPage = {
 
   async initiatePayment() {
     const activeMobile = this.currentUser.mobile;
-    if (!activeMobile) {
-      alert('Please log in with your mobile number to purchase VIP Membership.');
+    if (!activeMobile || activeMobile.length !== 10) {
+      alert('Please log in with a valid 10-digit mobile number to purchase VIP Membership.');
       window.location.href = 'customer.html';
       return;
     }
@@ -339,8 +455,14 @@ const MembershipPage = {
 
     // 1. Primary User Update
     if (primaryIncluded) {
+      this.isPrimaryVip = true;
+      this.primaryExpiry = expiry;
+      this.currentUser.membership = 'Membership';
+      this.isPrimarySelected = false;
+
       const membershipRecord = {
         status: 'Membership',
+        membership: 'Membership',
         plan: 'CarePass 1 Year VIP',
         amount: amount,
         paymentId: razorpayResponse.razorpay_payment_id || ('PAY_' + Date.now()),
@@ -371,6 +493,8 @@ const MembershipPage = {
       return m;
     });
 
+    this.selectedMemberIds.clear();
+
     localStorage.setItem('selfcare_family_members', JSON.stringify(this.familyMembers));
     localStorage.setItem(`selfcare_family_${activeMobile}`, JSON.stringify(this.familyMembers));
 
@@ -384,7 +508,8 @@ const MembershipPage = {
           amount: amount,
           expiryDate: expiry.toISOString(),
           primaryIncluded: primaryIncluded,
-          familyMemberIds: JSON.stringify(selectedFamilyIds)
+          familyMemberIds: JSON.stringify(selectedFamilyIds),
+          familyMembers: JSON.stringify(coveredFamily)
         }, false);
       } catch (err) {
         console.warn('Backend sync warning:', err);
@@ -396,7 +521,12 @@ const MembershipPage = {
       App.notifyVipSuccess();
     }
 
-    // 5. Success Modal Alert
+    // 5. Re-render UI
+    this.renderPrimaryUser();
+    this.renderFamilyOptions();
+    this.calculateTotal();
+
+    // 6. Success Modal Alert
     this.showSuccessModal(expiry);
   },
 
@@ -413,7 +543,7 @@ const MembershipPage = {
           <div style="background:#F0FDF4; border:1px solid #86EFAC; border-radius:10px; padding:10px; font-size:12px; color:#15803D; margin-bottom:20px; font-weight:600;">
             ✔ Valid till: ${formattedDate}
           </div>
-          <button onclick="window.location.reload();" style="width:100%; background:linear-gradient(135deg, #078866, #045D49); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; box-shadow:0 4px 12px rgba(7,136,102,0.3);">
+          <button onclick="document.getElementById('vip-success-modal').remove(); window.location.reload();" style="width:100%; background:linear-gradient(135deg, #078866, #045D49); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; box-shadow:0 4px 12px rgba(7,136,102,0.3);">
             Done & View Status
           </button>
         </div>
@@ -427,7 +557,7 @@ const MembershipPage = {
     if (modal) modal.style.display = show ? 'flex' : 'none';
   },
 
-  handleSaveQuickMember() {
+  async handleSaveQuickMember() {
     const name = document.getElementById('quick-name').value.trim();
     const relation = document.getElementById('quick-relation').value;
     const age = document.getElementById('quick-age').value.trim();
@@ -454,6 +584,23 @@ const MembershipPage = {
     const serialized = JSON.stringify(this.familyMembers);
     localStorage.setItem('selfcare_family_members', serialized);
     if (activeMobile) localStorage.setItem(`selfcare_family_${activeMobile}`, serialized);
+
+    // Backend Cloud Vault Sync
+    if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function' && activeMobile) {
+      try {
+        Api.request('saveFamilyMember', {
+          primaryMobile: activeMobile,
+          primaryUserId: this.currentUser.userId,
+          primaryUserName: this.currentUser.name,
+          id: newMember.id,
+          name: newMember.name,
+          relation: newMember.relation,
+          age: newMember.age,
+          mobile: newMember.mobile,
+          membership: 'Regular'
+        }, false);
+      } catch (e) {}
+    }
 
     this.toggleAddMemberModal(false);
     this.renderFamilyOptions();
