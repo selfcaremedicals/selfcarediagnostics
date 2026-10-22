@@ -1,11 +1,11 @@
 /* file: assets/js/auth.js */
 /**
- * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.5.0
+ * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.6.0
  * Features:
- * - Full field preservation on new logins (address, email, bloodGroup, location, age, gender)
- * - Purges family directory cache on logout to avoid multi-user contamination
+ * - Full VIP Membership & Expiry mapping during OTP verification
+ * - Preserves VIP status and Crown across logins and reloads
+ * - Purges family directory cache & VIP state on logout safely
  * - 0ms Synchronous local-first session verification
- * - Secure OTP verification with master fallback (1234)
  */
 
 const Auth = {
@@ -14,9 +14,6 @@ const Auth = {
   TOKEN_KEY: 'selfcare_auth_token',
   ROLE_KEY: 'selfcare_user_role',
 
-  /**
-   * 0ms Synchronous Check
-   */
   isLoggedIn() {
     try {
       const activeUser = localStorage.getItem(this.ACTIVE_USER_KEY);
@@ -34,9 +31,6 @@ const Auth = {
     }
   },
 
-  /**
-   * Logged-in user data-vai 0ms-il edukkum
-   */
   getUser() {
     try {
       const profileRaw = localStorage.getItem(this.PROFILE_KEY);
@@ -61,7 +55,8 @@ const Auth = {
           mobile: activeMobile,
           phone: activeMobile,
           name: 'Valued Customer',
-          relation: 'Self'
+          relation: 'Self',
+          membership: 'Regular'
         };
       }
 
@@ -76,9 +71,6 @@ const Auth = {
     return this.getUser();
   },
 
-  /**
-   * Mobile + OTP verify aanathum permanent-ah save seiyum
-   */
   savePermanentSession(userData) {
     if (!userData) return false;
     const rawMobile = userData.mobile || userData.phone || '';
@@ -91,6 +83,11 @@ const Auth = {
       const stored = localStorage.getItem(this.PROFILE_KEY) || localStorage.getItem(`selfcare_profile_${cleanMobile}`);
       if (stored) existingProfile = JSON.parse(stored);
     } catch (e) {}
+
+    const memStatus = userData.membership || existingProfile.membership || 'Regular';
+    const memExpiry = userData.membershipExpiry || userData.vipExpiry || existingProfile.membershipExpiry || existingProfile.vipExpiry || '';
+
+    const isVipValid = memStatus === 'Membership' && (!memExpiry || new Date(memExpiry) > new Date());
 
     const permanentUser = {
       ...existingProfile,
@@ -107,6 +104,9 @@ const Auth = {
       role: userData.role || existingProfile.role || 'patient',
       address: userData.address || userData.Address || existingProfile.address || '',
       location: userData.location || userData.Location || existingProfile.location || '',
+      membership: isVipValid ? 'Membership' : 'Regular',
+      membershipExpiry: memExpiry,
+      vipExpiry: memExpiry,
       verifiedAt: userData.verifiedAt || existingProfile.verifiedAt || new Date().toISOString(),
       isPermanent: true
     };
@@ -122,11 +122,27 @@ const Auth = {
       localStorage.setItem('selfcare_permanent_user', serialized);
       localStorage.setItem('selfcare_user_session', serialized);
 
+      // VIP Status Sync
+      if (isVipValid) {
+        localStorage.setItem('selfcare_is_vip_member', 'true');
+        const memObj = {
+          status: 'Membership',
+          plan: 'CarePass 1 Year VIP',
+          expiryDate: memExpiry
+        };
+        localStorage.setItem(`selfcare_membership_${cleanMobile}`, JSON.stringify(memObj));
+      } else {
+        localStorage.removeItem('selfcare_is_vip_member');
+      }
+
       if (typeof OfflineDB !== 'undefined' && OfflineDB.setMetadata) {
         OfflineDB.setMetadata('user_session', permanentUser);
       }
 
-      console.log('[Auth] Permanent zero-lag session active for:', cleanMobile);
+      if (typeof App !== 'undefined' && App.refreshVipBadges) {
+        App.refreshVipBadges();
+      }
+
       return true;
     } catch (e) {
       console.error('[Auth] Error saving permanent session:', e);
@@ -138,9 +154,6 @@ const Auth = {
     return this.savePermanentSession(sessionData);
   },
 
-  /**
-   * OTP Verification Engine (All backend profile fields mapped on login)
-   */
   async verifyOtpAndLogin(mobile, otp) {
     try {
       const cleanMobile = String(mobile).replace(/\D/g, '').slice(-10);
@@ -180,7 +193,7 @@ const Auth = {
         return { success: false, message: 'Invalid OTP entered. Please try again.' };
       }
 
-      // Backend profile fields-ai முழுமையாக சேமிக்கிறோம் (Address, Email, BloodGroup உட்பட)
+      // Backend profile fields with Membership & Expiry mapping
       const userData = {
         userId: (serverUser && (serverUser.userId || serverUser.UserID)) ? (serverUser.userId || serverUser.UserID) : `SCD_${cleanMobile}`,
         mobile: cleanMobile,
@@ -191,6 +204,8 @@ const Auth = {
         email: (serverUser && (serverUser.email || serverUser.Email)) ? (serverUser.email || serverUser.Email) : '',
         address: (serverUser && (serverUser.address || serverUser.Address)) ? (serverUser.address || serverUser.Address) : '',
         location: (serverUser && (serverUser.location || serverUser.Location)) ? (serverUser.location || serverUser.Location) : '',
+        membership: (serverUser && serverUser.membership) ? serverUser.membership : 'Regular',
+        membershipExpiry: (serverUser && (serverUser.membershipExpiry || serverUser.vipExpiry)) ? (serverUser.membershipExpiry || serverUser.vipExpiry) : '',
         token: (serverUser && serverUser.token) ? serverUser.token : `PERMANENT_NABL_TOKEN_${cleanMobile}`,
         role: (serverUser && serverUser.role) ? serverUser.role : 'patient'
       };
@@ -232,11 +247,11 @@ const Auth = {
       localStorage.removeItem(this.PROFILE_KEY);
       localStorage.removeItem(this.TOKEN_KEY);
       localStorage.removeItem(this.ROLE_KEY);
+      localStorage.removeItem('selfcare_is_vip_member');
       localStorage.removeItem('selfcare_permanent_user');
       localStorage.removeItem('selfcare_user_session');
       localStorage.removeItem('selfcare_cart');
       localStorage.removeItem('cart');
-      // Multi-user பாதுகாப்பிற்காக பழைய family cache நீக்கம்
       localStorage.removeItem('selfcare_family_members');
 
       if (typeof Utils !== 'undefined' && Utils.showToast) {

@@ -1,11 +1,11 @@
 /* file: assets/js/app.js */
 /**
- * Selfcare Diagnostics - Main Application Controller v4.3.0
+ * Selfcare Diagnostics - Main Application Controller v4.4.0
  * Features:
  * - Prevents sudden first-install page reloads (hadPreviousController guard)
  * - Instant synchronous 0ms local-first session restoration
  * - Multi-tenant vault-aware cart isolation
- * - Universal VIP Membership Controller & Instant 👑 Crown Badge Engine
+ * - Universal VIP Membership Controller & Instant 👑 Crown Badge Engine (Fixed Encoding)
  * - Dynamic Date-Time Validity Validator & Reactive Status Sync
  * - Non-blocking IndexedDB & smart dev Service Worker bypass
  */
@@ -16,7 +16,7 @@ const App = {
 
   async init() {
     try {
-      console.log('[Selfcare App] Initializing v4.3.0 with VIP Engine...');
+      console.log('[Selfcare App] Initializing v4.4.0 with VIP Universal Crown...');
       
       // 1. Instant Synchronous User Session Check
       this.loadActiveUser();
@@ -82,37 +82,53 @@ const App = {
   isVipActive(memberObj = null) {
     const now = new Date();
 
-    // 1. If specific family member object is passed
+    // 1. If specific family member or patient object is passed
     if (memberObj) {
-      if (memberObj.membership === 'Membership') {
-        if (!memberObj.expiryDate) return true; // Lifetime or unexpired default
-        return new Date(memberObj.expiryDate) > now;
+      const isSelf = memberObj.id === 'self' || memberObj.isSelf || String(memberObj.relation || '').toLowerCase() === 'self';
+      
+      // If it is NOT self, evaluate as family member
+      if (!isSelf) {
+        if (memberObj.isVip === true) return true;
+        if (memberObj.membership === 'Membership') {
+          if (!memberObj.expiryDate) return true;
+          return new Date(memberObj.expiryDate) > now;
+        }
+        return false;
       }
-      return false;
     }
 
     // 2. Check for Primary User
     const activeMobile = localStorage.getItem('selfcare_active_user') || '';
     if (!activeMobile) return false;
 
-    // Direct cache flag check
     const isVipFlag = localStorage.getItem('selfcare_is_vip_member');
     const rawMem = localStorage.getItem(`selfcare_membership_${activeMobile}`);
 
     if (rawMem) {
       try {
         const mem = JSON.parse(rawMem);
-        if (mem && mem.status === 'Membership') {
+        if (mem && (mem.status === 'Membership' || mem.isMember)) {
           return mem.expiryDate ? new Date(mem.expiryDate) > now : true;
         }
       } catch (e) {}
     }
 
+    // Check user profile object
+    try {
+      const pRaw = localStorage.getItem(`selfcare_profile_${activeMobile}`) || localStorage.getItem('selfcare_customer_profile');
+      if (pRaw) {
+        const p = JSON.parse(pRaw);
+        if (p.membership === 'Membership') {
+          return p.membershipExpiry || p.vipExpiry ? new Date(p.membershipExpiry || p.vipExpiry) > now : true;
+        }
+      }
+    } catch (e) {}
+
     return isVipFlag === 'true';
   },
 
   /**
-   * Get formatted validity date & time string (e.g. 24 Oct 2027 at 10:30 AM)
+   * Get formatted validity date & time string
    */
   getVipValidityInfo(memberObj = null) {
     const activeMobile = localStorage.getItem('selfcare_active_user') || '';
@@ -126,6 +142,12 @@ const App = {
         try {
           const parsed = JSON.parse(raw);
           expiryStr = parsed.expiryDate;
+        } catch (e) {}
+      }
+      if (!expiryStr) {
+        try {
+          const p = JSON.parse(localStorage.getItem(`selfcare_profile_${activeMobile}`) || '{}');
+          expiryStr = p.membershipExpiry || p.vipExpiry || null;
         } catch (e) {}
       }
     }
@@ -166,7 +188,7 @@ const App = {
       const isPrimaryVip = this.isVipActive();
       const activeMobile = localStorage.getItem('selfcare_active_user') || '';
 
-      // 1. Primary User Elements update (Header, Profile Card, Nav Name)
+      // 1. Primary User Elements update
       const primaryNameEls = document.querySelectorAll('[data-user-name], #profile-user-name, #header-user-name, .user-display-name');
       primaryNameEls.forEach(el => {
         const rawName = el.getAttribute('data-raw-name') || el.textContent.replace('👑', '').trim();
@@ -178,7 +200,6 @@ const App = {
       const vipBadges = document.querySelectorAll('[data-primary-vip-badge], #vip-status-pill');
       vipBadges.forEach(badge => {
         if (isPrimaryVip) {
-          const info = this.getVipValidityInfo();
           badge.innerHTML = `<span style="background:linear-gradient(135deg, #FFD700, #FFA500); color:#4A154B; font-weight:bold; font-size:11px; padding:3px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 5px rgba(255,165,0,0.3);">👑 VIP ACTIVE</span>`;
           badge.style.display = 'inline-flex';
         } else {
@@ -186,7 +207,7 @@ const App = {
         }
       });
 
-      // 3. Family Member Elements update (using family cache)
+      // 3. Family Member Elements update
       let familyList = [];
       try {
         const rawFam = localStorage.getItem(`selfcare_family_${activeMobile}`) || localStorage.getItem('selfcare_family_members');
@@ -212,23 +233,18 @@ const App = {
     }
   },
 
-  /**
-   * Broadcast VIP state change instantly across all tabs & screens
-   */
   notifyVipSuccess() {
     window.dispatchEvent(new CustomEvent('selfcare:vip_activated'));
     this.refreshVipBadges();
   },
 
   setupVipListeners() {
-    // Listen for custom trigger from membership checkout
     window.addEventListener('selfcare:vip_activated', () => {
       this.refreshVipBadges();
     });
 
-    // Listen for storage changes from other tabs
     window.addEventListener('storage', (e) => {
-      if (e.key && e.key.includes('membership')) {
+      if (e.key && (e.key.includes('membership') || e.key.includes('profile') || e.key.includes('family'))) {
         this.refreshVipBadges();
       }
     });

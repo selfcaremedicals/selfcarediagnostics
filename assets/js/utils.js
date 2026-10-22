@@ -1,16 +1,10 @@
 /* file: assets/js/utils.js */
 /**
- * Selfcare Diagnostics - Dynamic 2-Tier Sheet Inspection Engine v13.0.0
- * Verified against live database export:
- * - VIP Membership Expiry Engine & Per-Person Crown (👑) Validator
+ * Selfcare Diagnostics - Dynamic 2-Tier Sheet Inspection Engine v13.1.0
+ * Verified against live database:
+ * - VIP Membership Expiry Engine & Independent Per-Person Crown (👑) Validator
+ * - Allows family member VIP status even if primary user is regular
  * - Individual Patient 10% Discount Resolver
- * - Test IDs: CBC (SCDT0001/T0001), Lipid (SCDT0002/T0002), LFT (SCDT0003/T0003),
- *             RFT (SCDT0004/T0004), Thyroid (SCDT0005/T0005), Iron (SCDT0006/T0006),
- *             Hemoglobin (SCDT0008/T0008), PCV (SCDT0009/T0009), RBC (SCDT0010/T0010),
- *             WBC (SCDT0011/T0011), Platelets (SCDT0012/T0012), ESR (SCDT0013/T0013).
- * - Sugars:   FBS (SCDT0018/T0018), PPBS (SCDT0019/T0019), RBS (SCDT0020/T0020).
- * - Specimen: Urine Complete Analysis (SCDT0028/T0028) vs Blood Tests.
- * - Packages: SELFCARE BASIC HEALTH (SCD PACK 001 / PKG001 / BASIC HEALTH).
  */
 
 const Utils = {
@@ -80,50 +74,23 @@ const Utils = {
   },
 
   // ==========================================================
-  // VIP MEMBERSHIP STRICT VALIDITY & EXPIRY CHECKER
+  // VIP MEMBERSHIP STRICT VALIDITY & EXPIRY CHECKER (Fixed)
   // ==========================================================
   isPatientVIP(patientIdOrObj) {
     try {
+      const now = Date.now();
       const activeMobile = (typeof localStorage !== 'undefined' && localStorage.getItem('selfcare_active_user')) || '';
-      let membershipData = null;
-      if (activeMobile) {
-        const raw = localStorage.getItem(`selfcare_membership_${activeMobile}`);
-        if (raw) {
-          try { membershipData = JSON.parse(raw); } catch (e) {}
+
+      // Direct Object Checking if full member object passed
+      if (typeof patientIdOrObj === 'object' && patientIdOrObj !== null) {
+        if (patientIdOrObj.isVip === true) return true;
+        if (patientIdOrObj.membership === 'Membership') {
+          if (!patientIdOrObj.expiryDate) return true;
+          const objExp = new Date(patientIdOrObj.expiryDate).getTime();
+          if (!isNaN(objExp) && objExp > now) return true;
         }
       }
 
-      // 1. Strict Expiry Date Check: Expiry ஆகிவிட்டால் Crown மற்றும் 10% Discount இரண்டும் தானாக ரத்தாகும்
-      let isMembershipActive = false;
-      if (membershipData && (membershipData.status === 'Membership' || membershipData.isMember) && membershipData.expiryDate) {
-        const exp = new Date(membershipData.expiryDate);
-        if (!isNaN(exp.getTime()) && exp.getTime() > Date.now()) {
-          isMembershipActive = true;
-        }
-      }
-
-      // Local customer profile fallback check
-      if (!isMembershipActive && activeMobile) {
-        try {
-          const pRaw = localStorage.getItem(`selfcare_profile_${activeMobile}`) || localStorage.getItem('selfcare_customer_profile');
-          if (pRaw) {
-            const p = JSON.parse(pRaw);
-            if (p.membership === 'Membership' && p.membershipExpiry) {
-              const exp = new Date(p.membershipExpiry);
-              if (!isNaN(exp.getTime()) && exp.getTime() > Date.now()) {
-                isMembershipActive = true;
-              }
-            }
-          }
-        } catch (e) {}
-      }
-
-      // காலாவதியாகிவிட்டால் (Expired) யாருக்குமே VIP சலுகை கிடையாது
-      if (!isMembershipActive) {
-        return false;
-      }
-
-      // 2. Patient Specific Matching (User vs Family Member)
       let targetId = 'SELF';
       if (typeof patientIdOrObj === 'object' && patientIdOrObj !== null) {
         targetId = patientIdOrObj.id || patientIdOrObj.patientId || patientIdOrObj.MemberID || 'SELF';
@@ -132,24 +99,41 @@ const Utils = {
       }
 
       const cleanId = String(targetId).trim().toUpperCase();
+      const isPrimary = cleanId === 'SELF' || cleanId === 'PATIENT_SELF' || cleanId === '' || (activeMobile && (cleanId === activeMobile || cleanId === 'SCD_' + activeMobile));
 
-      // Primary Account Holder (User)
-      if (
-        cleanId === 'SELF' ||
-        cleanId === 'PATIENT_SELF' ||
-        cleanId === '' ||
-        (activeMobile && (cleanId === activeMobile || cleanId === 'SCD_' + activeMobile))
-      ) {
-        return true;
+      // CASE A: PRIMARY ACCOUNT HOLDER
+      if (isPrimary) {
+        let isPrimaryVip = false;
+        if (activeMobile) {
+          const raw = localStorage.getItem(`selfcare_membership_${activeMobile}`);
+          if (raw) {
+            try {
+              const mem = JSON.parse(raw);
+              if (mem && (mem.status === 'Membership' || mem.isMember) && mem.expiryDate) {
+                const exp = new Date(mem.expiryDate).getTime();
+                if (!isNaN(exp) && exp > now) isPrimaryVip = true;
+              }
+            } catch (e) {}
+          }
+
+          if (!isPrimaryVip) {
+            try {
+              const pRaw = localStorage.getItem(`selfcare_profile_${activeMobile}`) || localStorage.getItem('selfcare_customer_profile');
+              if (pRaw) {
+                const p = JSON.parse(pRaw);
+                const expStr = p.membershipExpiry || p.vipExpiry;
+                if (p.membership === 'Membership' && expStr) {
+                  const exp = new Date(expStr).getTime();
+                  if (!isNaN(exp) && exp > now) isPrimaryVip = true;
+                }
+              }
+            } catch (e) {}
+          }
+        }
+        return isPrimaryVip || localStorage.getItem('selfcare_is_vip_member') === 'true';
       }
 
-      // Family Member Check: இந்த குடும்ப உறுப்பினருக்கு ₹99 செலுத்தி VIP வாங்கப்பட்டதா?
-      if (membershipData && Array.isArray(membershipData.coveredFamilyIds)) {
-        const isCovered = membershipData.coveredFamilyIds.some(id => String(id).trim().toUpperCase() === cleanId);
-        if (isCovered) return true;
-      }
-
-      // Check Family Vault directory storage
+      // CASE B: FAMILY MEMBER (Evaluates independently of primary status)
       let famList = [];
       try {
         const famRaw = localStorage.getItem(`selfcare_family_${activeMobile}`) || localStorage.getItem('selfcare_family_members');
@@ -157,19 +141,37 @@ const Utils = {
       } catch (e) {}
 
       const matchedMember = famList.find(m => String(m.id || m.MemberID).trim().toUpperCase() === cleanId);
-      if (matchedMember && matchedMember.membership === 'Membership') {
-        return true;
+      if (matchedMember) {
+        if (matchedMember.membership === 'Membership') {
+          if (!matchedMember.expiryDate) return true;
+          const fExp = new Date(matchedMember.expiryDate).getTime();
+          if (!isNaN(fExp) && fExp > now) return true;
+        }
       }
 
-      return false; // VIP வாங்காத குடும்ப உறுப்பினர் (Regular)
+      // Fallback check against coveredFamilyIds
+      if (activeMobile) {
+        const rawMem = localStorage.getItem(`selfcare_membership_${activeMobile}`);
+        if (rawMem) {
+          try {
+            const memData = JSON.parse(rawMem);
+            if (memData && Array.isArray(memData.coveredFamilyIds)) {
+              const isCovered = memData.coveredFamilyIds.some(id => String(id).trim().toUpperCase() === cleanId);
+              if (isCovered && memData.expiryDate) {
+                const exp = new Date(memData.expiryDate).getTime();
+                if (!isNaN(exp) && exp > now) return true;
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
+      return false;
     } catch (e) {
       return false;
     }
   },
 
-  /**
-   * செல்லுபடியாகும் VIP மெம்பர்ஷிப் இருந்தால் மட்டுமே 👑 கிரவுன் காட்டும்
-   */
   formatVIPName(name, patientIdOrObj = 'SELF') {
     if (!name) return '';
     const isVip = this.isPatientVIP(patientIdOrObj);
@@ -180,16 +182,12 @@ const Utils = {
     return safeName;
   },
 
-  /**
-   * அந்த நபருக்கு 10% தள்ளுபடியா (10) அல்லது இல்லையா (0) என்பதைத் தரும்
-   */
   getPatientDiscountPercent(patientIdOrObj = 'SELF') {
     return this.isPatientVIP(patientIdOrObj) ? 10 : 0;
   }
 };
 
 const ConflictValidator = {
-  // Correctly aligned with your catalog
   panelAliases: {
     'CBC': ['cbc', 'complete blood count', 'hemogram', 'complete hemogram', 'haemogram', 'complete blood picture', 'cbp', 't0001', 'scdt0001'],
     'LIPID': ['lipid profile', 'lipid panel', 'cholesterol panel', 'lipid screen', 'lipids', 'complete lipid profile', 't0002', 'scdt0002'],
@@ -426,9 +424,7 @@ const ConflictValidator = {
         if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
           try {
             const parsed = JSON.parse(trimmed);
-            if (Array.isArray(parsed)) {
-              source = parsed;
-            }
+            if (Array.isArray(parsed)) source = parsed;
           } catch (e) {}
         }
       }
@@ -489,9 +485,7 @@ const ConflictValidator = {
       const aliases = this.panelAliases[key];
       const aMatches = aliases.some(alias => cleanA === alias || cleanA.includes(alias) || (cA && cA === alias.toUpperCase()));
       const bMatches = aliases.some(alias => cleanB === alias || cleanB.includes(alias) || (cB && cB === alias.toUpperCase()));
-      if (aMatches && bMatches) {
-        return true;
-      }
+      if (aMatches && bMatches) return true;
     }
     return false;
   },
@@ -541,15 +535,6 @@ const ConflictValidator = {
         });
       } else if (typeof rawParams === 'string') {
         subParams = rawParams.split(/[;,|\n•]|<br\s*[\/]?>/i).map(p => p.trim());
-      }
-    }
-
-    if (typeof constituentName === 'object' && constituentName !== null) {
-      const directParams = constituentName.Parameters || constituentName.parameters;
-      if (Array.isArray(directParams)) {
-        subParams.push(...directParams.map(p => typeof p === 'object' ? (p.Name || p.ParameterName || '') : String(p)));
-      } else if (typeof directParams === 'string') {
-        subParams.push(...directParams.split(/[;,|\n•]|<br\s*[\/]?>/i));
       }
     }
 
@@ -607,7 +592,6 @@ const ConflictValidator = {
       return { hasConflict: false, reason: '' };
     }
 
-    // Sugar Conflict Engine (T0018 / T0019 / T0020)
     const isNewRbs = this.isBloodSugarTest(newItem, 'rbs');
     const isNewFbs = this.isBloodSugarTest(newItem, 'fbs');
     const isNewPpbs = this.isBloodSugarTest(newItem, 'ppbs');
@@ -659,7 +643,6 @@ const ConflictValidator = {
       }
     }
 
-    // General Panel & Parameter Graph Engine
     for (const cartItem of patientCart) {
       if (!cartItem) continue;
       if (this.isReticulocyte(cartItem)) continue;
@@ -671,7 +654,6 @@ const ConflictValidator = {
       const isLocked = Boolean(cartItem.isExistingLocked || cartItem.isExistingBookingItem);
       const placeText = isLocked ? 'in your booked appointment' : 'in your cart';
 
-      // Rule 4: Package vs Package
       if (cartIsPkg && newIsPkg) {
         if (newCode && cartCode && newCode === cartCode) {
           return {
@@ -711,7 +693,6 @@ const ConflictValidator = {
         };
       }
 
-      // Rule 1: Package in Cart -> Adding Single Test / Parameter (e.g. CBC or Hb)
       if (cartIsPkg && !newIsPkg) {
         const pkgConstituents = this.extractPackageConstituents(cartItem);
 
@@ -733,9 +714,7 @@ const ConflictValidator = {
 
           const isConstituentUrine = this.isUrineItem(parentTest || { TestName: constituent });
           const isNewUrine = this.isUrineItem(newItem);
-          if (isConstituentUrine !== isNewUrine) {
-            continue;
-          }
+          if (isConstituentUrine !== isNewUrine) continue;
 
           if (parentTest && this.isSameOrganPanel(parentName, parentTest.TestCode, newName, newCode)) {
             return {
@@ -757,7 +736,6 @@ const ConflictValidator = {
         continue;
       }
 
-      // Rule 2: Single Test / Parameter in Cart -> Adding Package
       if (!cartIsPkg && newIsPkg) {
         const pkgConstituents = this.extractPackageConstituents(newItem);
 
@@ -777,9 +755,7 @@ const ConflictValidator = {
 
           const isConstituentUrine = this.isUrineItem(parentTest || { TestName: constituent });
           const isCartUrine = this.isUrineItem(cartItem);
-          if (isConstituentUrine !== isCartUrine) {
-            continue;
-          }
+          if (isConstituentUrine !== isCartUrine) continue;
 
           for (const param of subParameters) {
             const paramClean = this.cleanStr(param);
@@ -794,7 +770,6 @@ const ConflictValidator = {
         continue;
       }
 
-      // Rule 3: Single Test vs Single Test / Parameter (e.g. CBC vs Hemoglobin)
       if (!cartIsPkg && !newIsPkg) {
         if ((newCode && cartCode && newCode === cartCode) || (newNameClean && cartNameClean && newNameClean === cartNameClean)) {
           return {
@@ -812,11 +787,8 @@ const ConflictValidator = {
 
         const isCartUrine = this.isUrineItem(cartItem);
         const isNewUrine = this.isUrineItem(newItem);
-        if (isCartUrine !== isNewUrine) {
-          continue;
-        }
+        if (isCartUrine !== isNewUrine) continue;
 
-        // 3A: Cart has CBC -> Adding Hemoglobin / Platelets
         const cartDeep = this.getDeepParametersForSheetTest(cartName, allSheetTests);
         if (cartDeep.subParameters.length > 0) {
           for (const param of cartDeep.subParameters) {
@@ -830,7 +802,6 @@ const ConflictValidator = {
           }
         }
 
-        // 3B: Cart has Hemoglobin -> Adding CBC
         const newDeep = this.getDeepParametersForSheetTest(newName, allSheetTests);
         if (newDeep.subParameters.length > 0) {
           for (const param of newDeep.subParameters) {

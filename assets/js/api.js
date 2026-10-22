@@ -1,30 +1,25 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - API Gateway v6.1.0 (Turbo Speed & Memory Cache Edition)
+ * Selfcare Diagnostics - API Gateway v6.2.0 (VIP Cache Invalidation Edition)
  * Features:
  * - High-speed In-Memory TTL Response Caching for Instant UI updates (Zero GAS delay)
- * - Automatic cache invalidation on write/update mutations
- * - Dedicated endpoints for Family Vault (getFamilyMembers, saveFamilyMember, deleteFamilyMember)
+ * - Automatic cache invalidation on write/update mutations including VIP purchase
+ * - Dedicated endpoints for VIP Membership (saveMembership, getMembershipStatus)
  * - Concurrent In-Flight request deduplication
- * - Dynamic fail-fast timeouts & AbortController integration
  */
 
 const Api = {
   activeRequests: new Map(),
   responseCache: new Map(),
 
-  // Default Cache Durations (Milliseconds)
   CACHE_TTL: {
-    getFamilyMembers: 45000, // 45 seconds
+    getFamilyMembers: 45000,
     getProfile: 45000,
-    getTests: 180000,        // 3 minutes
+    getTests: 180000,
     getPackages: 180000,
-    defaultRead: 30000       // 30 seconds
+    defaultRead: 30000
   },
 
-  /**
-   * Action-specific timeout resolver (Milliseconds)
-   */
   getTimeoutForAction(action) {
     const fastReadActions = [
       'getTests',
@@ -35,6 +30,7 @@ const Api = {
       'searchPackages',
       'getProfile',
       'getFamilyMembers',
+      'getMembershipStatus',
       'getBookingsByPatient',
       'getBookingDetails',
       'getAdminTests',
@@ -45,23 +41,20 @@ const Api = {
     ];
 
     if (fastReadActions.includes(action)) {
-      return 8500; // 8.5 seconds fail-fast
+      return 8500;
     }
 
     if (action === 'processPrescriptionOCR' || action === 'uploadPrescription') {
-      return 90000; // 90 seconds for OCR & image processing
+      return 90000;
     }
 
-    if (action === 'createRazorpayOrder' || action === 'verifyRazorpayPayment') {
-      return 30000; // 30 seconds for Razorpay order generation & signature verification
+    if (action === 'createRazorpayOrder' || action === 'verifyRazorpayPayment' || action === 'saveMembership') {
+      return 30000;
     }
 
-    return 45000; // 45 seconds default for bookings and writes
+    return 45000;
   },
 
-  /**
-   * Clears in-memory cache for specific action keys on mutation
-   */
   invalidateCache(actionPrefix) {
     for (const key of this.responseCache.keys()) {
       if (key.startsWith(actionPrefix)) {
@@ -70,13 +63,9 @@ const Api = {
     }
   },
 
-  /**
-   * Core fetch wrapper with Deduplication, Memory Caching and Adaptive Timeout
-   */
   async request(action, params = {}, allowCache = false, customTimeout = null) {
     const cacheKey = `${action}_${JSON.stringify(params)}`;
 
-    // 1. Instant Cache hit (Zero Network Latency)
     if (allowCache && this.responseCache.has(cacheKey)) {
       const cached = this.responseCache.get(cacheKey);
       const ttl = this.CACHE_TTL[action] || this.CACHE_TTL.defaultRead;
@@ -86,7 +75,6 @@ const Api = {
       this.responseCache.delete(cacheKey);
     }
 
-    // 2. In-flight request deduplication (prevents duplicate parallel fetches)
     if (this.activeRequests.has(cacheKey)) {
       return this.activeRequests.get(cacheKey);
     }
@@ -148,7 +136,6 @@ const Api = {
 
         const result = (data && data.data !== undefined) ? data.data : data;
 
-        // Cache successful read response
         if (allowCache) {
           this.responseCache.set(cacheKey, {
             data: result,
@@ -195,6 +182,22 @@ const Api = {
   },
 
   // ==========================================================
+  // VIP MEMBERSHIP GATEWAY APIS
+  // ==========================================================
+
+  async saveMembership(membershipPayload) {
+    // Purges stale profile & family cached data so VIP updates immediately
+    this.invalidateCache('getProfile');
+    this.invalidateCache('getFamilyMembers');
+    this.invalidateCache('getMembershipStatus');
+    return this.request('saveMembership', membershipPayload, false);
+  },
+
+  async getMembershipStatus(mobile) {
+    return this.request('getMembershipStatus', { mobile }, false);
+  },
+
+  // ==========================================================
   // FAMILY VAULT DIRECTORY APIS
   // ==========================================================
 
@@ -207,11 +210,13 @@ const Api = {
 
   async saveFamilyMember(memberPayload) {
     this.invalidateCache('getFamilyMembers');
+    this.invalidateCache('getProfile');
     return this.request('saveFamilyMember', memberPayload, false);
   },
 
   async deleteFamilyMember(payload) {
     this.invalidateCache('getFamilyMembers');
+    this.invalidateCache('getProfile');
     return this.request('deleteFamilyMember', payload, false);
   },
 
