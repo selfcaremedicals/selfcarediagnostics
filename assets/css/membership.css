@@ -495,3 +495,7 @@ body {
   0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px #FFD700); }
   50% { transform: scale(1.18); filter: drop-shadow(0 0 6px #FFA500); }
 }
+@keyframes popModal {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
