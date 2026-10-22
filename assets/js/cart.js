@@ -1,15 +1,11 @@
 /* file: assets/js/cart.js */
 /**
- * Selfcare Diagnostics - Direct Booking Cart Engine v13.0.0
+ * Selfcare Diagnostics - Direct Booking Cart Engine v15.0.0
  * Features:
- * 1. Per-Person VIP Membership Engine: Calculates 10% discount strictly for VIP holders only.
- * 2. Non-VIP members pay standard price (No discount).
- * 3. Free Home Sample Collection for active VIP members.
- * 4. Dynamic Crown 👑 Badge rendered on Member names (Disappears automatically on expiry).
- * 5. Normalized Patient ID Engine: Case-insensitive 'self' & 'SELF' handling prevents silent checkout bypass.
- * 6. Guaranteed Addon Cart Loader: Always loads existing booked items alongside newly added tests.
- * 7. 2-Step Fast Addon Checkout: Addon mode automatically skips locked address/date slides straight to confirmation.
- * 8. Multi-Tenant Deep Persistence: Merges updated items locally & remotely to survive cloud syncs.
+ * 1. Dedicated Multi-Patient Payload Binding: Binds real Family Member Name, Phone & Relation per item.
+ * 2. Primary Mobile Preservation: Ensures backend links all sub-bookings to the primary user account.
+ * 3. Dynamic Addon Mode: Locks patient and test details accurately.
+ * 4. Per-Person VIP Membership Engine: Calculates 10% discount strictly for VIP holders only.
  */
 
 const CartPage = {
@@ -26,6 +22,8 @@ const CartPage = {
   selectedPatientRelation: 'Self',
   selectedPatientAge: '',
   selectedPatientGender: '',
+
+  editingPatientId: 'SELF',
 
   selectedSlotDay: 'Today',
   selectedTimeSlot: '',
@@ -109,8 +107,8 @@ const CartPage = {
   async init() {
     try {
       this.detectAddonBookingMode();
-      this.loadCartData();
       this.loadPatientAndAddressData();
+      this.loadCartData();
       this.restorePersistedWizardState();
 
       this.populateTimeSlotsDropdown();
@@ -207,7 +205,7 @@ const CartPage = {
   },
 
   navigateToAddItems(patientId, type) {
-    const targetId = patientId || 'SELF';
+    const targetId = patientId || this.selectedPatientId || 'SELF';
     sessionStorage.setItem('selfcare_target_patient_id', targetId);
     sessionStorage.setItem('selfcare_cart_slide', '1');
 
@@ -251,6 +249,10 @@ const CartPage = {
       if (slideEl) slideEl.classList.toggle('active', i === slideIndex);
     }
 
+    if (slideIndex === 2) {
+      this.renderSelectedPatientCard();
+    }
+
     this.updateBottomControlBarUI();
 
     if (this.isAddonMode) {
@@ -265,7 +267,7 @@ const CartPage = {
 
     document.querySelectorAll('.patient-chip').forEach(el => {
       el.style.pointerEvents = 'none';
-      el.style.opacity = '0.85';
+      el.style.opacity = '0.9';
     });
 
     const homeCard = document.getElementById('card-mode-home');
@@ -395,9 +397,6 @@ const CartPage = {
 
     const homeCard = document.getElementById('card-mode-home');
     const labCard = document.getElementById('card-mode-lab');
-    const addrRow = document.getElementById('patient-display-address-row');
-    const locRow = document.getElementById('patient-display-location-row');
-    const editBtn = document.getElementById('edit-address-btn');
     const cashLabel = document.getElementById('cash-payment-label-text');
     const cashSub = document.getElementById('cash-payment-sub-text');
 
@@ -405,15 +404,9 @@ const CartPage = {
     if (labCard) labCard.classList.toggle('active', type === 'lab');
 
     if (type === 'home') {
-      if (addrRow) addrRow.style.display = 'flex';
-      if (locRow) locRow.style.display = 'flex';
-      if (editBtn) editBtn.style.display = 'inline-block';
       if (cashLabel) cashLabel.textContent = 'Cash on Collection';
       if (cashSub) cashSub.textContent = 'Pay phlebotomist directly at doorstep during sample pickup';
     } else {
-      if (addrRow) addrRow.style.display = 'none';
-      if (locRow) locRow.style.display = 'none';
-      if (editBtn) editBtn.style.display = 'none';
       if (cashLabel) cashLabel.textContent = 'Pay Cash at Lab Counter';
       if (cashSub) cashSub.textContent = 'Pay directly at diagnostic center cash counter during sample visit';
     }
@@ -480,22 +473,16 @@ const CartPage = {
     }
   },
 
-  /**
-   * =========================================================================
-   * PER-PERSON 10% VIP DISCOUNT & BILL CALCULATION ENGINE
-   * =========================================================================
-   */
   calculateBillSummary() {
     let totalGrossMrp = 0;
     let totalGrossPrice = 0;
     let totalVipDiscount = 0;
     let anyPatientHasVip = false;
 
-    // Item-by-item calculation based on the individual patient's VIP status
     this.cart.forEach(item => {
       if (!item || item.isExistingBookingItem || item.isExistingLocked) return;
 
-      const pId = item.patientId || 'SELF';
+      const pId = item.patientId || this.selectedPatientId || 'SELF';
       const isItemVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function') 
         ? Utils.isPatientVIP(pId) 
         : false;
@@ -508,7 +495,6 @@ const CartPage = {
       totalGrossPrice += itemPrice;
       totalGrossMrp += mrp;
 
-      // 10% Discount applies strictly if this specific patient is a VIP Member
       if (isItemVip) {
         const itemDiscount = Math.round(itemPrice * 0.10);
         totalVipDiscount += itemDiscount;
@@ -517,7 +503,6 @@ const CartPage = {
 
     const subtotalAfterVip = Math.max(0, totalGrossPrice - totalVipDiscount);
 
-    // Free Home Collection if ANY patient in this booking has active VIP pass
     if (anyPatientHasVip || this.isAddonMode || this.collectionType === 'lab') {
       this.doorstepCharge = 0;
     } else {
@@ -544,7 +529,6 @@ const CartPage = {
     const standardSavings = Math.max(0, totalGrossMrp - totalGrossPrice);
     if (labSavingsEl) labSavingsEl.textContent = `- ${this.formatMoney(standardSavings)}`;
 
-    // Render or update VIP Discount Row
     let vipRow = document.getElementById('bill-vip-discount-row');
     if (!vipRow && totalVipDiscount > 0) {
       vipRow = document.createElement('div');
@@ -665,52 +649,104 @@ const CartPage = {
   },
 
   renderSelectedPatientCard() {
-    const nameEl = document.getElementById('disp-patient-name');
-    const relEl = document.getElementById('disp-patient-relation');
-    const phoneEl = document.getElementById('disp-patient-phone');
-    const addrEl = document.getElementById('cart-display-address');
-    const locEl = document.getElementById('cart-display-location');
-    const tagsContainer = document.getElementById('selected-patients-overview-tags');
+    const container = document.getElementById('selected-patient-details-card');
+    if (!container) return;
 
-    const selectedMembers = (Array.isArray(this.familyMembers) ? this.familyMembers : [])
-      .filter(m => m && this.selectedPatientIds.some(id => String(id).toUpperCase() === String(m.id).toUpperCase()));
+    const cartPatientIds = this.cart.map(i => String(i.patientId || this.selectedPatientId || 'SELF').toUpperCase());
+    const selectedIds = (this.selectedPatientIds || []).map(id => String(id).toUpperCase());
+    const activeIds = [...new Set([...cartPatientIds, ...selectedIds])];
 
-    const activeList = selectedMembers.length > 0 ? selectedMembers : [this.familyMembers[0] || {}];
+    const allMembers = Array.isArray(this.familyMembers) ? this.familyMembers : [];
+    const activeMembers = allMembers.filter(m => m && activeIds.includes(String(m.id).toUpperCase()));
 
-    if (nameEl) {
-      nameEl.textContent = activeList.length === 1 
-        ? activeList[0].name 
-        : `${activeList.length} Family Members Selected`;
-    }
+    const effectiveList = activeMembers.length > 0 ? activeMembers : [allMembers[0] || {
+      id: this.selectedPatientId || 'SELF',
+      name: this.selectedPatientName || 'Self',
+      relation: this.selectedPatientRelation || 'Self',
+      mobile: this.selectedPatientPhone || this.getPrimaryUserMobile(),
+      address: this.currentPickupAddress,
+      location: this.currentPickupLocation
+    }];
 
-    if (relEl) {
-      relEl.textContent = activeList.length === 1 
-        ? (activeList[0].relation || 'Self') 
-        : `${activeList.length} Members`;
-    }
+    container.className = 'selected-patients-container';
+    container.style.cssText = 'display:flex; flex-direction:column; gap:12px; margin-bottom:12px; background:transparent; border:none; padding:0; box-shadow:none;';
 
-    if (phoneEl) {
-      const primaryPhone = this.selectedPatientPhone || (activeList[0] && activeList[0].mobile) || this.getPrimaryUserMobile() || '';
-      phoneEl.textContent = primaryPhone ? `+91 ${primaryPhone}` : 'Not set';
-    }
+    const primaryMobile = this.getPrimaryUserMobile();
+    const primaryAddr = this.currentPickupAddress || 'Chennai, Tamil Nadu';
+    const primaryLoc = this.currentPickupLocation || 'Not set';
 
-    if (addrEl) addrEl.textContent = this.currentPickupAddress || 'Chennai, Tamil Nadu';
-    if (locEl) locEl.textContent = this.currentPickupLocation || 'Not set';
+    container.innerHTML = effectiveList.map(m => {
+      const isMemberVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function') 
+        ? Utils.isPatientVIP(m.id) 
+        : (m.membership === 'Membership');
 
-    if (tagsContainer) {
-      tagsContainer.style.display = 'flex';
-      tagsContainer.innerHTML = activeList.map(m => {
-        const formattedTag = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function')
-          ? Utils.formatVIPName(m.name, m.id)
-          : this.safeEscape(m.name);
+      const formattedName = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function')
+        ? Utils.formatVIPName(m.name, m.id)
+        : this.safeEscape(m.name);
 
-        return `
-          <span class="patient-overview-tag">
-            👤 ${formattedTag} (${this.safeEscape(m.relation || 'Member')})
-          </span>
-        `;
-      }).join('');
-    }
+      const memberPhone = m.mobile || primaryMobile;
+      const memberAddress = m.address || primaryAddr;
+      const memberLocation = m.location || primaryLoc;
+
+      return `
+        <div class="glass-panel-3d group-box patient-info-card-3d" style="margin-bottom:0; padding:12px 14px; ${isMemberVip ? 'border-color:#FCD34D; background:#FFFDF7;' : ''}">
+          <div class="patient-info-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(0,0,0,0.06);">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <h4 style="font-size:13.5px; font-weight:800; color:#0F172A; margin:0;">
+                👤 ${formattedName}
+              </h4>
+              <span class="relation-pill" style="font-size:9.5px; font-weight:800; background:#CCFBF1; color:#0F766E; padding:1.5px 6px; border-radius:5px; text-transform:uppercase;">
+                ${this.safeEscape(m.relation || 'Member')}
+              </span>
+              ${isMemberVip ? '<span style="background:#FEF3C7; color:#92400E; font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:4px; border:1px solid #FCD34D;">👑 VIP</span>' : ''}
+            </div>
+            <button type="button" class="mini-glass-btn" onclick="CartPage.openEditAddressModal('${m.id}')" style="background:rgba(7,136,102,0.1); color:#078866; border:1px solid rgba(7,136,102,0.25); font-size:10px; font-weight:800; padding:4px 8px; border-radius:6px; cursor:pointer;">
+              ✏️ Edit
+            </button>
+          </div>
+
+          <div class="patient-info-body">
+            <div class="info-row" style="display:flex; gap:10px; margin-bottom:6px;">
+              <span class="info-icon">📱</span>
+              <div class="info-text">
+                <label style="font-size:9.5px; font-weight:700; color:#64748B; display:block;">Mobile (WhatsApp Reports & Calls):</label>
+                <strong style="font-size:11.5px; color:#1E293B;">${memberPhone ? '+91 ' + memberPhone : 'Not set'}</strong>
+              </div>
+            </div>
+
+            ${this.collectionType === 'home' ? `
+            <div class="info-row" style="display:flex; gap:10px; margin-bottom:6px;">
+              <span class="info-icon">🏠</span>
+              <div class="info-text">
+                <label style="font-size:9.5px; font-weight:700; color:#64748B; display:block;">Doorstep Pickup Address:</label>
+                <strong style="font-size:11.5px; color:#1E293B;">${this.safeEscape(memberAddress)}</strong>
+              </div>
+            </div>
+
+            <div class="info-row" style="display:flex; gap:10px;">
+              <span class="info-icon">📍</span>
+              <div class="info-text">
+                <label style="font-size:9.5px; font-weight:700; color:#64748B; display:block;">Google Maps Location Link:</label>
+                <span class="location-link-text" style="font-size:10px; color:#0284C7; word-break:break-all;">
+                  ${memberLocation && memberLocation !== 'Not set' 
+                    ? `<a href="${this.safeEscape(memberLocation)}" target="_blank" rel="noopener noreferrer" style="color:#0284C7; font-weight:700; text-decoration:underline;">📍 Open Map Location</a>` 
+                    : 'Not set'}
+                </span>
+              </div>
+            </div>
+            ` : `
+            <div class="info-row" style="display:flex; gap:10px;">
+              <span class="info-icon">🔬</span>
+              <div class="info-text">
+                <label style="font-size:9.5px; font-weight:700; color:#64748B; display:block;">Collection Method:</label>
+                <strong style="font-size:11.5px; color:#045D49;">Direct Lab Walk-in (Selfcare Diagnostics, Chennai)</strong>
+              </div>
+            </div>
+            `}
+          </div>
+        </div>
+      `;
+    }).join('');
   },
 
   renderPatientChips() {
@@ -723,8 +759,9 @@ const CartPage = {
     }
 
     if (this.isAddonMode) {
+      const activePatientId = this.selectedPatientId || 'SELF';
       const formattedSelf = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function')
-        ? Utils.formatVIPName(this.selectedPatientName, this.selectedPatientId)
+        ? Utils.formatVIPName(this.selectedPatientName, activePatientId)
         : this.safeEscape(this.selectedPatientName);
 
       container.innerHTML = `
@@ -773,26 +810,6 @@ const CartPage = {
     this.updateBottomControlBarUI();
   },
 
-  assignItemPatient(itemIndex, targetPatientId) {
-    if (itemIndex >= 0 && itemIndex < this.cart.length) {
-      const targetItem = this.cart[itemIndex];
-      if (!targetItem) return;
-
-      if (targetItem.isExistingBookingItem || targetItem.isExistingLocked) {
-        this.safeShowToast('Already booked tests cannot be reassigned', 'info');
-        return;
-      }
-
-      const normTarget = String(targetPatientId).toUpperCase();
-      this.cart[itemIndex].patientId = normTarget;
-      this.saveCartState();
-      this.renderItemsList();
-      this.calculateBillSummary();
-      const p = this.familyMembers.find(m => m && String(m.id).toUpperCase() === normTarget);
-      if (p) this.safeShowToast(`Test assigned to ${p.name}`, 'info');
-    }
-  },
-
   renderItemsList() {
     const container = document.getElementById('cart-items-list');
     const countBadge = document.getElementById('cart-items-count-badge');
@@ -805,9 +822,13 @@ const CartPage = {
 
     const effectiveMembers = (selectedMembers && selectedMembers.length > 0) 
       ? selectedMembers 
-      : [this.familyMembers[0] || { id: 'SELF', name: 'Self', relation: 'Self' }];
+      : [{ 
+          id: this.selectedPatientId || 'SELF', 
+          name: this.selectedPatientName || 'Patient', 
+          relation: this.selectedPatientRelation || 'Member' 
+        }];
     
-    const fallbackPatientId = effectiveMembers[0].id || 'SELF';
+    const fallbackPatientId = effectiveMembers[0].id || this.selectedPatientId || 'SELF';
 
     this.cart.forEach(item => {
       const pId = String(item.patientId || '').toUpperCase();
@@ -843,7 +864,6 @@ const CartPage = {
             const originalOfferPrice = isPaidItem ? 0 : Number(item.price || item.OfferPrice || 0);
             const mrp = isPaidItem ? Number(item.originalPrice || 0) : Number(item.mrp || item.MRP || originalOfferPrice);
 
-            // VIP Member-ஆக இருந்தால் மட்டுமே 10% தள்ளுபடி!
             const itemVipDiscount = (!isPaidItem && isMemberVip) ? Math.round(originalOfferPrice * 0.10) : 0;
             const finalItemPrice = originalOfferPrice - itemVipDiscount;
 
@@ -866,16 +886,6 @@ const CartPage = {
             const lockedClass = isPaidItem ? 'existing-locked-item' : '';
             const itemCodeText = this.safeEscape(item.code || item.TestCode || item.PackageCode || '');
             const displayPriceText = isPaidItem ? '₹0' : this.formatMoney(finalItemPrice);
-
-            let reassignSelectHtml = '';
-            if (!isPaidItem && effectiveMembers.length > 1) {
-              const options = effectiveMembers.map(m => {
-                const isSelected = String(m.id).toUpperCase() === memId ? 'selected' : '';
-                return '<option value="' + m.id + '" ' + isSelected + '>For: ' + this.safeEscape(m.name) + '</option>';
-              }).join('');
-
-              reassignSelectHtml = '<select class="patient-reassign-select" onchange="CartPage.assignItemPatient(' + item.originalIndex + ', this.value)">' + options + '</select>';
-            }
 
             const actionBtnHtml = isPaidItem
               ? '<span class="item-paid-badge" style="color:#64748b; font-size:11px; font-weight:800; background:#f1f5f9; padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1;">🔒 Cannot Remove</span>'
@@ -900,7 +910,6 @@ const CartPage = {
                 </div>
 
                 <div class="item-actions-row">
-                  ${reassignSelectHtml}
                   ${actionBtnHtml}
                 </div>
               </div>
@@ -997,6 +1006,8 @@ const CartPage = {
         }
         if (!Array.isArray(rawBookingItems)) rawBookingItems = [];
 
+        const targetPid = this.selectedPatientId || this.addonBooking.lockedPatientId || this.addonBooking.patientId || 'SELF';
+
         existingMarked = rawBookingItems.filter(Boolean).map((item, idx) => {
           const isPkg = (
             item.type === 'package' ||
@@ -1018,7 +1029,7 @@ const CartPage = {
             originalPrice: Number(item.price || item.OfferPrice || item.originalPrice || 0),
             mrp: Number(item.mrp || item.MRP || item.price || 0),
             type: isPkg ? 'package' : 'test',
-            patientId: 'SELF',
+            patientId: targetPid,
             isExistingBookingItem: true,
             isExistingLocked: true,
             removable: false
@@ -1049,14 +1060,26 @@ const CartPage = {
         }
       }
 
+      const defaultAssignId = this.isAddonMode ? (this.selectedPatientId || 'SELF') : 'SELF';
       newItems.forEach(i => {
-        if (!i.patientId) i.patientId = 'SELF';
+        if (!i.patientId) i.patientId = defaultAssignId;
       });
 
       if (this.isAddonMode) {
         this.cart = [...this.existingBookingItems, ...newItems];
       } else {
         this.cart = newItems;
+      }
+
+      if (!this.isAddonMode) {
+        this.cart.forEach(item => {
+          if (item && item.patientId) {
+            const pid = String(item.patientId).toUpperCase();
+            if (!this.selectedPatientIds.includes(pid)) {
+              this.selectedPatientIds.push(pid);
+            }
+          }
+        });
       }
     } catch (e) {
       console.warn('Error in loadCartData:', e);
@@ -1129,18 +1152,41 @@ const CartPage = {
 
       if (this.isAddonMode && this.addonBooking) {
         const b = this.addonBooking;
-        this.selectedPatientIds = ['SELF'];
+        const lockedPid = String(b.lockedPatientId || b.patientId || 'SELF');
+        this.selectedPatientId = lockedPid;
+        this.selectedPatientIds = [lockedPid.toUpperCase()];
         this.selectedPatientName = b.lockedPatientName || b.patientName || selfPatient.name;
         this.selectedPatientPhone = b.patientPhone || b.mobile || primaryMobile || selfPatient.mobile || '7010174890';
         this.selectedPatientEmail = b.patientEmail || '';
-        this.selectedPatientRelation = b.lockedRelation || b.relation || 'Self';
-        this.selectedPatientId = 'SELF';
+        this.selectedPatientRelation = b.lockedRelation || b.relation || 'Member';
         this.selectedPatientAge = this.calculateAge(b.patientAge || b.age || calculatedSelfAge);
         this.selectedPatientGender = b.patientGender || b.gender || selfPatient.gender;
         this.currentPickupAddress = b.lockedAddress || b.address || selfPatient.address;
         this.currentPickupLocation = b.location?.link || b.location || 'Not set';
         this.collectionType = b.lockedCollectionType || b.collectionType || 'home';
         this.selectedTimeSlot = b.lockedTimeSlot || b.timeSlot || '';
+
+        const matchedIndex = this.familyMembers.findIndex(m => 
+          String(m.id).toUpperCase() === lockedPid.toUpperCase() || 
+          m.name.trim().toLowerCase() === this.selectedPatientName.trim().toLowerCase()
+        );
+
+        if (matchedIndex === -1) {
+          this.familyMembers.push({
+            id: lockedPid,
+            name: this.selectedPatientName,
+            relation: this.selectedPatientRelation,
+            mobile: this.selectedPatientPhone,
+            email: this.selectedPatientEmail,
+            age: this.selectedPatientAge,
+            gender: this.selectedPatientGender,
+            address: this.currentPickupAddress,
+            location: this.currentPickupLocation,
+            membership: 'Regular'
+          });
+        } else {
+          this.familyMembers[matchedIndex].id = lockedPid;
+        }
       } else {
         this.syncPrimaryPatientDetails();
         this.currentPickupAddress = user.address || user.Address || 'Chennai, Tamil Nadu';
@@ -1319,9 +1365,6 @@ const CartPage = {
     }
   },
 
-  /**
-   * ZERO-FAIL CHECKOUT ENGINE (WITH PER-PATIENT DISCOUNT PRESERVATION)
-   */
   async handleProceedToCheckout() {
     if (this.isProcessingCheckout) return;
 
@@ -1355,7 +1398,7 @@ const CartPage = {
     let totalVipDiscount = 0;
 
     newItems.forEach(item => {
-      const pId = item.patientId || 'SELF';
+      const pId = item.patientId || this.selectedPatientId || 'SELF';
       const isItemVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function') 
         ? Utils.isPatientVIP(pId) 
         : false;
@@ -1397,24 +1440,34 @@ const CartPage = {
     const existingTotal = this.existingBookingItems.reduce((sum, it) => sum + Number(it.originalPrice || it.price || 0), 0);
     const finalTotalWithExisting = existingTotal + (subtotalNewGross - totalVipDiscount) + doorstepCharge;
 
+    const primaryMobileNum = this.getPrimaryUserMobile();
+
     const bookingPayload = {
       bookingId: baseBookingId,
       baseBookingId: baseBookingId,
-      patientId: 'SELF',
+      patientId: this.isAddonMode ? this.selectedPatientId : 'SELF',
       patientName: this.selectedPatientName || 'Valued Customer',
       patientAge: this.selectedPatientAge || '',
       patientGender: this.selectedPatientGender || '',
       patientPhone: this.selectedPatientPhone,
       patientEmail: this.selectedPatientEmail || '',
       relation: this.selectedPatientRelation || 'Self',
+      primaryMobile: primaryMobileNum,
       items: combinedItems.map(i => {
-        const itemPatientId = i.patientId || 'SELF';
+        const itemPatientId = i.patientId || this.selectedPatientId || 'SELF';
         const isItemVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function')
           ? Utils.isPatientVIP(itemPatientId)
           : false;
 
         const original = Number(i.originalPrice || i.price || i.OfferPrice || 0);
         const itemDiscount = (!i.isExistingBookingItem && isItemVip) ? Math.round(original * 0.10) : 0;
+
+        const normPId = String(itemPatientId).toUpperCase();
+        const targetMember = (this.familyMembers || []).find(m => m && String(m.id).toUpperCase() === normPId);
+
+        const pName = targetMember ? targetMember.name : (normPId === 'SELF' ? (this.currentUser?.name || this.selectedPatientName) : this.selectedPatientName);
+        const pRel = targetMember ? targetMember.relation : (normPId === 'SELF' ? 'Self' : this.selectedPatientRelation);
+        const pPhone = (targetMember && targetMember.mobile) ? targetMember.mobile : primaryMobileNum;
 
         return {
           id: i.id || i.TestID || i.PackageID || '',
@@ -1424,8 +1477,9 @@ const CartPage = {
           discount: itemDiscount,
           price: original - itemDiscount,
           patientId: itemPatientId,
-          patientName: this.selectedPatientName || 'Valued Customer',
-          relation: this.selectedPatientRelation || 'Self'
+          patientName: pName,
+          patientPhone: pPhone,
+          relation: pRel
         };
       }),
       collectionType: this.collectionType,
@@ -1445,7 +1499,6 @@ const CartPage = {
       targetBookingId: this.addonBookingId
     };
 
-    // 1. CASH ON VISIT / CASH CONFIRMATION
     if (this.selectedPaymentMode === 'cash') {
       try {
         let resBookingId = bookingPayload.bookingId;
@@ -1478,7 +1531,6 @@ const CartPage = {
       return;
     }
 
-    // 2. RAZORPAY ONLINE GATEWAY FLOW
     try {
       if (typeof Razorpay === 'undefined') {
         throw new Error('Razorpay payment gateway failed to load. Please check internet connection.');
@@ -1725,14 +1777,32 @@ const CartPage = {
     }
   },
 
-  openEditAddressModal() {
+  openEditAddressModal(patientId = null) {
+    const targetId = patientId || this.selectedPatientId || 'SELF';
+    this.editingPatientId = targetId;
+
+    const targetMember = this.familyMembers.find(m => m && String(m.id).toUpperCase() === String(targetId).toUpperCase()) 
+      || this.familyMembers[0] 
+      || {};
+
+    const modalTitle = document.querySelector('#edit-address-modal .modal-title-wrap h3');
+    if (modalTitle) {
+      modalTitle.textContent = `Edit Details: ${targetMember.name || 'Patient'}`;
+    }
+
     const phoneInput = document.getElementById('cart-edit-phone-input');
     const addressInput = document.getElementById('cart-edit-address-input');
     const locationInput = document.getElementById('cart-edit-location-input');
 
-    if (phoneInput) phoneInput.value = this.selectedPatientPhone || '';
-    if (addressInput) addressInput.value = this.currentPickupAddress || '';
-    if (locationInput) locationInput.value = this.currentPickupLocation !== 'Not set' ? this.currentPickupLocation : '';
+    const phone = targetMember.mobile || this.selectedPatientPhone || this.getPrimaryUserMobile() || '';
+    const address = targetMember.address || this.currentPickupAddress || '';
+    const loc = (targetMember.location && targetMember.location !== 'Not set') 
+      ? targetMember.location 
+      : (this.currentPickupLocation !== 'Not set' ? this.currentPickupLocation : '');
+
+    if (phoneInput) phoneInput.value = phone;
+    if (addressInput) addressInput.value = address;
+    if (locationInput) locationInput.value = loc;
 
     this.openModal('edit-address-modal');
   },
@@ -1756,29 +1826,41 @@ const CartPage = {
       return;
     }
 
-    this.selectedPatientPhone = phone;
-    this.currentPickupAddress = addr;
-    this.currentPickupLocation = loc || 'Not set';
+    const targetId = String(this.editingPatientId || 'SELF').toUpperCase();
+    const target = this.familyMembers.find(p => p && String(p.id).toUpperCase() === targetId);
 
-    const target = this.familyMembers.find(p => p && p.id === this.selectedPatientId);
     if (target) {
       target.mobile = phone;
       target.address = addr;
       target.location = loc || 'Not set';
     }
 
-    this.renderSelectedPatientCard();
+    if (targetId === 'SELF') {
+      this.selectedPatientPhone = phone;
+      this.currentPickupAddress = addr;
+      this.currentPickupLocation = loc || 'Not set';
 
-    const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-    user.mobile = phone;
-    user.address = this.currentPickupAddress;
-    user.location = this.currentPickupLocation;
-    if (typeof Auth !== 'undefined' && Auth.savePermanentSession) {
-      Auth.savePermanentSession(user);
+      const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
+      user.mobile = phone;
+      user.address = this.currentPickupAddress;
+      user.location = this.currentPickupLocation;
+      if (typeof Auth !== 'undefined' && Auth.savePermanentSession) {
+        Auth.savePermanentSession(user);
+      }
     }
 
+    const primaryMobile = this.getPrimaryUserMobile();
+    const nonSelf = this.familyMembers.filter(m => m && String(m.id).toUpperCase() !== 'SELF');
+    if (nonSelf.length > 0) {
+      try {
+        localStorage.setItem(`selfcare_family_${primaryMobile}`, JSON.stringify(nonSelf));
+        localStorage.setItem('selfcare_family_members', JSON.stringify(nonSelf));
+      } catch (e) {}
+    }
+
+    this.renderSelectedPatientCard();
     this.closeModal('edit-address-modal');
-    this.safeShowToast('Mobile, Address & Location updated ✓', 'success');
+    this.safeShowToast(`${target ? target.name : 'Patient'} details updated ✓`, 'success');
   },
 
   detectGpsLocation(targetId) {

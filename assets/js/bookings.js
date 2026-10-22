@@ -1,15 +1,10 @@
 /* file: assets/js/bookings.js */
 /**
- * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v6.6.0
- * Features:
- * 1. Strict 3-Hour Slot Window: "Add Tests" box appears ONLY up to 3 hours after the appointment slot.
- * 2. Add Tests Box Layout: Rendered strictly between Booking Meta Card and Live Diagnostic Progress.
- * 3. User Deduplication: Merges same user records into ONE clean chip.
- * 4. Universal VIP Membership Crown (👑): Dynamically displays Prime Crown on avatar & name 
- *    for BOTH Primary Account Holder AND Family Members whenever VIP is active.
- * 5. Clean Human-Readable Date & Time: "Today, 21 Oct 2026 • 06:30 AM - 07:00 AM".
- * 6. Chronological Date Sorter: Newest bookings first.
- * 7. Doorstep Fee Auto-Sync: ₹100 collection fee for orders below ₹500.
+ * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v7.2.0
+ * Fixed:
+ * 1. Automatic Parent Booking Deduplication (Hides un-split parent booking when split -1, -2 exist).
+ * 2. Cross-Linked Sibling Order Total Calculation for Split Sub-Bookings.
+ * 3. Strict Tab Isolation (Mohamed only sees -1, Jazeerah only sees -2).
  */
 
 const BookingsPage = {
@@ -56,12 +51,8 @@ const BookingsPage = {
     }
   },
 
-  /**
-   * Universal Membership Check: Handles both specific patient object or primary account
-   */
   isMembershipActive(patient = null) {
     try {
-      // 1. If patient object provided (e.g., in patient chip loop)
       if (patient) {
         if (typeof App !== 'undefined' && App.isVipActive) {
           return App.isVipActive(patient);
@@ -73,7 +64,6 @@ const BookingsPage = {
         return false;
       }
 
-      // 2. Global Primary Account Check
       if (typeof App !== 'undefined' && App.isVipActive) {
         return App.isVipActive();
       }
@@ -195,7 +185,6 @@ const BookingsPage = {
   },
 
   loadPatientsAndBookings(skipMockSeeding = false) {
-    let savedPatients = [];
     let savedBookings = [];
 
     let selfName = 'Customer (Self)';
@@ -257,8 +246,23 @@ const BookingsPage = {
       }
     } catch (e) {}
 
-    const isPrimaryVip = this.isMembershipActive();
+    // DEDUPLICATION: Split aaya sub-bookings (-1, -2) undenkil unsplit parent booking list-il ninnu kalayunnu
+    const subParentBIds = new Set();
+    savedBookings.forEach(b => {
+      const bId = String(b.bookingId || '');
+      if (/-\d+$/.test(bId)) {
+        subParentBIds.add(bId.replace(/-\d+$/, '').toUpperCase());
+      }
+    });
 
+    if (subParentBIds.size > 0) {
+      savedBookings = savedBookings.filter(b => {
+        const cleanId = String(b.bookingId || '').toUpperCase();
+        return !subParentBIds.has(cleanId);
+      });
+    }
+
+    const isPrimaryVip = this.isMembershipActive();
     const patientMap = new Map();
     const cleanMobile = currentMobile ? String(currentMobile).replace(/\D/g, '').slice(-10) : '';
     const normalizedSelfName = selfName.trim().toLowerCase();
@@ -286,7 +290,6 @@ const BookingsPage = {
       return false;
     };
 
-    // Family Members with individual VIP verification
     familyMembers.forEach((fm, idx) => {
       if (!fm) return;
       if (isSelfIdentifier(fm.id, fm.name, fm.relation)) return;
@@ -307,7 +310,6 @@ const BookingsPage = {
       }
     });
 
-    // Members from Bookings
     savedBookings.forEach(b => {
       const pName = b.patientName || selfName;
       const pId = b.patientId || pName;
@@ -324,25 +326,6 @@ const BookingsPage = {
           membership: 'Regular',
           isVip: false,
           isSelf: false
-        });
-      }
-
-      if (b.selectedPatients && Array.isArray(b.selectedPatients)) {
-        b.selectedPatients.forEach(sp => {
-          if (!sp) return;
-          if (isSelfIdentifier(sp.id, sp.name, sp.relation)) return;
-
-          const spKey = String(sp.name || sp.id).trim().toLowerCase();
-          if (!patientMap.has(spKey)) {
-            patientMap.set(spKey, {
-              id: sp.id || spKey,
-              name: sp.name,
-              relation: sp.relation || 'Member',
-              membership: 'Regular',
-              isVip: false,
-              isSelf: false
-            });
-          }
         });
       }
     });
@@ -375,7 +358,22 @@ const BookingsPage = {
           if (!bookingMap.has(b.bookingId)) bookingMap.set(b.bookingId, b);
         });
 
-        this.allBookings = Array.from(bookingMap.values());
+        let merged = Array.from(bookingMap.values());
+
+        // Deduplication in live cloud sync
+        const subParentBIds = new Set();
+        merged.forEach(b => {
+          const bId = String(b.bookingId || '');
+          if (/-\d+$/.test(bId)) {
+            subParentBIds.add(bId.replace(/-\d+$/, '').toUpperCase());
+          }
+        });
+
+        if (subParentBIds.size > 0) {
+          merged = merged.filter(b => !subParentBIds.has(String(b.bookingId || '').toUpperCase()));
+        }
+
+        this.allBookings = merged;
         localStorage.setItem('selfcare_recent_bookings', JSON.stringify(this.allBookings));
 
         this.loadPatientsAndBookings(true);
@@ -397,7 +395,6 @@ const BookingsPage = {
     }
 
     container.innerHTML = this.patientsList.map((p, idx) => {
-      // Check if this patient (Primary OR Family Member) has active VIP
       const showCrown = this.isMembershipActive(p);
       const initial = (p.name || 'U').charAt(0).toUpperCase();
 
@@ -469,31 +466,50 @@ const BookingsPage = {
     if (!patient) return [];
     const pId = String(patient.id || '').trim().toLowerCase();
     const pName = String(patient.name || '').trim().toLowerCase();
-    const isSelf = pId === 'self' || patient.isSelf || pId === 'patient_self' || pName.includes('self') || pName.includes('valued');
+    const isSelf = pId === 'self' || patient.isSelf || pId === 'patient_self' || pName.includes('self');
 
     const filtered = this.allBookings.filter(b => {
       const bPatientId = String(b.patientId || '').trim().toLowerCase();
       const bPatientName = String(b.patientName || '').trim().toLowerCase();
+      const bId = String(b.bookingId || '').trim().toLowerCase();
 
-      if (bPatientId === pId || bPatientName === pName) return true;
-      if (isSelf && (bPatientId === 'self' || bPatientId === 'patient_self' || bPatientId === '')) return true;
+      const isSubBooking = /-\d+$/.test(bId);
 
-      if (b.selectedPatients && Array.isArray(b.selectedPatients)) {
-        const inSelected = b.selectedPatients.some(sp => {
-          const spId = String(sp.id || '').trim().toLowerCase();
-          const spName = String(sp.name || '').trim().toLowerCase();
-          return spId === pId || spName === pName || (isSelf && (spId === 'self' || spName.includes('self')));
-        });
-        if (inSelected) return true;
+      // Self account-il ninnu family split booking-kal (-2, -3) maati nirthunnu
+      if (isSelf) {
+        if (bPatientId.startsWith('fam_')) return false;
+        if (isSubBooking && !bId.endsWith('-1')) return false;
+        if (bPatientId === 'self' || bPatientId === 'patient_self' || bPatientName === pName || (isSubBooking && bId.endsWith('-1'))) {
+          return true;
+        }
+      } else {
+        // Family member tab-il Self booking-kal (-1) varilla
+        if (bPatientId === 'self' || bPatientId === 'patient_self') return false;
+        if (isSubBooking && bId.endsWith('-1')) return false;
+
+        if (bPatientId === pId) return true;
+        if (bPatientName && (bPatientName === pName || bPatientName.includes(pName) || pName.includes(bPatientName))) {
+          return true;
+        }
       }
 
-      if (b.items && Array.isArray(b.items)) {
-        const inItems = b.items.some(it => {
+      let items = b.items;
+      if (typeof items === 'string') {
+        try { items = JSON.parse(items); } catch (e) { items = []; }
+      }
+
+      if (Array.isArray(items) && items.length > 0) {
+        return items.some(it => {
           const itId = String(it.patientId || '').trim().toLowerCase();
           const itName = String(it.patientName || '').trim().toLowerCase();
-          return itId === pId || itName === pName || (isSelf && (itId === 'self' || itId === 'patient_self'));
+          if (isSelf) {
+            if (itId.startsWith('fam_')) return false;
+            return itId === 'self' || itId === 'patient_self' || itName === pName;
+          } else {
+            if (itId === 'self' || itId === 'patient_self') return false;
+            return itId === pId || (itName && (itName === pName || itName.includes(pName) || pName.includes(itName)));
+          }
         });
-        if (inItems) return true;
       }
 
       return false;
@@ -525,28 +541,11 @@ const BookingsPage = {
         const itId = String(it.patientId || '').trim().toLowerCase();
         const itName = String(it.patientName || '').trim().toLowerCase();
         if (itId && itId === pId) return true;
-        if (itName && itName === pName) return true;
+        if (itName && (itName === pName || pName.includes(itName) || itName.includes(pName))) return true;
         if (isSelf && (itId === 'self' || itId === 'patient_self' || itId === '')) return true;
         return false;
       });
       if (matched.length > 0) return matched;
-    }
-
-    if (items.length > 1 && booking.selectedPatients && booking.selectedPatients.length === items.length) {
-      const patientIdx = booking.selectedPatients.findIndex(sp => {
-        const spId = String(sp.id || '').trim().toLowerCase();
-        const spName = String(sp.name || '').trim().toLowerCase();
-        return spId === pId || spName === pName || (isSelf && (spId === 'self' || spName.includes('self')));
-      });
-      if (patientIdx >= 0 && items[patientIdx]) {
-        return [items[patientIdx]];
-      }
-    }
-
-    const bId = String(booking.patientId || '').trim().toLowerCase();
-    const bName = String(booking.patientName || '').trim().toLowerCase();
-    if (bId === pId || bName === pName || (isSelf && (bId === 'self' || bId === 'patient_self'))) {
-      return items;
     }
 
     return items;
@@ -683,22 +682,42 @@ const BookingsPage = {
 
     const patientItems = this.getPatientItemsForBooking(booking);
     const patientSum = patientItems.reduce((acc, it) => acc + Number(it.price || it.OfferPrice || 0), 0);
-    
-    let doorstepCharge = Number(booking.doorstepCharge || 0);
-    if (doorstepCharge === 0 && !isLab && patientSum > 0 && patientSum < 500) {
-      doorstepCharge = 100;
+    const currentBookingAmount = Number(booking.finalAmount || patientSum || 0);
+
+    // Cross-Linked Sibling Order Total Calculation
+    const bId = String(booking.bookingId || '');
+    const isSub = /-\d+$/.test(bId);
+    let orderGrandTotal = currentBookingAmount;
+    let hasSiblings = false;
+
+    if (isSub) {
+      const basePrefix = bId.replace(/-\d+$/, '');
+      const siblings = this.allBookings.filter(b => String(b.bookingId || '').startsWith(basePrefix + '-'));
+      if (siblings.length > 1) {
+        hasSiblings = true;
+        orderGrandTotal = siblings.reduce((sum, b) => sum + Number(b.finalAmount || 0), 0);
+      }
     }
 
-    let finalDisplayTotal = Number(booking.finalAmount || 0);
-    if (!finalDisplayTotal || finalDisplayTotal < (patientSum + doorstepCharge)) {
-      finalDisplayTotal = patientSum + doorstepCharge;
-    }
+    if (amtEl) {
+      const amtBlock = amtEl.parentElement;
+      const amtLabel = amtBlock ? amtBlock.querySelector('span') : null;
 
-    if (amtEl) amtEl.textContent = this.safeFormatCurrency(finalDisplayTotal);
+      if (hasSiblings) {
+        if (amtLabel) amtLabel.textContent = '💰 Patient Share:';
+        amtEl.innerHTML = `
+          <span style="color:#078866; font-size:14.5px; font-weight:900;">${this.safeFormatCurrency(currentBookingAmount)}</span>
+          <span style="display:block; font-size:9.5px; font-weight:600; color:#536E66; margin-top:2px;">(Order Total: ${this.safeFormatCurrency(orderGrandTotal)})</span>
+        `;
+      } else {
+        if (amtLabel) amtLabel.textContent = '💰 Amount:';
+        amtEl.innerHTML = `<span style="color:#10231E; font-size:14px; font-weight:800;">${this.safeFormatCurrency(currentBookingAmount)}</span>`;
+      }
+    }
 
     this.renderAddTestsCenterBanner(booking);
     this.renderTimelineStepper(booking);
-    this.renderBookedTests(booking, doorstepCharge);
+    this.renderBookedTests(booking, currentBookingAmount, orderGrandTotal, hasSiblings);
   },
 
   renderAddTestsCenterBanner(booking) {
@@ -776,13 +795,14 @@ const BookingsPage = {
     }).join('');
   },
 
-  renderBookedTests(booking, doorstepCharge = 0) {
+  renderBookedTests(booking, currentBookingAmount, orderGrandTotal, hasSiblings) {
     const container = document.getElementById('disp-tests-list');
     if (!container) return;
 
     const items = this.getPatientItemsForBooking(booking);
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
     const isLab = booking.collectionType === 'lab' || String(booking.address || '').includes('Direct Lab');
+    const doorstepCharge = Number(booking.doorstepCharge || 0);
 
     let html = items.map(item => `
       <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f5f9;">
@@ -801,9 +821,22 @@ const BookingsPage = {
         <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 8px; border-bottom:1px solid #f1f5f9; background:#fff7ed; border-radius:8px; margin-top:8px;">
           <div style="display:flex; flex-direction:column; gap:1px;">
             <span style="font-size:12px; font-weight:700; color:#9a3412;">🏠 Home Sample Collection Fee</span>
-            <span style="font-size:9.5px; color:#c2410c; font-weight:600;">Standard doorstep charge (Orders below ₹500)</span>
+            <span style="font-size:9.5px; color:#c2410c; font-weight:600;">Standard doorstep charge</span>
           </div>
           <strong style="color:#c2410c; font-size:13px;">${this.safeFormatCurrency(doorstepCharge)}</strong>
+        </div>
+      `;
+    }
+
+    if (hasSiblings) {
+      html += `
+        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 4px 6px 4px; border-top:1.5px solid #E5E7EB; margin-top:6px;">
+          <span style="font-size:12px; font-weight:800; color:#10231E;">👤 ${this.safeEscape(activePatient.name)}'s Share:</span>
+          <strong style="color:#078866; font-size:14px; font-weight:900;">${this.safeFormatCurrency(currentBookingAmount)}</strong>
+        </div>
+        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:2px 4px 6px 4px; font-size:11px; color:#6B7280;">
+          <span>🧾 Family Order Combined Total:</span>
+          <strong style="color:#1F2937; font-size:12px; font-weight:800;">${this.safeFormatCurrency(orderGrandTotal)}</strong>
         </div>
       `;
     }

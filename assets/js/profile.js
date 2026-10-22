@@ -1,6 +1,6 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v8.0.0
+ * Selfcare Diagnostics - My Account Controller v8.1.0
  * Features:
  * - Dynamic VIP Crown 👑 Engine: Displays crown on User & paid Family Members only
  * - Automatic Expiry Awareness: Crown disappears automatically once 1-year pass expires
@@ -11,6 +11,7 @@
  * - Strict duplicate member prevention & preserves Membership status across edits
  * - Binds primaryUserId, primaryUserName & primaryMobile to backend Family Vault
  * - Mobile Haptic feedback (vibration on click)
+ * - Full Directory Card View: Displays Relationship, Mobile, Age, Gender, Blood Group, Email, Address & GPS
  */
 
 const ProfilePage = {
@@ -27,7 +28,6 @@ const ProfilePage = {
       const loader = document.getElementById('profile-loading-overlay') || document.getElementById('page-loader');
       if (loader) loader.style.display = 'none';
 
-      // Puthu device-il login pannum pothu cloud sheet data-vai sync seigirathu
       if (navigator.onLine) {
         setTimeout(() => {
           this.syncLiveCloudProfile().catch(e => console.warn('[Profile] Background profile sync notice:', e));
@@ -111,7 +111,6 @@ const ProfilePage = {
 
     const currentMobile = this.currentUser.mobile;
 
-    // Local cache-il irunthu family members load seithal
     try {
       let savedFam = null;
       if (currentMobile) {
@@ -128,6 +127,7 @@ const ProfilePage = {
         name: m.name || m.Name || 'Member',
         relation: m.relation || m.Relation || 'Relative',
         mobile: m.mobile || m.Mobile || '',
+        email: m.email || m.Email || '',
         age: this.calculateAge(m.age || m.Age),
         gender: m.gender || m.Gender || '',
         bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
@@ -182,7 +182,6 @@ const ProfilePage = {
         this.renderSelfProfile();
         this.populateFormInputs();
 
-        // Profile API kooda familyMembers vanthaal athaiyum udanadiyaaga cache & render seigirom
         const incomingFam = res.familyMembers || res.members;
         if (Array.isArray(incomingFam) && incomingFam.length > 0) {
           this.hydrateFamilyMembers(incomingFam, activeMobile);
@@ -237,6 +236,7 @@ const ProfilePage = {
       name: m.name || m.Name || 'Member',
       relation: m.relation || m.Relation || 'Relative',
       mobile: m.mobile || m.Mobile || '',
+      email: m.email || m.Email || '',
       age: this.calculateAge(m.age || m.Age),
       gender: m.gender || m.Gender || '',
       bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
@@ -262,9 +262,6 @@ const ProfilePage = {
     this.openModal('modal-my-profile');
   },
 
-  /**
-   * Primary User Profile Render (Crown 👑 appears only if user has active VIP pass)
-   */
   renderSelfProfile() {
     const u = this.currentUser || {};
     const nameEl = document.getElementById('self-display-name');
@@ -279,7 +276,6 @@ const ProfilePage = {
 
     const displayName = (u.name && u.name.trim()) ? u.name : 'Customer Account';
 
-    // 👑 Crown only for active membership (disappears automatically on expiry)
     const formattedName = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function') 
       ? Utils.formatVIPName(displayName, 'SELF') 
       : Utils.escapeHtml(displayName);
@@ -465,7 +461,6 @@ const ProfilePage = {
     }
 
     container.innerHTML = this.familyMembers.map(m => {
-      // Expiry-aware VIP check
       const isMemberVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function') 
         ? Utils.isPatientVIP(m.id) 
         : (m.membership === 'Membership');
@@ -502,8 +497,18 @@ const ProfilePage = {
               <span class="info-val">${m.bloodGroup || 'O+'}</span>
             </div>
             <div class="member-info-item">
+              <span class="info-label">Email Address</span>
+              <span class="info-val" style="word-break: break-all; font-size:11px;">${m.email ? Utils.escapeHtml(m.email) : 'Not provided'}</span>
+            </div>
+            <div class="member-info-item">
               <span class="info-label">Pickup Address</span>
-              <span class="info-val" style="font-size:10.5px;">${Utils.escapeHtml(m.address || 'Same as primary')}</span>
+              <span class="info-val" style="font-size:11px;">${Utils.escapeHtml(m.address || 'Same as primary')}</span>
+            </div>
+            <div class="member-info-item">
+              <span class="info-label">GPS Location</span>
+              <span class="info-val" style="font-size:11px;">
+                ${m.location ? `<a href="${Utils.escapeHtml(m.location)}" target="_blank" rel="noopener noreferrer" style="color:#059669; font-weight:700; text-decoration:underline;">📍 Open Map</a>` : 'Not set'}
+              </span>
             </div>
           </div>
         </div>
@@ -616,7 +621,6 @@ const ProfilePage = {
       const finalMemberId = editId || `FAM_${Date.now()}`;
       const calculatedAge = this.calculateAge(rawAge);
 
-      // Preserve existing VIP membership status across edits
       let existingMembership = 'Regular';
       if (editId) {
         const existingTarget = this.familyMembers.find(m => m.id === editId);
