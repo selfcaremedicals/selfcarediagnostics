@@ -1,0 +1,233 @@
+<!-- file: membership.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>VIP Membership - Selfcare Diagnostics</title>
+
+  <!-- PWA & Mobile Meta -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4A154B">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/profile.css?v=6.3.0">
+  <link rel="stylesheet" href="assets/css/membership.css?v=1.1.0">
+
+  <!-- Razorpay Checkout SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="membership-top-header">
+    <button type="button" class="back-circle-btn" onclick="window.history.back()">‹</button>
+    <div class="header-title">Selfcare VIP Club</div>
+    <div style="width: 32px;"></div>
+  </header>
+
+  <main class="membership-container">
+
+    <!-- VIP Hero Banner -->
+    <div class="vip-hero-card">
+      <div class="crown-glow-badge">👑</div>
+      <h1 class="vip-title">Selfcare CarePass VIP</h1>
+      <p class="vip-sub">Valid for 1 Full Year • Premium Health Privileges</p>
+      
+      <div class="vip-badge-pill">Annual Pass • ₹99 / person</div>
+
+      <!-- Verified Perks Grid -->
+      <div class="vip-perks-grid">
+        <div class="perk-chip">
+          <span class="perk-icon">🏷️</span>
+          <div>
+            <strong>Flat 10% OFF</strong>
+            <small>On every blood test & health package</small>
+          </div>
+        </div>
+        <div class="perk-chip">
+          <span class="perk-icon">💳</span>
+          <div>
+            <strong>Online & Cash</strong>
+            <small>10% discount on both payment modes</small>
+          </div>
+        </div>
+        <div class="perk-chip">
+          <span class="perk-icon">🛵</span>
+          <div>
+            <strong>Free Home Collection</strong>
+            <small>Zero sample collection charges</small>
+          </div>
+        </div>
+        <div class="perk-chip">
+          <span class="perk-icon">👑</span>
+          <div>
+            <strong>VIP Crown Status</strong>
+            <small>Active VIP Badge everywhere</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Membership Alert -->
+    <div id="already-member-banner" class="active-member-banner" style="display: none;">
+      <div class="amb-left">
+        <span class="amb-crown">👑</span>
+        <div>
+          <h4>Active VIP Membership</h4>
+          <p id="membership-validity-text">Valid until: --/--/----</p>
+        </div>
+      </div>
+      <span class="amb-status-tag">ACTIVE</span>
+    </div>
+
+    <!-- Member Selection Section -->
+    <section class="selection-card">
+      <div class="section-title-row">
+        <h3>Select Members</h3>
+        <span class="price-pill-tag">₹99 / year per person</span>
+      </div>
+      <p class="section-hint">Choose who you want to include under this VIP membership:</p>
+
+      <!-- Primary User (Self) - Always Checked & Locked -->
+      <div class="member-select-row active-locked">
+        <label class="custom-checkbox">
+          <input type="checkbox" id="check-primary-user" checked disabled>
+          <span class="checkmark"></span>
+        </label>
+        <div class="member-row-info">
+          <div class="name-line">
+            <strong id="primary-user-name">Loading...</strong>
+            <span class="relation-tag self-tag">Primary (You)</span>
+          </div>
+          <span class="member-sub" id="primary-user-phone">+91 ----------</span>
+        </div>
+        <div class="row-price">₹99</div>
+      </div>
+
+      <!-- Family Members Checkbox List from Profile -->
+      <div id="family-members-selection-list" class="family-selection-wrap"></div>
+
+      <!-- Quick Add Family Member Link -->
+      <button type="button" class="btn-quick-add-member" onclick="MembershipPage.toggleAddMemberModal(true)">
+        <span>+ Add new family member</span>
+      </button>
+    </section>
+
+    <!-- Bill Summary Card -->
+    <section class="bill-summary-card">
+      <div class="bill-row">
+        <span>Primary Account Holder:</span>
+        <span id="bill-primary-amount">₹99</span>
+      </div>
+      <div class="bill-row" id="bill-family-row" style="display: none;">
+        <span>Family Members (<span id="bill-family-count">0</span>):</span>
+        <span id="bill-family-amount">₹0</span>
+      </div>
+      <div class="bill-divider"></div>
+      <div class="bill-total-row">
+        <div>
+          <strong>Total Payable</strong>
+          <small class="validity-sub">1 Year Validity • Inclusive of GST</small>
+        </div>
+        <div class="final-amount" id="bill-grand-total">₹99</div>
+      </div>
+    </section>
+
+    <!-- Payment Notice & CTA -->
+    <div class="checkout-bar">
+      <div class="online-only-badge">
+        <span>⚡ Note: Membership fee can be paid <strong>Online Only</strong> via Razorpay. Cash is not accepted for membership.</span>
+      </div>
+
+      <button type="button" id="pay-razorpay-btn" class="razorpay-pay-cta" onclick="MembershipPage.initiatePayment()">
+        <span class="cta-shield">🔒</span>
+        <span id="cta-btn-text">Pay ₹99 Online & Activate VIP</span>
+      </button>
+
+      <div class="trust-notice">
+        <span>🛡️ 100% Secure Checkout via Razorpay (UPI, GPay, Cards, NetBanking)</span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Quick Add Member Modal -->
+  <div id="quick-add-modal" class="sia-modal-overlay">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>👨‍👩‍👧‍👦</span>
+          <h3>Add Family Member</h3>
+        </div>
+        <button type="button" class="sia-close-btn" onclick="MembershipPage.toggleAddMemberModal(false)">✕</button>
+      </div>
+      <div class="sia-modal-body">
+        <div class="form-field">
+          <label>Member Full Name *</label>
+          <input type="text" id="quick-name" placeholder="Full name">
+        </div>
+        <div class="form-row-2">
+          <div class="form-field">
+            <label>Relationship *</label>
+            <select id="quick-relation">
+              <option value="Spouse">Spouse / Partner</option>
+              <option value="Father">Father</option>
+              <option value="Mother">Mother</option>
+              <option value="Son">Son</option>
+              <option value="Daughter">Daughter</option>
+              <option value="Brother">Brother</option>
+              <option value="Sister">Sister</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Age (Years) *</label>
+            <input type="number" id="quick-age" placeholder="e.g. 28" min="1" max="120">
+          </div>
+        </div>
+        <div class="form-field">
+          <label>Mobile Number (Optional)</label>
+          <input type="tel" id="quick-mobile" maxlength="10" placeholder="10-digit mobile">
+        </div>
+        <button type="button" class="modal-action-btn" onclick="MembershipPage.handleSaveQuickMember()">
+          Save & Add to Pass (+₹99) ✓
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <a href="customer.html" class="nav-item">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="reports.html" class="nav-item">
+      <span class="nav-icon">📑</span>
+      <span class="nav-label">Reports</span>
+    </a>
+    <a href="bookings.html" class="nav-item">
+      <span class="nav-icon">📍</span>
+      <span class="nav-label">Track</span>
+    </a>
+    <a href="profile.html" class="nav-item active">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">My Account</span>
+    </a>
+    <a href="cart.html" class="nav-item">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">Cart</span>
+    </a>
+  </nav>
+
+  <!-- Scripts -->
+  <script src="assets/js/config.js?v=6.0.0"></script>
+  <script src="assets/js/utils.js?v=6.0.0"></script>
+  <script src="assets/js/api.js?v=6.0.0"></script>
+  <script src="assets/js/membership.js?v=1.1.0"></script>
+</body>
+</html>
