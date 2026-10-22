@@ -1,0 +1,461 @@
+/* file: assets/css/membership.css */
+:root {
+  --vip-gold: #FFB800;
+  --vip-gold-dark: #D97706;
+  --vip-purple: #4A154B;
+  --vip-purple-dark: #2F0730;
+  --vip-green: #078866;
+  --card-bg: #FFFFFF;
+}
+
+body {
+  background-color: #F8F9FA;
+  padding-bottom: 110px;
+}
+
+/* Header */
+.membership-top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--vip-purple);
+  color: #FFFFFF;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.back-circle-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #FFFFFF;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.membership-container {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* VIP Hero Card */
+.vip-hero-card {
+  background: linear-gradient(145deg, #3B0746, #5B1B5D);
+  border-radius: 20px;
+  padding: 22px 16px 18px;
+  color: #FFFFFF;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(74, 21, 75, 0.25);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.crown-glow-badge {
+  font-size: 38px;
+  display: inline-block;
+  filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.8));
+  animation: floatCrown 3s ease-in-out infinite;
+  margin-bottom: 4px;
+}
+
+@keyframes floatCrown {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.vip-title {
+  font-size: 20px;
+  font-weight: 900;
+  background: linear-gradient(90deg, #FFFFFF, #FFEAA7, #FFD700);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 3px;
+}
+
+.vip-sub {
+  font-size: 11.5px;
+  color: #E2D9E2;
+  margin-bottom: 10px;
+}
+
+.vip-badge-pill {
+  display: inline-block;
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid #FFD700;
+  color: #FFD700;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 12px;
+  border-radius: 20px;
+  margin-bottom: 14px;
+}
+
+/* Perks Grid */
+.vip-perks-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  text-align: left;
+}
+
+.perk-chip {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.perk-icon {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.perk-chip strong {
+  display: block;
+  font-size: 11.5px;
+  color: #FFFFFF;
+}
+
+.perk-chip small {
+  display: block;
+  font-size: 9.5px;
+  color: #D1D5DB;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+
+/* Active Membership Banner */
+.active-member-banner {
+  background: #ECFDF5;
+  border: 1.5px solid #059669;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.amb-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.amb-crown {
+  font-size: 24px;
+}
+
+.amb-left h4 {
+  font-size: 13px;
+  font-weight: 800;
+  color: #065F46;
+}
+
+.amb-left p {
+  font-size: 11px;
+  color: #047857;
+}
+
+.amb-status-tag {
+  background: #059669;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* Selection Card */
+.selection-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.section-title-row h3 {
+  font-size: 14px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.price-pill-tag {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.section-hint {
+  font-size: 11px;
+  color: #6B7280;
+  margin-bottom: 12px;
+}
+
+/* Member Rows */
+.member-select-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 12px;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.member-select-row.selected {
+  border-color: var(--vip-purple);
+  background: #FAF5FA;
+}
+
+.member-select-row.active-locked {
+  background: #F9FAFB;
+  border-color: #D1D5DB;
+  cursor: default;
+}
+
+.custom-checkbox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+  cursor: pointer;
+}
+
+.custom-checkbox input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.checkmark {
+  height: 20px;
+  width: 20px;
+  background-color: #F3F4F6;
+  border: 2px solid #D1D5DB;
+  border-radius: 6px;
+  display: inline-block;
+  position: relative;
+}
+
+.custom-checkbox input:checked ~ .checkmark {
+  background-color: var(--vip-purple);
+  border-color: var(--vip-purple);
+}
+
+.checkmark::after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.custom-checkbox input:checked ~ .checkmark::after {
+  display: block;
+}
+
+.member-row-info {
+  flex: 1;
+}
+
+.name-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.name-line strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.relation-tag {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #E5E7EB;
+  color: #4B5563;
+  text-transform: uppercase;
+}
+
+.relation-tag.self-tag {
+  background: #E0E7FF;
+  color: #3730A3;
+}
+
+.relation-tag.vip-tag {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+
+.member-sub {
+  font-size: 11px;
+  color: #6B7280;
+  display: block;
+  margin-top: 1px;
+}
+
+.row-price {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--vip-green);
+}
+
+.btn-quick-add-member {
+  width: 100%;
+  background: #F9FAFB;
+  border: 1.5px dashed #D1D5DB;
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--vip-green);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+/* Bill Summary */
+.bill-summary-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid #E5E7EB;
+}
+
+.bill-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: #4B5563;
+  margin-bottom: 6px;
+}
+
+.bill-divider {
+  height: 1px;
+  background: #E5E7EB;
+  margin: 10px 0;
+}
+
+.bill-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bill-total-row strong {
+  font-size: 14px;
+  color: #111827;
+}
+
+.validity-sub {
+  display: block;
+  font-size: 10px;
+  color: #6B7280;
+}
+
+.final-amount {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--vip-purple);
+}
+
+/* Checkout Bar */
+.checkout-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.online-only-badge {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #92400E;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.razorpay-pay-cta {
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, #078866, #045D49);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(7, 136, 102, 0.35);
+  cursor: pointer;
+}
+
+.trust-notice {
+  text-align: center;
+  font-size: 10.5px;
+  color: #6B7280;
+}
+
+/* Global 👑 VIP Crown Badge */
+.vip-crown-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  margin-left: 5px;
+  vertical-align: middle;
+  filter: drop-shadow(0 0 3px #FFD700);
+  animation: pulseGlow 2.5s infinite ease-in-out;
+  cursor: pointer;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px #FFD700); }
+  50% { transform: scale(1.18); filter: drop-shadow(0 0 6px #FFA500); }
+}
