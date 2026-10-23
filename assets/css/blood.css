@@ -1,7 +1,15 @@
 /* file: assets/css/blood.css */
 /**
- * Selfcare Diagnostics - Emergency Blood Connect CSS v2.0.0
- * Updated with Complete Unit Highlights, Gamified Tier Badges, Touch Modals, & Image Share
+ * Selfcare Diagnostics - Emergency Blood Connect CSS v14.0.0
+ * Fully Integrated:
+ * 1. Mobile Viewport & Header Logo Zoom Constraint
+ * 2. Highlighted Units Balance & Real-time Target Badges
+ * 3. Live Card Donors Status Chips (Outer Feed Card)
+ * 4. Pinned Current User Card ('YOU' Badge & Profile Actions)
+ * 5. Permanent Giant PIN Highlight Showcase Box
+ * 6. Attender PIN Handshake & Verification Forms
+ * 7. Gamified Lifesaver Tiers (Bronze, Silver, Gold, Platinum, Diamond, Legendary)
+ * 8. Dynamic E-Certificate Paper 3D Card for Native WhatsApp Image Sharing
  */
 
 :root {
@@ -40,6 +48,9 @@ body.glass-bg-body {
   width: 100%;
 }
 
+/* ==========================================================================
+   APP HEADER & LOGO CONSTRAINT
+   ========================================================================== */
 .app-header {
   position: sticky;
   top: 0;
@@ -98,6 +109,9 @@ body.glass-bg-body {
   100% { transform: scale(1); }
 }
 
+/* ==========================================================================
+   SAFETY ADVISORY SHIELD
+   ========================================================================== */
 .safety-shield-box {
   background: linear-gradient(135deg, #FEF2F2 0%, #FFFBEB 100%);
   border: 2px solid #EF4444;
@@ -147,6 +161,9 @@ body.glass-bg-body {
   line-height: 1.45;
 }
 
+/* ==========================================================================
+   DUAL ACTION HERO GATEWAY
+   ========================================================================== */
 .gateway-hero-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -240,6 +257,9 @@ body.glass-bg-body {
   color: #FFFFFF;
 }
 
+/* ==========================================================================
+   HERO STATS BAR
+   ========================================================================== */
 .hero-stats-bar {
   display: flex;
   justify-content: space-around;
@@ -282,6 +302,9 @@ body.glass-bg-body {
   background: #E2E8F0;
 }
 
+/* ==========================================================================
+   NAVIGATION & SUB TABS
+   ========================================================================== */
 .blood-nav-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr 1.2fr;
@@ -331,6 +354,9 @@ body.glass-bg-body {
   border-color: #A7F3D0;
 }
 
+/* ==========================================================================
+   FILTERS BAR
+   ========================================================================== */
 .blood-filter-box {
   padding: 10px 12px;
   margin-bottom: 14px;
@@ -396,7 +422,7 @@ body.glass-bg-body {
 }
 
 /* ==========================================================================
-   REQUEST CARD WITH HIGHLIGHTED UNITS & TOUCH-EXPAND
+   EMERGENCY REQUEST CARD & PROGRESS
    ========================================================================== */
 .request-card {
   background: #FFFFFF;
@@ -495,7 +521,7 @@ body.glass-bg-body {
   border: 1px solid #A7F3D0;
 }
 
-/* HIGHLIGHTED UNITS BANNER IN CARD */
+/* Highlighted Units Progress Banner */
 .units-highlight-banner {
   background: #FFF7ED;
   border: 1px solid #FED7AA;
@@ -519,6 +545,50 @@ body.glass-bg-body {
   border-radius: 6px;
   font-weight: 800;
   font-size: 9.5px;
+}
+
+/* Outer Card Donors Status Chips */
+.card-accepted-donors-box {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.accepted-head {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  color: #166534;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.donor-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.donor-status-chip {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.chip-accepted {
+  background: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #86EFAC;
+}
+
+.chip-confirmed {
+  background: #E0E7FF;
+  color: #3730A3;
+  border: 1px solid #A5B4FC;
 }
 
 .card-hospital-box {
@@ -548,7 +618,7 @@ body.glass-bg-body {
 
 .card-action-bar {
   display: grid;
-  grid-template-columns: 1.2fr 1.2fr 0.8fr;
+  grid-template-columns: 1fr 1fr 1.2fr;
   gap: 6px;
   margin-top: 2px;
 }
@@ -583,6 +653,49 @@ body.glass-bg-body {
   border: 1px solid #CBD5E1;
 }
 
+.action-btn-accept-outer {
+  background: linear-gradient(135deg, #078866, #045D49);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 5px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.action-btn-accepted {
+  background: #D1FAE5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+  border-radius: 8px;
+  padding: 7px 5px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.action-btn-owner-panel {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+  border-radius: 8px;
+  padding: 7px 5px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.action-btn-full {
+  background: #F1F5F9;
+  color: #94A3B8;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 7px 5px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .tap-view-hint {
   font-size: 9px;
   color: #94A3B8;
@@ -591,7 +704,7 @@ body.glass-bg-body {
 }
 
 /* ==========================================================================
-   PATIENT DETAILS EXPAND MODAL
+   PATIENT DETAILS EXPAND MODAL & PIN VERIFICATION
    ========================================================================== */
 .patient-detail-group {
   background: #F8FAFC;
@@ -651,44 +764,101 @@ body.glass-bg-body {
   margin-bottom: 6px;
 }
 
-.donor-pin-badge {
-  background: #045D49;
-  color: #FFFFFF;
-  font-size: 9px;
-  font-weight: 900;
-  padding: 2px 6px;
-  border-radius: 5px;
-}
-
-.handshake-actions {
+.pin-verify-action-group {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
 }
 
-.btn-confirm-donated {
-  background: #059669;
+.pin-entry-input {
+  width: 75px !important;
+  padding: 5px !important;
+  text-align: center !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: 2px !important;
+  border: 1.5px solid #045D49 !important;
+  border-radius: 6px !important;
+}
+
+.btn-verify-pin {
+  background: #045D49;
   color: #FFFFFF;
   border: none;
   border-radius: 6px;
-  padding: 5px 8px;
+  padding: 6px 9px;
   font-size: 10px;
   font-weight: 800;
   cursor: pointer;
+  white-space: nowrap;
 }
 
-.btn-cancel-donated {
+.btn-reject-donor {
   background: #EF4444;
   color: #FFFFFF;
   border: none;
   border-radius: 6px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   font-size: 10px;
   font-weight: 800;
   cursor: pointer;
 }
 
+.verified-done-tag {
+  font-size: 10px;
+  font-weight: 800;
+  color: #047857;
+  background: #D1FAE5;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* Giant Permanent PIN Highlight Showcase */
+.donor-pin-showcase-box {
+  background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+  border: 2px dashed #059669;
+  border-radius: 14px;
+  padding: 14px;
+  text-align: center;
+  margin: 6px 0;
+}
+
+.pin-showcase-tag {
+  font-size: 9px;
+  font-weight: 900;
+  color: #065F46;
+  letter-spacing: 0.5px;
+}
+
+.pin-display-giant {
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 8px;
+  color: #045D49;
+  margin: 4px 0;
+}
+
+.pin-instructions {
+  font-size: 10.5px;
+  color: #064E3B;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.slots-full-notice {
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+  margin: 6px 0;
+}
+
 /* ==========================================================================
-   DONOR DIRECTORY CARD
+   VERIFIED DONORS DIRECTORY & 'YOU' PINNED CARD
    ========================================================================== */
 .donor-card-item {
   background: #FFFFFF;
@@ -704,6 +874,57 @@ body.glass-bg-body {
 .donor-card-item.active-available {
   border-color: #A7F3D0;
   background: linear-gradient(135deg, #FFFFFF 0%, #F0FDF9 100%);
+}
+
+.donor-card-item.is-me-card {
+  border: 2px solid #045D49 !important;
+  background: linear-gradient(135deg, #F0FDF9 0%, #FFFFFF 100%) !important;
+  box-shadow: 0 6px 18px rgba(4, 93, 73, 0.14) !important;
+  position: relative;
+}
+
+.badge-you-donor {
+  background: #045D49;
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 7px;
+  border-radius: 6px;
+  margin-left: 6px;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  vertical-align: middle;
+  box-shadow: 0 2px 5px rgba(4, 93, 73, 0.3);
+}
+
+.action-btn-my-profile {
+  background: linear-gradient(135deg, #078866, #045D49);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 9px;
+  font-size: 10.5px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.action-btn-edit-donor {
+  background: #F1F5F9;
+  color: #0F172A;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 9px;
+  font-size: 10.5px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
 .donor-header-row {
@@ -1003,7 +1224,7 @@ body.glass-bg-body {
 }
 
 /* ==========================================================================
-   E-CERTIFICATE RENDERING BOX (OFFICIAL LOGO + TIERS)
+   E-CERTIFICATE RENDERING BOX (OFFICIAL LOGO & TIERS)
    ========================================================================== */
 .certificate-modal-wrap {
   max-width: 440px !important;
@@ -1202,189 +1423,4 @@ body.glass-bg-body {
   grid-template-columns: 1.3fr 1fr;
   gap: 8px;
   margin-top: 8px;
-}
-/* ==========================================================================
-   LIVE CHIPS, PIN VERIFICATION & PERMANENT PIN HIGHLIGHTS
-   ========================================================================== */
-
-/* Outer Accept Button on Feed Card */
-.action-btn-accept-outer {
-  background: linear-gradient(135deg, #078866, #045D49);
-  color: #FFFFFF;
-  border: none;
-  border-radius: 8px;
-  padding: 7px 5px;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.action-btn-accepted {
-  background: #D1FAE5;
-  color: #047857;
-  border: 1px solid #A7F3D0;
-  border-radius: 8px;
-  padding: 7px 5px;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.action-btn-owner-panel {
-  background: #FEF3C7;
-  color: #92400E;
-  border: 1px solid #FCD34D;
-  border-radius: 8px;
-  padding: 7px 5px;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.action-btn-full {
-  background: #F1F5F9;
-  color: #94A3B8;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  padding: 7px 5px;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-/* Card Outer Accepted Donors Chips Box */
-.card-accepted-donors-box {
-  background: #F0FDF4;
-  border: 1px solid #BBF7D0;
-  border-radius: 8px;
-  padding: 6px 8px;
-}
-
-.accepted-head {
-  display: block;
-  font-size: 9px;
-  font-weight: 800;
-  color: #166534;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.donor-chips-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.donor-status-chip {
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-}
-
-.chip-accepted {
-  background: #DCFCE7;
-  color: #15803D;
-  border: 1px solid #86EFAC;
-}
-
-.chip-confirmed {
-  background: #E0E7FF;
-  color: #3730A3;
-  border: 1px solid #A5B4FC;
-}
-
-/* PERMANENT PIN GIANT HIGHLIGHT DISPLAY */
-.donor-pin-showcase-box {
-  background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
-  border: 2px dashed #059669;
-  border-radius: 14px;
-  padding: 14px;
-  text-align: center;
-  margin: 6px 0;
-}
-
-.pin-showcase-tag {
-  font-size: 9px;
-  font-weight: 900;
-  color: #065F46;
-  letter-spacing: 0.5px;
-}
-
-.pin-display-giant {
-  font-size: 34px;
-  font-weight: 900;
-  letter-spacing: 8px;
-  color: #045D49;
-  margin: 4px 0;
-}
-
-.pin-instructions {
-  font-size: 10.5px;
-  color: #064E3B;
-  line-height: 1.4;
-  margin: 0;
-}
-
-/* ATTENDER PIN ENTRY FORM IN MODAL */
-.pin-verify-action-group {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.pin-entry-input {
-  width: 75px !important;
-  padding: 5px !important;
-  text-align: center !important;
-  font-size: 13px !important;
-  font-weight: 900 !important;
-  letter-spacing: 2px !important;
-  border: 1.5px solid #045D49 !important;
-  border-radius: 6px !important;
-}
-
-.btn-verify-pin {
-  background: #045D49;
-  color: #FFFFFF;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 9px;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn-reject-donor {
-  background: #EF4444;
-  color: #FFFFFF;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 8px;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.verified-done-tag {
-  font-size: 10px;
-  font-weight: 800;
-  color: #047857;
-  background: #D1FAE5;
-  padding: 3px 8px;
-  border-radius: 6px;
-}
-
-.slots-full-notice {
-  background: #F1F5F9;
-  border: 1px solid #CBD5E1;
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #475569;
-  text-align: center;
-  margin: 6px 0;
 }
