@@ -1,10 +1,11 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - API Gateway v6.2.0 (VIP Cache Invalidation Edition)
+ * Selfcare Diagnostics - API Gateway v6.3.0 (Emergency Blood Connect Cloud Edition)
  * Features:
  * - High-speed In-Memory TTL Response Caching for Instant UI updates (Zero GAS delay)
- * - Automatic cache invalidation on write/update mutations including VIP purchase
- * - Dedicated endpoints for VIP Membership (saveMembership, getMembershipStatus)
+ * - Automatic cache invalidation on write/update mutations (VIP, Bookings, & Blood SOS)
+ * - Dedicated endpoints for Emergency Blood Connect (getBloodData, saveBloodRequest, updateBloodRequest, registerBloodDonor)
+ * - Fast-Read timeout optimization for instant live blood feeds
  * - Concurrent In-Flight request deduplication
  */
 
@@ -13,6 +14,7 @@ const Api = {
   responseCache: new Map(),
 
   CACHE_TTL: {
+    getBloodData: 20000,
     getFamilyMembers: 45000,
     getProfile: 45000,
     getTests: 180000,
@@ -22,6 +24,7 @@ const Api = {
 
   getTimeoutForAction(action) {
     const fastReadActions = [
+      'getBloodData',
       'getTests',
       'getPackages',
       'getTestById',
@@ -157,6 +160,29 @@ const Api = {
   },
 
   // ==========================================================
+  // EMERGENCY BLOOD CONNECT CLOUD APIS (NEW)
+  // ==========================================================
+
+  async getBloodData() {
+    return this.request('getBloodData', {}, true);
+  },
+
+  async saveBloodRequest(requestPayload) {
+    this.invalidateCache('getBloodData');
+    return this.request('saveBloodRequest', requestPayload, false);
+  },
+
+  async updateBloodRequest(updatePayload) {
+    this.invalidateCache('getBloodData');
+    return this.request('updateBloodRequest', updatePayload, false);
+  },
+
+  async registerBloodDonor(donorPayload) {
+    this.invalidateCache('getBloodData');
+    return this.request('registerBloodDonor', donorPayload, false);
+  },
+
+  // ==========================================================
   // AUTHENTICATION & PROFILE APIS
   // ==========================================================
 
@@ -186,7 +212,6 @@ const Api = {
   // ==========================================================
 
   async saveMembership(membershipPayload) {
-    // Purges stale profile & family cached data so VIP updates immediately
     this.invalidateCache('getProfile');
     this.invalidateCache('getFamilyMembers');
     this.invalidateCache('getMembershipStatus');

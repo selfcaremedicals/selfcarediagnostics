@@ -1,15 +1,11 @@
 /* file: assets/js/blood.js */
 /**
- * Selfcare Diagnostics - Emergency Blood Connect Controller v2.2.0
- * Features:
- * - Permanent Rapido-like Donor PIN (Fixed per user).
- * - Post Creator Auto-Detection (Attender will never see 'Ready to Donate').
- * - 1 Active SOS Lock & 90-Day Medical Cooldown.
- * - Accept SOS Button visible both on outer card & inner details modal.
- * - Live Card Donor Chips ("Person (Name) ready to donate").
- * - Slot Quota Lock (Hides accept button when required units assigned).
- * - Attender PIN Verification Handshake (Only correct PIN confirms donation).
- * - Auto-Disappear & Completed Archive on 100% verification.
+ * Selfcare Diagnostics - Emergency Blood Connect Controller v15.0.0
+ * Backend Cloud Synchronized Edition:
+ * 1. Zero-Typing Smart Auto-Fill: Form open aanaale logged-in user-oda Name, Phone, Blood Group, Age, Gender, District, Area ellam automatic-aa pre-fill aagum.
+ * 2. Realtime Two-Way Cloud Handshake: Pledging, PIN Verification, and Status updates are saved directly to Google Sheets (BloodRequests & BloodDonors).
+ * 3. Permanent Donor Profile Hydration: Cloud-la irunthu donor profile, donation count, and permanent PIN auto-restores even after browser cache clear.
+ * 4. Strict Ownership Guard & Pinned 'YOU' card preserved.
  */
 
 const BloodPage = {
@@ -56,7 +52,7 @@ const BloodPage = {
   },
 
   /**
-   * PERMANENT RAPIDO-LIKE DONOR PIN (Fixed for this user forever)
+   * PERMANENT RAPIDO-LIKE DONOR PIN (Fixed forever for this user)
    */
   ensurePermanentDonorPin() {
     let pin = localStorage.getItem('selfcare_donor_permanent_pin');
@@ -71,27 +67,70 @@ const BloodPage = {
     return localStorage.getItem('selfcare_donor_permanent_pin') || this.ensurePermanentDonorPin();
   },
 
+  /**
+   * ACCURATE LOGGED-IN USER PHONE & PROFILE DETAILS
+   */
   getMyPhone() {
-    const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-    let ph = localStorage.getItem('selfcare_active_user') || user.mobile || '';
-    return String(ph).replace(/\D/g, '').slice(-10);
+    let ph = '';
+    try {
+      const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
+      ph = user.mobile || localStorage.getItem('selfcare_active_user') || '';
+      if (!ph) {
+        const storedDonor = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
+        ph = storedDonor.phone || '';
+      }
+    } catch (e) {}
+    return String(ph || '').replace(/\D/g, '').slice(-10);
+  },
+
+  getMyProfile() {
+    let profile = {
+      name: '',
+      phone: this.getMyPhone(),
+      bloodGroup: '',
+      age: '',
+      gender: 'Male',
+      district: 'Chennai',
+      area: ''
+    };
+
+    try {
+      const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
+      if (user.name) profile.name = user.name;
+      if (user.bloodGroup) profile.bloodGroup = user.bloodGroup;
+      if (user.age) profile.age = user.age;
+      if (user.gender) profile.gender = user.gender;
+      if (user.location) profile.district = user.location;
+      if (user.address) profile.area = user.address;
+
+      const storedDonor = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
+      if (storedDonor.name) profile.name = storedDonor.name;
+      if (storedDonor.phone) profile.phone = storedDonor.phone;
+      if (storedDonor.bloodGroup) profile.bloodGroup = storedDonor.bloodGroup;
+      if (storedDonor.age) profile.age = storedDonor.age;
+      if (storedDonor.gender) profile.gender = storedDonor.gender;
+      if (storedDonor.district) profile.district = storedDonor.district;
+      if (storedDonor.area) profile.area = storedDonor.area;
+      if (storedDonor.lastDonationDate) profile.lastDonationDate = storedDonor.lastDonationDate;
+    } catch (e) {}
+
+    return profile;
   },
 
   getMyName() {
-    let myProfile = null;
-    try {
-      myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
-    } catch (e) {}
-    const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-    return myProfile?.name || user.name || 'Voluntary Donor';
+    const prof = this.getMyProfile();
+    return prof.name || 'Voluntary Donor';
   },
 
-  isMyCreatedRequest(reqId, reqAttenderPhone) {
-    const myCreated = JSON.parse(localStorage.getItem('selfcare_my_created_requests') || '[]');
+  /**
+   * STRICT POST OWNER CHECK:
+   * Returns true ONLY if the current logged-in phone matches the attender's phone.
+   */
+  isMyCreatedRequest(reqAttenderPhone) {
     const myPhone = this.getMyPhone();
-    if (myCreated.includes(reqId)) return true;
-    if (myPhone && reqAttenderPhone && String(reqAttenderPhone).slice(-10) === myPhone) return true;
-    return false;
+    if (!myPhone) return false;
+    const cleanAttenderPhone = String(reqAttenderPhone || '').replace(/\D/g, '').slice(-10);
+    return cleanAttenderPhone !== '' && myPhone === cleanAttenderPhone;
   },
 
   hasActivePledgedSos() {
@@ -106,24 +145,78 @@ const BloodPage = {
     return null;
   },
 
+  /**
+   * ZERO-TYPING SMART AUTO-FILL ENGINE
+   * Pre-populates all inputs from Backend User Profile / Donor Profile
+   */
   populateUserContext() {
     try {
-      const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-      const activeMobile = this.getMyPhone();
+      const prof = this.getMyProfile();
 
-      const nameInput = document.getElementById('donor-name');
-      const phoneInput = document.getElementById('donor-phone');
-      const groupInput = document.getElementById('donor-blood-group');
+      // 1. Auto-fill Request Modal Inputs (SOS Form)
       const reqAttender = document.getElementById('req-attender-name');
       const reqPhone = document.getElementById('req-attender-phone');
+      const reqDist = document.getElementById('req-hospital-district');
+      const reqArea = document.getElementById('req-hospital-area');
 
-      if (nameInput && user.name) nameInput.value = user.name;
-      if (phoneInput && activeMobile) phoneInput.value = activeMobile;
-      if (groupInput && user.bloodGroup) groupInput.value = user.bloodGroup;
+      if (reqAttender && !reqAttender.value && prof.name) reqAttender.value = prof.name;
+      if (reqPhone && !reqPhone.value && prof.phone) reqPhone.value = prof.phone;
+      if (reqArea && !reqArea.value && prof.area) reqArea.value = prof.area;
 
-      if (reqAttender && user.name) reqAttender.value = user.name;
-      if (reqPhone && activeMobile) reqPhone.value = activeMobile;
-    } catch (e) {}
+      if (reqDist && prof.district) {
+        for (let i = 0; i < reqDist.options.length; i++) {
+          if (reqDist.options[i].value.toLowerCase() === prof.district.toLowerCase()) {
+            reqDist.selectedIndex = i;
+            break;
+          }
+        }
+      }
+
+      // 2. Auto-fill Donor Registration Modal Inputs
+      const donName = document.getElementById('donor-name');
+      const donPhone = document.getElementById('donor-phone');
+      const donGroup = document.getElementById('donor-blood-group');
+      const donAge = document.getElementById('donor-age');
+      const donGender = document.getElementById('donor-gender');
+      const donDist = document.getElementById('donor-district');
+      const donArea = document.getElementById('donor-area');
+      const donLastDate = document.getElementById('donor-last-date');
+
+      if (donName && prof.name) donName.value = prof.name;
+      if (donPhone && prof.phone) donPhone.value = prof.phone;
+      if (donAge && prof.age) donAge.value = prof.age;
+      if (donArea && prof.area) donArea.value = prof.area;
+      if (donLastDate && prof.lastDonationDate) donLastDate.value = prof.lastDonationDate;
+
+      if (donGroup && prof.bloodGroup) {
+        for (let i = 0; i < donGroup.options.length; i++) {
+          if (donGroup.options[i].value.toLowerCase() === prof.bloodGroup.toLowerCase()) {
+            donGroup.selectedIndex = i;
+            break;
+          }
+        }
+      }
+
+      if (donGender && prof.gender) {
+        for (let i = 0; i < donGender.options.length; i++) {
+          if (donGender.options[i].value.toLowerCase() === prof.gender.toLowerCase()) {
+            donGender.selectedIndex = i;
+            break;
+          }
+        }
+      }
+
+      if (donDist && prof.district) {
+        for (let i = 0; i < donDist.options.length; i++) {
+          if (donDist.options[i].value.toLowerCase() === prof.district.toLowerCase()) {
+            donDist.selectedIndex = i;
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[BloodConnect] Auto-fill notice:', e);
+    }
   },
 
   loadBloodData() {
@@ -139,6 +232,9 @@ const BloodPage = {
     }
   },
 
+  /**
+   * TWO-WAY REALTIME CLOUD SYNC WITH GOOGLE SHEETS
+   */
   async syncLiveCloudData() {
     if (!navigator.onLine || typeof Api === 'undefined' || typeof Api.request !== 'function') return;
 
@@ -149,13 +245,28 @@ const BloodPage = {
           this.bloodRequests = res.requests;
           localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
         }
+
         if (Array.isArray(res.donors)) {
           this.bloodDonors = res.donors;
           localStorage.setItem('selfcare_blood_donors', JSON.stringify(this.bloodDonors));
+
+          // Hydrate current user's donor profile directly from backend
+          const myPhone = this.getMyPhone();
+          if (myPhone) {
+            const myServerProfile = res.donors.find(d => String(d.phone).slice(-10) === myPhone);
+            if (myServerProfile) {
+              localStorage.setItem('selfcare_my_donor_profile', JSON.stringify(myServerProfile));
+              if (myServerProfile.permanentPin) {
+                localStorage.setItem('selfcare_donor_permanent_pin', myServerProfile.permanentPin);
+              }
+            }
+          }
         }
         this.renderAll();
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[BloodConnect] Cloud sync notice:', e);
+    }
   },
 
   switchTab(tab) {
@@ -241,17 +352,12 @@ const BloodPage = {
     if (tabCountHist) tabCountHist.textContent = completedReqs.length;
   },
 
-  /**
-   * SECTION 1: Render Active Emergency Blood Requests
-   * Auto-disappears when all units verified with PIN (balance = 0)
-   */
   renderRequests() {
     const container = document.getElementById('requests-list-container');
     if (!container) return;
 
     const myPhone = this.getMyPhone();
 
-    // STRICT FILTER: Only show active requests with balance > 0
     let list = this.bloodRequests.filter(r => {
       const needed = parseInt(r.unitsNeeded || 1, 10);
       const donated = parseInt(r.unitsDonated || 0, 10);
@@ -293,7 +399,7 @@ const BloodPage = {
       const acceptedCount = donorsList.filter(d => d.status === 'ACCEPTED' || d.status === 'CONFIRMED').length;
       const isSlotsFull = acceptedCount >= totalNeeded;
 
-      const isOwner = this.isMyCreatedRequest(req.id, req.attenderPhone);
+      const isOwner = this.isMyCreatedRequest(req.attenderPhone);
       const hasMeAccepted = myPhone && donorsList.some(d => d.donorPhone === myPhone && d.status === 'ACCEPTED');
 
       const whatsappText = encodeURIComponent(
@@ -314,13 +420,11 @@ const BloodPage = {
             <span class="urgency-pill ${urgencyClass}">${urgencyLabel}</span>
           </div>
 
-          <!-- Highlight Units Progress Banner -->
           <div class="units-highlight-banner">
             <span class="units-text">🎯 Target: ${totalNeeded} Units Required</span>
             <span class="balance-tag">${donatedCount} Donated • ${balance} Units Balance</span>
           </div>
 
-          <!-- Live Donors Status Chips (Veliya Card Layum Kaattum) -->
           ${donorsList.length > 0 ? `
             <div class="card-accepted-donors-box">
               <span class="accepted-head">Lifesavers on the way (${acceptedCount}/${totalNeeded}):</span>
@@ -344,7 +448,6 @@ const BloodPage = {
             </div>
           </div>
 
-          <!-- Action Buttons Bar with Outer Accept Button -->
           <div class="card-action-bar" onclick="event.stopPropagation()">
             <button type="button" class="action-btn-call" onclick="BloodPage.promptDonorSafetyCall('${req.attenderPhone}', '${this.safeEscape(req.hospitalName)}')">
               📞 Call
@@ -353,7 +456,6 @@ const BloodPage = {
               💬 WhatsApp
             </button>
 
-            <!-- Outer Accept Button Logic -->
             ${isOwner ? `
               <button type="button" class="action-btn-owner-panel" onclick="BloodPage.openPatientDetails('${req.id}')">
                 ⚙️ Verify PIN
@@ -373,15 +475,12 @@ const BloodPage = {
             `}
           </div>
 
-          <div class="tap-view-hint">👆 Tap card to view full details & verify PIN</div>
+          <div class="tap-view-hint">👆 Tap card to view full details</div>
         </div>
       `;
     }).join('');
   },
 
-  /**
-   * TOUCH PATIENT CARD -> OPEN FULL DETAILS & ATTENDER PIN HANDSHAKE
-   */
   openPatientDetails(reqId) {
     this.triggerHaptic();
     const req = this.bloodRequests.find(r => r.id === reqId);
@@ -394,7 +493,7 @@ const BloodPage = {
     const donatedCount = parseInt(req.unitsDonated || 0, 10);
     const balance = Math.max(0, totalNeeded - donatedCount);
 
-    const isOwner = this.isMyCreatedRequest(req.id, req.attenderPhone);
+    const isOwner = this.isMyCreatedRequest(req.attenderPhone);
     const myPhone = this.getMyPhone();
     const myPermanentPin = this.getMyDonorPin();
 
@@ -423,7 +522,6 @@ const BloodPage = {
         </div>
       </div>
 
-      <!-- Highlight Units Status -->
       <div class="units-highlight-banner" style="padding: 10px;">
         <div>
           <strong style="color: #9A3412; font-size: 13px;">${totalNeeded} Units Required</strong>
@@ -462,9 +560,8 @@ const BloodPage = {
         </div>
       </div>
 
-      <!-- CONDITIONAL LOGIC: ATTENDER VERIFICATION vs DONOR ACCEPT VIEW -->
+      <!-- CONDITIONAL VIEW: OWNER SEES VERIFY PIN, ALL OTHERS SEE ACCEPT -->
       ${isOwner ? `
-        <!-- VIEW A: POST OWNER / ATTENDER PIN VERIFICATION PANEL -->
         <div class="handshake-box">
           <h5>🔐 Attender PIN Verification Panel</h5>
           <p style="font-size: 10.5px; color: #78350F; margin-bottom: 8px;">
@@ -499,9 +596,7 @@ const BloodPage = {
           `).join('')}
         </div>
       ` : `
-        <!-- VIEW B: VOLUNTARY DONOR VIEW -->
         ${myPledge ? `
-          <!-- Donor has accepted: Show permanent PIN highlighted -->
           <div class="donor-pin-showcase-box animate-pop">
             <span class="pin-showcase-tag">YOUR PERMANENT LIFESAVER PIN</span>
             <div class="pin-display-giant">${myPermanentPin}</div>
@@ -510,12 +605,10 @@ const BloodPage = {
             </p>
           </div>
         ` : isSlotsFull ? `
-          <!-- Required units are already pledged by other donors -->
           <div class="slots-full-notice">
             🔒 Required units have already been pledged by lifesavers on the way.
           </div>
         ` : `
-          <!-- Inner Accept Button -->
           <div style="margin-top: 6px;">
             <button type="button" class="modal-action-btn primary-glow-btn" onclick="BloodPage.volunteerForRequest('${req.id}')">
               🙋 I Am Ready to Donate for This Patient →
@@ -541,8 +634,7 @@ const BloodPage = {
   },
 
   /**
-   * VOLUNTEER DONATION ACCEPT LOGIC
-   * Enforces 1-SOS Active Rule & 90-Day Medical Cooldown
+   * VOLUNTEER PLEDGE HANDSHAKE -> SAVED TO LOCAL + GOOGLE SHEETS
    */
   volunteerForRequest(reqId) {
     this.triggerHaptic();
@@ -555,16 +647,14 @@ const BloodPage = {
       return;
     }
 
-    // 1. Check if user is the request creator
     const req = this.bloodRequests.find(r => r.id === reqId);
     if (!req) return;
 
-    if (this.isMyCreatedRequest(req.id, req.attenderPhone)) {
+    if (this.isMyCreatedRequest(req.attenderPhone)) {
       this.safeShowToast('You created this SOS request! Only other voluntary donors can accept.', 'error');
       return;
     }
 
-    // 2. 90-Day Medical Cooldown Check
     let myProfile = null;
     try {
       myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
@@ -578,7 +668,6 @@ const BloodPage = {
       }
     }
 
-    // 3. 1 Active SOS Lock: Check if already pledged to an active unfulfilled SOS
     const activePledgedReq = this.hasActivePledgedSos();
     if (activePledgedReq && activePledgedReq.id !== reqId) {
       alert(`⚠️ Active SOS in Progress:\nYou have already accepted to donate for patient "${activePledgedReq.patientName}" at ${activePledgedReq.hospitalName}. Please complete or cancel that donation before accepting another SOS.`);
@@ -587,7 +676,6 @@ const BloodPage = {
 
     if (!req.donorsList) req.donorsList = [];
 
-    // 4. Check if required quota is already full
     const totalNeeded = parseInt(req.unitsNeeded || 1, 10);
     const currentAccepted = req.donorsList.filter(d => d.status === 'ACCEPTED' || d.status === 'CONFIRMED').length;
     if (currentAccepted >= totalNeeded) {
@@ -595,7 +683,6 @@ const BloodPage = {
       return;
     }
 
-    // 5. Existing check
     const existing = req.donorsList.find(d => d.donorPhone === myPhone);
     const permanentPin = this.getMyDonorPin();
 
@@ -605,18 +692,25 @@ const BloodPage = {
       return;
     }
 
-    // Save pledge with permanent PIN
     const donorRecord = {
       donorId: `VOL_${Date.now()}`,
       donorName: this.getMyName(),
       donorPhone: myPhone,
-      pin: permanentPin, // Permanent fixed PIN
+      pin: permanentPin,
       status: 'ACCEPTED',
       timestamp: new Date().toISOString()
     };
 
     req.donorsList.push(donorRecord);
     localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
+
+    // CLOUD SYNC: Update Google Sheets in background
+    if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
+      Api.request('updateBloodRequest', {
+        id: req.id,
+        donorsList: req.donorsList
+      }, false).catch(err => console.warn('[BloodConnect] Cloud pledge sync notice:', err));
+    }
 
     alert(
       `🎉 DONATION PLEDGE ACCEPTED!\n\nYour Permanent Lifesaver PIN is: [ ${permanentPin} ]\n\nPlease reach "${req.hospitalName}" and give this 4-digit PIN to attender "${req.attenderName}".`
@@ -627,7 +721,7 @@ const BloodPage = {
   },
 
   /**
-   * ATTENDER PIN VERIFICATION (Only correct donor PIN confirms donation)
+   * ATTENDER PIN VERIFICATION -> SAVED TO LOCAL + GOOGLE SHEETS
    */
   verifyDonorPin(reqId, donorId) {
     this.triggerHaptic();
@@ -650,11 +744,9 @@ const BloodPage = {
       return;
     }
 
-    // PIN MATCHED: Mark confirmed
     donorObj.status = 'CONFIRMED';
     req.unitsDonated = (parseInt(req.unitsDonated || 0, 10)) + 1;
 
-    // Update donor's local profile if verifying on own device
     try {
       let myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
       if (myProfile && myProfile.phone === donorObj.donorPhone) {
@@ -678,6 +770,22 @@ const BloodPage = {
     const totalNeeded = parseInt(req.unitsNeeded || 1, 10);
     const balance = Math.max(0, totalNeeded - req.unitsDonated);
 
+    // CLOUD SYNC: Reflect in Google Sheets
+    if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
+      Api.request('updateBloodRequest', {
+        id: req.id,
+        unitsDonated: req.unitsDonated,
+        donorsList: req.donorsList,
+        status: balance === 0 ? 'COMPLETED' : 'ACTIVE'
+      }, false).catch(err => console.warn('[BloodConnect] Cloud verification sync notice:', err));
+
+      // Sync donor's updated donation count to Cloud sheet 'BloodDonors'
+      let myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
+      if (myProfile && myProfile.phone === donorObj.donorPhone) {
+        Api.request('registerBloodDonor', myProfile, false).catch(() => {});
+      }
+    }
+
     if (balance === 0) {
       alert(`🎉 100% BLOOD UNITS COLLECTED!\n\nAll ${totalNeeded} units have been verified with donor PINs. This emergency request is now completed and archived.`);
       this.closeModal('modal-patient-details');
@@ -700,18 +808,23 @@ const BloodPage = {
     req.donorsList = req.donorsList.filter(d => d.donorId !== donorId);
     localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
 
+    if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
+      Api.request('updateBloodRequest', {
+        id: req.id,
+        donorsList: req.donorsList
+      }, false).catch(() => {});
+    }
+
     this.safeShowToast('Donor removed. Slot opened for others.', 'info');
     this.renderAll();
     this.openPatientDetails(reqId);
   },
 
-  /**
-   * SECTION 2: Render Verified Donors Directory
-   */
   renderDonors() {
     const container = document.getElementById('donors-list-container');
     if (!container) return;
 
+    const myPhone = this.getMyPhone();
     let list = [...this.bloodDonors];
 
     if (this.selectedBloodGroup !== 'ALL') {
@@ -719,6 +832,15 @@ const BloodPage = {
     }
     if (this.selectedDistrict !== 'ALL') {
       list = list.filter(d => d.district.toLowerCase() === this.selectedDistrict.toLowerCase());
+    }
+
+    // 🌟 PIN CURRENT USER FIXED AT THE VERY TOP
+    if (myPhone) {
+      const myIndex = list.findIndex(d => String(d.phone).replace(/\D/g, '').slice(-10) === myPhone);
+      if (myIndex > -1) {
+        const [myRecord] = list.splice(myIndex, 1);
+        list.unshift(myRecord);
+      }
     }
 
     if (list.length === 0) {
@@ -736,6 +858,7 @@ const BloodPage = {
     }
 
     container.innerHTML = list.map(d => {
+      const isMe = myPhone && (String(d.phone).replace(/\D/g, '').slice(-10) === myPhone);
       const cooldown = this.calculateCooldown(d.lastDonationDate);
       const isEligible = d.isAvailable && cooldown.canDonate;
 
@@ -744,12 +867,15 @@ const BloodPage = {
       );
 
       return `
-        <div class="donor-card-item ${isEligible ? 'active-available' : ''}">
+        <div class="donor-card-item ${isMe ? 'is-me-card' : ''} ${isEligible ? 'active-available' : ''}">
           <div class="donor-header-row">
             <div class="donor-info-left">
               <span class="donor-group-pill">${this.safeEscape(d.bloodGroup)}</span>
               <div class="donor-title-group">
-                <h4>${this.safeEscape(d.name)}</h4>
+                <h4>
+                  ${this.safeEscape(d.name)}
+                  ${isMe ? '<span class="badge-you-donor">YOU</span>' : ''}
+                </h4>
                 <span class="donor-meta-desc">${d.age} Yrs • ${this.safeEscape(d.gender)} • ${this.safeEscape(d.area)}, ${this.safeEscape(d.district)}</span>
               </div>
             </div>
@@ -761,7 +887,7 @@ const BloodPage = {
           <div class="donor-card-body">
             <div>
               <span class="d-label">Total Donations</span>
-              <span class="d-val">⭐ ${d.donationCount || 1} Times</span>
+              <span class="d-val">⭐ ${d.donationCount ?? 0} Times</span>
             </div>
             <div>
               <span class="d-label">Last Donated</span>
@@ -769,22 +895,31 @@ const BloodPage = {
             </div>
           </div>
 
-          <div class="donor-actions-row">
-            <button type="button" class="action-btn-call" onclick="window.location.href='tel:${d.phone}'">
-              📞 Call Donor
-            </button>
-            <button type="button" class="action-btn-whatsapp" onclick="window.location.href='https://wa.me/91${d.phone}?text=${whatsappText}'">
-              💬 WhatsApp
-            </button>
-          </div>
+          <!-- SMART ACTIONS: IF 'YOU', SHOW CERTIFICATE & EDIT BUTTONS -->
+          ${isMe ? `
+            <div class="donor-actions-row">
+              <button type="button" class="action-btn-my-profile" onclick="BloodPage.openMyCertificateModal()">
+                📜 My Certificate
+              </button>
+              <button type="button" class="action-btn-edit-donor" onclick="BloodPage.openDonorRegisterModal()">
+                ✏️ Edit My Profile
+              </button>
+            </div>
+          ` : `
+            <div class="donor-actions-row">
+              <button type="button" class="action-btn-call" onclick="window.location.href='tel:${d.phone}'">
+                📞 Call Donor
+              </button>
+              <button type="button" class="action-btn-whatsapp" onclick="window.location.href='https://wa.me/91${d.phone}?text=${whatsappText}'">
+                💬 WhatsApp
+              </button>
+            </div>
+          `}
         </div>
       `;
     }).join('');
   },
 
-  /**
-   * SECTION 3: Completed Archive (Past Requests & Past Donations)
-   */
   renderHistory() {
     const container = document.getElementById('history-list-container');
     if (!container) return;
@@ -895,6 +1030,9 @@ const BloodPage = {
     }
   },
 
+  /**
+   * REQUEST SOS SUBMISSION -> CLOUD BACKEND SYNC
+   */
   handleRequestSubmit(event) {
     event.preventDefault();
     this.triggerHaptic();
@@ -947,25 +1085,24 @@ const BloodPage = {
       donorsList: []
     };
 
-    // Store in my created requests to ensure creator is always recognized
-    let myCreated = JSON.parse(localStorage.getItem('selfcare_my_created_requests') || '[]');
-    myCreated.push(reqId);
-    localStorage.setItem('selfcare_my_created_requests', JSON.stringify(myCreated));
-
     this.bloodRequests.unshift(newRequest);
     localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
 
+    // CLOUD PERSISTENCE: Save into Google Sheets
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
-      Api.request('saveBloodRequest', newRequest, false).catch(() => {});
+      Api.request('saveBloodRequest', newRequest, false).catch(err => console.warn('[BloodConnect] Save request cloud notice:', err));
     }
 
     this.renderAll();
     this.closeModal('modal-blood-request');
     this.switchTab('requests');
 
-    this.safeShowToast('Emergency request posted! 🚨', 'success');
+    this.safeShowToast('Emergency request posted to Cloud! 🚨', 'success');
   },
 
+  /**
+   * DONOR REGISTRATION SUBMIT -> CLOUD BACKEND SYNC
+   */
   handleDonorSubmit(event) {
     event.preventDefault();
     this.triggerHaptic();
@@ -987,6 +1124,7 @@ const BloodPage = {
     }
 
     const permanentPin = this.ensurePermanentDonorPin();
+    const initialDonationCount = (lastDate && lastDate.trim() !== '') ? 1 : 0;
 
     const newDonor = {
       id: `DON_${Date.now()}`,
@@ -999,7 +1137,7 @@ const BloodPage = {
       area,
       gpsLink: gpsLink || '',
       lastDonationDate: lastDate || '',
-      donationCount: 1,
+      donationCount: initialDonationCount,
       isAvailable,
       permanentPin
     };
@@ -1009,8 +1147,9 @@ const BloodPage = {
     localStorage.setItem('selfcare_blood_donors', JSON.stringify(this.bloodDonors));
     localStorage.setItem('selfcare_my_donor_profile', JSON.stringify(newDonor));
 
+    // CLOUD PERSISTENCE: Save into Google Sheets
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
-      Api.request('registerBloodDonor', newDonor, false).catch(() => {});
+      Api.request('registerBloodDonor', newDonor, false).catch(err => console.warn('[BloodConnect] Save donor cloud notice:', err));
     }
 
     this.renderAll();
@@ -1021,9 +1160,6 @@ const BloodPage = {
     setTimeout(() => this.openMyCertificateModal(), 800);
   },
 
-  /**
-   * E-CERTIFICATE MODAL & GAMIFIED TIERS
-   */
   openMyCertificateModal() {
     this.triggerHaptic();
 
@@ -1035,7 +1171,7 @@ const BloodPage = {
     const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
     const name = myProfile?.name || user.name || 'Valued Lifesaver';
     const group = myProfile?.bloodGroup || user.bloodGroup || 'O +ve';
-    const count = parseInt(myProfile?.donationCount || 1, 10);
+    const count = parseInt(myProfile?.donationCount ?? 0, 10);
 
     const nameEl = document.getElementById('cert-donor-name');
     const groupEl = document.getElementById('cert-donor-group');
@@ -1045,12 +1181,15 @@ const BloodPage = {
 
     if (nameEl) nameEl.textContent = name;
     if (groupEl) groupEl.textContent = group;
-    if (countEl) countEl.textContent = `${count} ${count > 1 ? 'Times' : 'Time'}`;
+    if (countEl) countEl.textContent = `${count} ${count === 1 ? 'Time' : 'Times'}`;
     if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
     if (badgeEl) {
       badgeEl.className = 'cert-badge-tag';
-      if (count === 1) {
+      if (count === 0) {
+        badgeEl.classList.add('tier-bronze');
+        badgeEl.textContent = '🌱 PLEDGED LIFESAVER (READY TO DONATE)';
+      } else if (count === 1) {
         badgeEl.classList.add('tier-bronze');
         badgeEl.textContent = '🥉 BRONZE LIFESAVER (1 DONATION)';
       } else if (count === 2) {
