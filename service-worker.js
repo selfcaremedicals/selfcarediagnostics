@@ -1,17 +1,18 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v11.0.0 (Multi-Patient Split & Instant Cache Purge Edition)
+ * Selfcare Diagnostics - Service Worker v12.0.0 (Emergency Blood Connect & Instant Cache Purge Edition)
  * Features:
- * - Upgraded Cache Version to v11.0.0 (Instantly purges stale cart.js, bookings.js & profile.js cache)
+ * - Upgraded Cache Version to v12.0.0 (Instantly purges older cache & forces blood connect assets update)
  * - Automatic cache purge on activation & immediate client takeover (clients.claim())
- * - Fast precache with cache-busting timestamp to prevent browser HTTP disk caching
- * - Instant broadcast to all open tabs/PWA windows on update
+ * - Integrated blood.html, blood.css & blood.js into Core Offline Shell precache
+ * - Fast precache with cache-busting timestamp to bypass browser disk caching
+ * - Instant broadcast to all open tabs/PWA windows on update (SW_UPDATED signal)
  * - Strict network bypass for Google Apps Script & Central API calls
  * - Stale-While-Revalidate (SWR) for lightning-fast JS/CSS execution
  * - Network-First for HTML pages with seamless offline fallback
  */
 
-const CACHE_NAME = 'selfcare-cache-v11.0.0';
+const CACHE_NAME = 'selfcare-cache-v12.0.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -28,6 +29,7 @@ const ASSETS_TO_CACHE = [
   './admin.html',
   './technician.html',
   './membership.html',
+  './blood.html',
   './manifest.json',
   './assets/css/global.css',
   './assets/css/components.css',
@@ -43,6 +45,7 @@ const ASSETS_TO_CACHE = [
   './assets/css/admin.css',
   './assets/css/technician.css',
   './assets/css/membership.css',
+  './assets/css/blood.css',
   './assets/js/config.js',
   './assets/js/api.js',
   './assets/js/utils.js',
@@ -62,6 +65,7 @@ const ASSETS_TO_CACHE = [
   './assets/js/admin.js',
   './assets/js/technician.js',
   './assets/js/membership.js',
+  './assets/js/blood.js',
   './assets/images/logo.png',
   './assets/images/icon-192.png',
   './assets/images/icon-512.png'
@@ -69,7 +73,7 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache Fresh Files & Skip Waiting
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Upgraded Engine v11.0.0 (Multi-Patient Split Edition)...');
+  console.log('[Selfcare SW] Installing Upgraded Engine v12.0.0 (Emergency Blood Connect Edition)...');
   self.skipWaiting();
 
   event.waitUntil(
@@ -77,7 +81,7 @@ self.addEventListener('install', (event) => {
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
           // Cache busting query added during fetch to bypass browser disk cache
-          const bustUrl = `${url}?sw_bust=11.0.0`;
+          const bustUrl = `${url}?sw_bust=12.0.0`;
           const response = await fetch(bustUrl, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
@@ -101,7 +105,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purge All Older Caches & Claim Clients Immediately
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v11.0.0 & Purging all stale caches...');
+  console.log('[Selfcare SW] Activating v12.0.0 & Purging all stale caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -117,7 +121,7 @@ self.addEventListener('activate', (event) => {
       // Notify all open tabs/clients that new version is live
       const clients = await self.clients.matchAll({ type: 'window' });
       clients.forEach((client) => {
-        client.postMessage({ type: 'SW_UPDATED', version: 'v11.0.0' });
+        client.postMessage({ type: 'SW_UPDATED', version: 'v12.0.0' });
       });
     })
   );

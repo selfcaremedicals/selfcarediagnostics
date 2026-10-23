@@ -10,12 +10,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <link rel="stylesheet" href="assets/css/global.css?v=6.3.0">
-  <link rel="stylesheet" href="assets/css/components.css?v=6.3.0">
-  <link rel="stylesheet" href="assets/css/responsive.css?v=6.3.0">
-  <link rel="stylesheet" href="assets/css/blood.css?v=2.0.0">
+  <!-- Synced Cache-Busted Assets v12.0.0 -->
+  <link rel="stylesheet" href="assets/css/global.css?v=12.0.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=12.0.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=12.0.0">
+  <link rel="stylesheet" href="assets/css/blood.css?v=12.0.0">
 
-  <!-- HTML2Canvas Library for Direct WhatsApp Image Conversion -->
+  <!-- HTML2Canvas Library for Native WhatsApp Image Conversion -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body class="glass-bg-body">
@@ -201,9 +202,7 @@
 
   </main>
 
-  <!-- ====================================================================
-       MODAL 1: POST EMERGENCY BLOOD REQUEST
-       ==================================================================== -->
+  <!-- MODAL 1: POST EMERGENCY BLOOD REQUEST -->
   <div id="modal-blood-request" class="sia-modal-overlay" style="display: none;">
     <div class="sia-modal-content glass-modal-3d animate-3d-pop">
       <div class="sia-modal-header emergency-header">
@@ -395,9 +394,7 @@
     </div>
   </div>
 
-  <!-- ====================================================================
-       MODAL 2: REGISTER AS VOLUNTEER DONOR
-       ==================================================================== -->
+  <!-- MODAL 2: REGISTER AS VOLUNTEER DONOR -->
   <div id="modal-donor-register" class="sia-modal-overlay" style="display: none;">
     <div class="sia-modal-content glass-modal-3d animate-3d-pop">
       <div class="sia-modal-header donor-header">
@@ -536,9 +533,7 @@
     </div>
   </div>
 
-  <!-- ====================================================================
-       MODAL 3: PATIENT HISTORY & FULL DETAILS CARD TOUCH MODAL
-       ==================================================================== -->
+  <!-- MODAL 3: PATIENT HISTORY & FULL DETAILS CARD TOUCH MODAL -->
   <div id="modal-patient-details" class="sia-modal-overlay" style="display: none;">
     <div class="sia-modal-content glass-modal-3d animate-3d-pop">
       <div class="sia-modal-header emergency-header">
@@ -549,15 +544,11 @@
         <button type="button" class="sia-close-btn" onclick="BloodPage.closeModal('modal-patient-details')">✕</button>
       </div>
 
-      <div class="sia-modal-body" id="patient-details-body">
-        <!-- Rendered dynamically via BloodPage.openPatientDetails(id) -->
-      </div>
+      <div class="sia-modal-body" id="patient-details-body"></div>
     </div>
   </div>
 
-  <!-- ====================================================================
-       MODAL 4: DYNAMIC E-CERTIFICATE WITH REAL LOGO & TIERS
-       ==================================================================== -->
+  <!-- MODAL 4: DYNAMIC E-CERTIFICATE WITH REAL LOGO & TIERS -->
   <div id="modal-certificate" class="sia-modal-overlay" style="display: none;">
     <div class="sia-modal-content glass-modal-3d animate-3d-pop certificate-modal-wrap">
       <div class="sia-modal-header" style="background: linear-gradient(135deg, #045D49, #078866);">
@@ -569,7 +560,6 @@
       </div>
 
       <div class="sia-modal-body">
-        <!-- Renderable Certificate Paper Node (Target for HTML2Canvas Image Share) -->
         <div class="certificate-paper-3d" id="certificate-render-node">
           <div class="cert-border-inner" id="cert-border-wrapper">
             <div class="cert-header">
@@ -583,7 +573,6 @@
 
             <div class="cert-title-wrap">
               <h2>CERTIFICATE OF APPRECIATION</h2>
-              <!-- Dynamic Gamified Tier Tag -->
               <div id="cert-tier-badge" class="cert-badge-tag tier-bronze">🥉 BRONZE LIFESAVER (1 DONATION)</div>
             </div>
 
@@ -624,7 +613,6 @@
           </div>
         </div>
 
-        <!-- Certificate Sharing Actions -->
         <div class="cert-actions-grid">
           <button type="button" class="modal-action-btn primary-glow-btn" id="btn-share-certificate" onclick="BloodPage.shareCertificateDirect()">
             📲 Share Image to WhatsApp
@@ -662,10 +650,11 @@
     </a>
   </nav>
 
-  <script src="assets/js/config.js?v=6.3.0"></script>
-  <script src="assets/js/utils.js?v=12.1.0"></script>
-  <script src="assets/js/api.js?v=6.0.0"></script>
-  <script src="assets/js/auth.js?v=3.4.0"></script>
-  <script src="assets/js/blood.js?v=2.0.0"></script>
+  <!-- Cache-Busted Scripts v12.0.0 -->
+  <script src="assets/js/config.js?v=12.0.0"></script>
+  <script src="assets/js/utils.js?v=12.0.0"></script>
+  <script src="assets/js/api.js?v=12.0.0"></script>
+  <script src="assets/js/auth.js?v=12.0.0"></script>
+  <script src="assets/js/blood.js?v=12.0.0"></script>
 </body>
 </html>
