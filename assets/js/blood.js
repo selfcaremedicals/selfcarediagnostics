@@ -1,8 +1,15 @@
 /* file: assets/js/blood.js */
 /**
- * Selfcare Diagnostics - Emergency Blood Connect Controller v2.0.0
- * Zero-Dummy Data, Touch Modals, Unit Highlights, Attender Handshake,
- * 38 Districts, Gamified Tiers, and Native WhatsApp Image Sharing.
+ * Selfcare Diagnostics - Emergency Blood Connect Controller v2.2.0
+ * Features:
+ * - Permanent Rapido-like Donor PIN (Fixed per user).
+ * - Post Creator Auto-Detection (Attender will never see 'Ready to Donate').
+ * - 1 Active SOS Lock & 90-Day Medical Cooldown.
+ * - Accept SOS Button visible both on outer card & inner details modal.
+ * - Live Card Donor Chips ("Person (Name) ready to donate").
+ * - Slot Quota Lock (Hides accept button when required units assigned).
+ * - Attender PIN Verification Handshake (Only correct PIN confirms donation).
+ * - Auto-Disappear & Completed Archive on 100% verification.
  */
 
 const BloodPage = {
@@ -15,6 +22,7 @@ const BloodPage = {
 
   async init() {
     try {
+      this.ensurePermanentDonorPin();
       this.loadBloodData();
       this.populateUserContext();
       this.renderAll();
@@ -47,10 +55,61 @@ const BloodPage = {
     }
   },
 
+  /**
+   * PERMANENT RAPIDO-LIKE DONOR PIN (Fixed for this user forever)
+   */
+  ensurePermanentDonorPin() {
+    let pin = localStorage.getItem('selfcare_donor_permanent_pin');
+    if (!pin || pin.length !== 4) {
+      pin = String(Math.floor(1000 + Math.random() * 9000));
+      localStorage.setItem('selfcare_donor_permanent_pin', pin);
+    }
+    return pin;
+  },
+
+  getMyDonorPin() {
+    return localStorage.getItem('selfcare_donor_permanent_pin') || this.ensurePermanentDonorPin();
+  },
+
+  getMyPhone() {
+    const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
+    let ph = localStorage.getItem('selfcare_active_user') || user.mobile || '';
+    return String(ph).replace(/\D/g, '').slice(-10);
+  },
+
+  getMyName() {
+    let myProfile = null;
+    try {
+      myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
+    } catch (e) {}
+    const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
+    return myProfile?.name || user.name || 'Voluntary Donor';
+  },
+
+  isMyCreatedRequest(reqId, reqAttenderPhone) {
+    const myCreated = JSON.parse(localStorage.getItem('selfcare_my_created_requests') || '[]');
+    const myPhone = this.getMyPhone();
+    if (myCreated.includes(reqId)) return true;
+    if (myPhone && reqAttenderPhone && String(reqAttenderPhone).slice(-10) === myPhone) return true;
+    return false;
+  },
+
+  hasActivePledgedSos() {
+    const myPhone = this.getMyPhone();
+    if (!myPhone) return null;
+    for (const req of this.bloodRequests) {
+      if ((req.unitsNeeded - (req.unitsDonated || 0)) > 0 && Array.isArray(req.donorsList)) {
+        const found = req.donorsList.find(d => d.donorPhone === myPhone && d.status === 'ACCEPTED');
+        if (found) return req;
+      }
+    }
+    return null;
+  },
+
   populateUserContext() {
     try {
       const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-      const activeMobile = localStorage.getItem('selfcare_active_user') || user.mobile || '';
+      const activeMobile = this.getMyPhone();
 
       const nameInput = document.getElementById('donor-name');
       const phoneInput = document.getElementById('donor-phone');
@@ -59,16 +118,15 @@ const BloodPage = {
       const reqPhone = document.getElementById('req-attender-phone');
 
       if (nameInput && user.name) nameInput.value = user.name;
-      if (phoneInput && activeMobile) phoneInput.value = String(activeMobile).replace(/\D/g, '').slice(-10);
+      if (phoneInput && activeMobile) phoneInput.value = activeMobile;
       if (groupInput && user.bloodGroup) groupInput.value = user.bloodGroup;
 
       if (reqAttender && user.name) reqAttender.value = user.name;
-      if (reqPhone && activeMobile) reqPhone.value = String(activeMobile).replace(/\D/g, '').slice(-10);
+      if (reqPhone && activeMobile) reqPhone.value = activeMobile;
     } catch (e) {}
   },
 
   loadBloodData() {
-    // Zero-Dummy Data: Initialized strictly from LocalStorage or empty arrays
     try {
       const storedReq = localStorage.getItem('selfcare_blood_requests');
       this.bloodRequests = storedReq ? JSON.parse(storedReq) : [];
@@ -185,13 +243,15 @@ const BloodPage = {
 
   /**
    * SECTION 1: Render Active Emergency Blood Requests
-   * Auto-disappears when balance = 0
+   * Auto-disappears when all units verified with PIN (balance = 0)
    */
   renderRequests() {
     const container = document.getElementById('requests-list-container');
     if (!container) return;
 
-    // Filter ONLY active requests where balance > 0
+    const myPhone = this.getMyPhone();
+
+    // STRICT FILTER: Only show active requests with balance > 0
     let list = this.bloodRequests.filter(r => {
       const needed = parseInt(r.unitsNeeded || 1, 10);
       const donated = parseInt(r.unitsDonated || 0, 10);
@@ -214,7 +274,7 @@ const BloodPage = {
         <div class="empty-family-state" style="padding: 24px 16px; text-align: center; background: #FFFFFF; border-radius: 16px; border: 1.5px dashed #CBD5E1;">
           <span style="font-size: 32px; display: block; margin-bottom: 6px;">🩺</span>
           <h4 style="font-size: 13.5px; font-weight: 800; color: #1E293B;">No Active Emergency Requests</h4>
-          <p style="font-size: 11px; color: #64748B;">No patients currently need blood in ${this.selectedDistrict !== 'ALL' ? this.selectedDistrict : 'Tamil Nadu'}.</p>
+          <p style="font-size: 11px; color: #64748B;">No open emergency requests in ${this.selectedDistrict !== 'ALL' ? this.selectedDistrict : 'Tamil Nadu'}.</p>
         </div>
       `;
       return;
@@ -229,8 +289,15 @@ const BloodPage = {
       const donatedCount = parseInt(req.unitsDonated || 0, 10);
       const balance = Math.max(0, totalNeeded - donatedCount);
 
+      const donorsList = req.donorsList || [];
+      const acceptedCount = donorsList.filter(d => d.status === 'ACCEPTED' || d.status === 'CONFIRMED').length;
+      const isSlotsFull = acceptedCount >= totalNeeded;
+
+      const isOwner = this.isMyCreatedRequest(req.id, req.attenderPhone);
+      const hasMeAccepted = myPhone && donorsList.some(d => d.donorPhone === myPhone && d.status === 'ACCEPTED');
+
       const whatsappText = encodeURIComponent(
-        `Hello ${req.attenderName}, I saw your emergency request on Selfcare Diagnostics Blood Connect for patient ${req.patientName} (${req.bloodGroup} at ${req.hospitalName}). I would like to volunteer to donate blood. Please confirm hospital details.`
+        `Hello ${req.attenderName}, I saw your emergency request on Selfcare Diagnostics Blood Connect for patient ${req.patientName} (${req.bloodGroup} at ${req.hospitalName}). I would like to volunteer to donate blood.`
       );
 
       return `
@@ -247,11 +314,25 @@ const BloodPage = {
             <span class="urgency-pill ${urgencyClass}">${urgencyLabel}</span>
           </div>
 
-          <!-- Highlighted Units Progress Banner -->
+          <!-- Highlight Units Progress Banner -->
           <div class="units-highlight-banner">
             <span class="units-text">🎯 Target: ${totalNeeded} Units Required</span>
             <span class="balance-tag">${donatedCount} Donated • ${balance} Units Balance</span>
           </div>
+
+          <!-- Live Donors Status Chips (Veliya Card Layum Kaattum) -->
+          ${donorsList.length > 0 ? `
+            <div class="card-accepted-donors-box">
+              <span class="accepted-head">Lifesavers on the way (${acceptedCount}/${totalNeeded}):</span>
+              <div class="donor-chips-wrap">
+                ${donorsList.map(d => `
+                  <span class="donor-status-chip ${d.status === 'CONFIRMED' ? 'chip-confirmed' : 'chip-accepted'}">
+                    🩸 ${this.safeEscape(d.donorName)} (${d.status === 'CONFIRMED' ? '✅ Donated' : 'Ready to donate'})
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
 
           <div class="card-hospital-box">
             <div class="hosp-line">
@@ -263,6 +344,7 @@ const BloodPage = {
             </div>
           </div>
 
+          <!-- Action Buttons Bar with Outer Accept Button -->
           <div class="card-action-bar" onclick="event.stopPropagation()">
             <button type="button" class="action-btn-call" onclick="BloodPage.promptDonorSafetyCall('${req.attenderPhone}', '${this.safeEscape(req.hospitalName)}')">
               📞 Call
@@ -270,19 +352,35 @@ const BloodPage = {
             <button type="button" class="action-btn-whatsapp" onclick="BloodPage.promptDonorSafetyWhatsApp('${req.attenderPhone}', '${whatsappText}', '${this.safeEscape(req.hospitalName)}')">
               💬 WhatsApp
             </button>
-            <a href="${req.gpsLink || `https://maps.google.com/?q=${encodeURIComponent(req.hospitalName + ' ' + req.district)}`}" target="_blank" rel="noopener noreferrer" class="action-btn-map">
-              🗺️ Map
-            </a>
+
+            <!-- Outer Accept Button Logic -->
+            ${isOwner ? `
+              <button type="button" class="action-btn-owner-panel" onclick="BloodPage.openPatientDetails('${req.id}')">
+                ⚙️ Verify PIN
+              </button>
+            ` : hasMeAccepted ? `
+              <button type="button" class="action-btn-accepted" onclick="BloodPage.openPatientDetails('${req.id}')">
+                ✓ Pledged
+              </button>
+            ` : isSlotsFull ? `
+              <button type="button" class="action-btn-full" disabled>
+                🔒 Full
+              </button>
+            ` : `
+              <button type="button" class="action-btn-accept-outer" onclick="BloodPage.volunteerForRequest('${req.id}')">
+                🙋 Accept SOS
+              </button>
+            `}
           </div>
 
-          <div class="tap-view-hint">👆 Tap card to view full patient details & confirm donation</div>
+          <div class="tap-view-hint">👆 Tap card to view full details & verify PIN</div>
         </div>
       `;
     }).join('');
   },
 
   /**
-   * TOUCH PATIENT CARD -> OPEN FULL DETAILS & ATTENDER HANDSHAKE MODAL
+   * TOUCH PATIENT CARD -> OPEN FULL DETAILS & ATTENDER PIN HANDSHAKE
    */
   openPatientDetails(reqId) {
     this.triggerHaptic();
@@ -296,12 +394,14 @@ const BloodPage = {
     const donatedCount = parseInt(req.unitsDonated || 0, 10);
     const balance = Math.max(0, totalNeeded - donatedCount);
 
-    // Current user context
-    const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-    const myPhone = String(localStorage.getItem('selfcare_active_user') || user.mobile || '').replace(/\D/g, '').slice(-10);
-    const isAttender = myPhone && (myPhone === req.attenderPhone);
+    const isOwner = this.isMyCreatedRequest(req.id, req.attenderPhone);
+    const myPhone = this.getMyPhone();
+    const myPermanentPin = this.getMyDonorPin();
 
     const donorsList = req.donorsList || [];
+    const acceptedCount = donorsList.filter(d => d.status === 'ACCEPTED' || d.status === 'CONFIRMED').length;
+    const isSlotsFull = acceptedCount >= totalNeeded;
+    const myPledge = myPhone ? donorsList.find(d => d.donorPhone === myPhone) : null;
 
     modalBody.innerHTML = `
       <div class="patient-detail-group">
@@ -327,7 +427,7 @@ const BloodPage = {
       <div class="units-highlight-banner" style="padding: 10px;">
         <div>
           <strong style="color: #9A3412; font-size: 13px;">${totalNeeded} Units Required</strong>
-          <p style="font-size: 10.5px; color: #C2410C; margin: 2px 0 0 0;">${donatedCount} Person(s) Donated</p>
+          <p style="font-size: 10.5px; color: #C2410C; margin: 2px 0 0 0;">${donatedCount} Confirmed • ${acceptedCount} Pledged</p>
         </div>
         <span class="balance-tag" style="font-size: 11px; padding: 4px 10px;">${balance} Units Balance Needed</span>
       </div>
@@ -362,47 +462,69 @@ const BloodPage = {
         </div>
       </div>
 
-      <!-- ATTENDER CONFIRMATION HANDSHAKE SECTION -->
-      ${isAttender ? `
+      <!-- CONDITIONAL LOGIC: ATTENDER VERIFICATION vs DONOR ACCEPT VIEW -->
+      ${isOwner ? `
+        <!-- VIEW A: POST OWNER / ATTENDER PIN VERIFICATION PANEL -->
         <div class="handshake-box">
-          <h5>🤝 Attender Verification Panel</h5>
+          <h5>🔐 Attender PIN Verification Panel</h5>
           <p style="font-size: 10.5px; color: #78350F; margin-bottom: 8px;">
-            Donors who volunteer at the hospital will appear here. Click <strong>[Donated]</strong> only after blood collection is verified.
+            Ask the voluntary donor for their <strong>4-Digit Lifesaver PIN</strong> when they arrive at the hospital. Enter the PIN to confirm blood collection.
           </p>
 
           ${donorsList.length === 0 ? `
-            <p style="font-size: 11px; color: #92400E; font-style: italic;">No donors have accepted this request yet.</p>
+            <div style="padding: 10px; background: #FEF3C7; border-radius: 8px; text-align: center;">
+              <p style="font-size: 11px; color: #92400E; margin: 0; font-weight: 700;">Waiting for donors to accept this request...</p>
+            </div>
           ` : donorsList.map(d => `
             <div class="handshake-donor-item">
               <div>
-                <strong style="font-size: 11.5px; color: #1E293B;">${this.safeEscape(d.donorName)}</strong>
-                <div style="font-size: 9.5px; color: #64748B;">PIN: <span class="donor-pin-badge">${d.pin}</span> • ${d.donorPhone}</div>
+                <strong style="font-size: 12px; color: #0F172A;">${this.safeEscape(d.donorName)}</strong>
+                <div style="font-size: 10px; color: #64748B;">📞 ${this.safeEscape(d.donorPhone)}</div>
               </div>
-              <div class="handshake-actions">
-                ${d.status === 'CONFIRMED' ? `
-                  <span style="font-size: 10px; color: #047857; font-weight: 900;">✅ Confirmed Donated</span>
-                ` : `
-                  <button type="button" class="btn-confirm-donated" onclick="BloodPage.confirmDonationHandshake('${req.id}', '${d.donorId}', true)">
-                    ✓ Donated
+
+              ${d.status === 'CONFIRMED' ? `
+                <span class="verified-done-tag">✅ Confirmed Donated</span>
+              ` : `
+                <div class="pin-verify-action-group">
+                  <input type="tel" maxlength="4" placeholder="4-Digit PIN" id="input-pin-${d.donorId}" class="pin-entry-input">
+                  <button type="button" class="btn-verify-pin" onclick="BloodPage.verifyDonorPin('${req.id}', '${d.donorId}')">
+                    Verify PIN ✓
                   </button>
-                  <button type="button" class="btn-cancel-donated" onclick="BloodPage.confirmDonationHandshake('${req.id}', '${d.donorId}', false)">
-                    ✕ Not Donated
+                  <button type="button" class="btn-reject-donor" onclick="BloodPage.rejectDonor('${req.id}', '${d.donorId}')" title="Not Donated">
+                    ✕
                   </button>
-                `}
-              </div>
+                </div>
+              `}
             </div>
           `).join('')}
         </div>
       ` : `
-        <!-- VOLUNTEER DONOR CTA -->
-        <div style="margin-top: 6px;">
-          <button type="button" class="modal-action-btn primary-glow-btn" onclick="BloodPage.volunteerForRequest('${req.id}')">
-            🙋 I Am Ready to Donate for This Patient →
-          </button>
-        </div>
+        <!-- VIEW B: VOLUNTARY DONOR VIEW -->
+        ${myPledge ? `
+          <!-- Donor has accepted: Show permanent PIN highlighted -->
+          <div class="donor-pin-showcase-box animate-pop">
+            <span class="pin-showcase-tag">YOUR PERMANENT LIFESAVER PIN</span>
+            <div class="pin-display-giant">${myPermanentPin}</div>
+            <p class="pin-instructions">
+              Please visit <strong>${this.safeEscape(req.hospitalName)}</strong> and provide this 4-digit PIN to attender <strong>${this.safeEscape(req.attenderName)}</strong> to verify your donation.
+            </p>
+          </div>
+        ` : isSlotsFull ? `
+          <!-- Required units are already pledged by other donors -->
+          <div class="slots-full-notice">
+            🔒 Required units have already been pledged by lifesavers on the way.
+          </div>
+        ` : `
+          <!-- Inner Accept Button -->
+          <div style="margin-top: 6px;">
+            <button type="button" class="modal-action-btn primary-glow-btn" onclick="BloodPage.volunteerForRequest('${req.id}')">
+              🙋 I Am Ready to Donate for This Patient →
+            </button>
+          </div>
+        `}
       `}
 
-      <div class="card-action-bar" style="margin-top: 8px;">
+      <div class="card-action-bar" style="margin-top: 10px;">
         <button type="button" class="action-btn-call" onclick="BloodPage.promptDonorSafetyCall('${req.attenderPhone}', '${this.safeEscape(req.hospitalName)}')">
           📞 Direct Call
         </button>
@@ -419,47 +541,77 @@ const BloodPage = {
   },
 
   /**
-   * VOLUNTEER DONATION HANDSHAKE
+   * VOLUNTEER DONATION ACCEPT LOGIC
+   * Enforces 1-SOS Active Rule & 90-Day Medical Cooldown
    */
   volunteerForRequest(reqId) {
     this.triggerHaptic();
-    let myProfile = null;
-    try {
-      const stored = localStorage.getItem('selfcare_my_donor_profile');
-      if (stored) myProfile = JSON.parse(stored);
-    } catch (e) {}
+    const myPhone = this.getMyPhone();
 
-    const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-    const donorName = myProfile?.name || user.name || 'Voluntary Donor';
-    const donorPhone = myProfile?.phone || String(localStorage.getItem('selfcare_active_user') || user.mobile || '').replace(/\D/g, '').slice(-10);
-
-    if (!donorPhone) {
+    if (!myPhone) {
       this.safeShowToast('Please register as a donor first to volunteer!', 'error');
       this.closeModal('modal-patient-details');
       this.openDonorRegisterModal();
       return;
     }
 
+    // 1. Check if user is the request creator
     const req = this.bloodRequests.find(r => r.id === reqId);
     if (!req) return;
 
-    if (!req.donorsList) req.donorsList = [];
-
-    // Check if already volunteered
-    const existing = req.donorsList.find(d => d.donorPhone === donorPhone);
-    if (existing) {
-      this.safeShowToast(`You already volunteered! Your Verification PIN is: ${existing.pin}`, 'info');
+    if (this.isMyCreatedRequest(req.id, req.attenderPhone)) {
+      this.safeShowToast('You created this SOS request! Only other voluntary donors can accept.', 'error');
       return;
     }
 
-    // Generate 4-digit verification PIN
-    const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    // 2. 90-Day Medical Cooldown Check
+    let myProfile = null;
+    try {
+      myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
+    } catch (e) {}
+
+    if (myProfile && myProfile.lastDonationDate) {
+      const cooldown = this.calculateCooldown(myProfile.lastDonationDate);
+      if (!cooldown.canDonate) {
+        alert(`⚠️ Medical Cooldown Active:\nYou recently donated blood. You must wait ${cooldown.daysRemaining} more days before accepting another donation.`);
+        return;
+      }
+    }
+
+    // 3. 1 Active SOS Lock: Check if already pledged to an active unfulfilled SOS
+    const activePledgedReq = this.hasActivePledgedSos();
+    if (activePledgedReq && activePledgedReq.id !== reqId) {
+      alert(`⚠️ Active SOS in Progress:\nYou have already accepted to donate for patient "${activePledgedReq.patientName}" at ${activePledgedReq.hospitalName}. Please complete or cancel that donation before accepting another SOS.`);
+      return;
+    }
+
+    if (!req.donorsList) req.donorsList = [];
+
+    // 4. Check if required quota is already full
+    const totalNeeded = parseInt(req.unitsNeeded || 1, 10);
+    const currentAccepted = req.donorsList.filter(d => d.status === 'ACCEPTED' || d.status === 'CONFIRMED').length;
+    if (currentAccepted >= totalNeeded) {
+      alert('This request already has the required number of donors on the way!');
+      return;
+    }
+
+    // 5. Existing check
+    const existing = req.donorsList.find(d => d.donorPhone === myPhone);
+    const permanentPin = this.getMyDonorPin();
+
+    if (existing) {
+      this.safeShowToast(`You already accepted! Your permanent PIN is: ${permanentPin}`, 'info');
+      this.openPatientDetails(reqId);
+      return;
+    }
+
+    // Save pledge with permanent PIN
     const donorRecord = {
       donorId: `VOL_${Date.now()}`,
-      donorName,
-      donorPhone,
-      pin,
-      status: 'PENDING',
+      donorName: this.getMyName(),
+      donorPhone: myPhone,
+      pin: permanentPin, // Permanent fixed PIN
+      status: 'ACCEPTED',
       timestamp: new Date().toISOString()
     };
 
@@ -467,16 +619,17 @@ const BloodPage = {
     localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
 
     alert(
-      `🎉 THANK YOU LIFESAVER!\n\nYou have volunteered to donate blood for ${req.patientName}.\n\nYour 4-Digit Verification PIN is: [ ${pin} ]\n\nPlease give this PIN to the attender (${req.attenderName}) at ${req.hospitalName}.`
+      `🎉 DONATION PLEDGE ACCEPTED!\n\nYour Permanent Lifesaver PIN is: [ ${permanentPin} ]\n\nPlease reach "${req.hospitalName}" and give this 4-digit PIN to attender "${req.attenderName}".`
     );
 
+    this.renderAll();
     this.openPatientDetails(reqId);
   },
 
   /**
-   * ATTENDER HANDSHAKE: Donated vs Not Donated
+   * ATTENDER PIN VERIFICATION (Only correct donor PIN confirms donation)
    */
-  confirmDonationHandshake(reqId, donorId, isDonated) {
+  verifyDonorPin(reqId, donorId) {
     this.triggerHaptic();
     const req = this.bloodRequests.find(r => r.id === reqId);
     if (!req || !req.donorsList) return;
@@ -484,37 +637,70 @@ const BloodPage = {
     const donorObj = req.donorsList.find(d => d.donorId === donorId);
     if (!donorObj) return;
 
-    if (isDonated) {
-      donorObj.status = 'CONFIRMED';
-      req.unitsDonated = (parseInt(req.unitsDonated || 0, 10)) + 1;
+    const inputEl = document.getElementById(`input-pin-${donorId}`);
+    const enteredPin = inputEl ? inputEl.value.trim() : '';
 
-      // Update donor's local profile & donation tier
-      try {
-        let myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
-        if (myProfile && myProfile.phone === donorObj.donorPhone) {
-          myProfile.donationCount = (myProfile.donationCount || 0) + 1;
-          myProfile.lastDonationDate = new Date().toISOString().slice(0, 10);
-          localStorage.setItem('selfcare_my_donor_profile', JSON.stringify(myProfile));
-        }
-
-        // Add to donor's completed history list
-        let myHistory = JSON.parse(localStorage.getItem('selfcare_my_donation_history') || '[]');
-        myHistory.unshift({
-          patientName: req.patientName,
-          hospitalName: req.hospitalName,
-          district: req.district,
-          date: new Date().toLocaleDateString('en-GB')
-        });
-        localStorage.setItem('selfcare_my_donation_history', JSON.stringify(myHistory));
-      } catch (e) {}
-
-      this.safeShowToast('Donation verified! Units balance updated ❤️', 'success');
-    } else {
-      donorObj.status = 'REJECTED';
-      this.safeShowToast('Marked as Not Donated. Slot opened for other donors.', 'info');
+    if (!enteredPin || enteredPin.length !== 4) {
+      this.safeShowToast('Please enter the 4-digit PIN provided by the donor', 'error');
+      return;
     }
 
+    if (enteredPin !== String(donorObj.pin)) {
+      alert('❌ INCORRECT PIN!\nThe entered PIN does not match the donor’s PIN. Please verify with the donor.');
+      return;
+    }
+
+    // PIN MATCHED: Mark confirmed
+    donorObj.status = 'CONFIRMED';
+    req.unitsDonated = (parseInt(req.unitsDonated || 0, 10)) + 1;
+
+    // Update donor's local profile if verifying on own device
+    try {
+      let myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
+      if (myProfile && myProfile.phone === donorObj.donorPhone) {
+        myProfile.donationCount = (myProfile.donationCount || 0) + 1;
+        myProfile.lastDonationDate = new Date().toISOString().slice(0, 10);
+        localStorage.setItem('selfcare_my_donor_profile', JSON.stringify(myProfile));
+      }
+
+      let myHistory = JSON.parse(localStorage.getItem('selfcare_my_donation_history') || '[]');
+      myHistory.unshift({
+        patientName: req.patientName,
+        hospitalName: req.hospitalName,
+        district: req.district,
+        date: new Date().toLocaleDateString('en-GB')
+      });
+      localStorage.setItem('selfcare_my_donation_history', JSON.stringify(myHistory));
+    } catch (e) {}
+
     localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
+
+    const totalNeeded = parseInt(req.unitsNeeded || 1, 10);
+    const balance = Math.max(0, totalNeeded - req.unitsDonated);
+
+    if (balance === 0) {
+      alert(`🎉 100% BLOOD UNITS COLLECTED!\n\nAll ${totalNeeded} units have been verified with donor PINs. This emergency request is now completed and archived.`);
+      this.closeModal('modal-patient-details');
+    } else {
+      this.safeShowToast(`PIN Verified! ${balance} more units required.`, 'success');
+      this.openPatientDetails(reqId);
+    }
+
+    this.renderAll();
+  },
+
+  rejectDonor(reqId, donorId) {
+    this.triggerHaptic();
+    const confirmed = confirm('Mark this donor as Not Donated? This will open the slot for another lifesaver.');
+    if (!confirmed) return;
+
+    const req = this.bloodRequests.find(r => r.id === reqId);
+    if (!req || !req.donorsList) return;
+
+    req.donorsList = req.donorsList.filter(d => d.donorId !== donorId);
+    localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
+
+    this.safeShowToast('Donor removed. Slot opened for others.', 'info');
     this.renderAll();
     this.openPatientDetails(reqId);
   },
@@ -554,7 +740,7 @@ const BloodPage = {
       const isEligible = d.isAvailable && cooldown.canDonate;
 
       const whatsappText = encodeURIComponent(
-        `Hello ${d.name}, we urgently need blood donation for a critical patient in ${d.district}. We found your profile on Selfcare Diagnostics Blood Connect. Could you please let us know if you are available?`
+        `Hello ${d.name}, we urgently need blood donation for a patient in ${d.district}. We found your profile on Selfcare Diagnostics Blood Connect. Could you please let us know if you are available?`
       );
 
       return `
@@ -638,7 +824,7 @@ const BloodPage = {
             <span class="urgency-pill urgency-scheduled">✅ 100% FULFILLED</span>
           </div>
           <p style="font-size: 10.5px; color: #065F46; margin-top: 4px; font-weight: 700;">
-            All ${r.unitsNeeded} units successfully collected and confirmed by attender!
+            All ${r.unitsNeeded} units successfully verified with donor PINs!
           </p>
         </div>
       `).join('');
@@ -739,8 +925,9 @@ const BloodPage = {
       return;
     }
 
+    const reqId = `REQ_${Date.now()}`;
     const newRequest = {
-      id: `REQ_${Date.now()}`,
+      id: reqId,
       patientName,
       patientAgeGender,
       attenderName,
@@ -760,6 +947,11 @@ const BloodPage = {
       donorsList: []
     };
 
+    // Store in my created requests to ensure creator is always recognized
+    let myCreated = JSON.parse(localStorage.getItem('selfcare_my_created_requests') || '[]');
+    myCreated.push(reqId);
+    localStorage.setItem('selfcare_my_created_requests', JSON.stringify(myCreated));
+
     this.bloodRequests.unshift(newRequest);
     localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
 
@@ -771,7 +963,7 @@ const BloodPage = {
     this.closeModal('modal-blood-request');
     this.switchTab('requests');
 
-    this.safeShowToast('Emergency request posted across Tamil Nadu! 🚨', 'success');
+    this.safeShowToast('Emergency request posted! 🚨', 'success');
   },
 
   handleDonorSubmit(event) {
@@ -794,6 +986,8 @@ const BloodPage = {
       return;
     }
 
+    const permanentPin = this.ensurePermanentDonorPin();
+
     const newDonor = {
       id: `DON_${Date.now()}`,
       name,
@@ -806,7 +1000,8 @@ const BloodPage = {
       gpsLink: gpsLink || '',
       lastDonationDate: lastDate || '',
       donationCount: 1,
-      isAvailable
+      isAvailable,
+      permanentPin
     };
 
     this.bloodDonors = this.bloodDonors.filter(d => d.phone !== phone);
@@ -822,7 +1017,7 @@ const BloodPage = {
     this.closeModal('modal-donor-register');
     this.switchTab('donors');
 
-    this.safeShowToast(`Thank you ${name}! You are registered as a Lifesaver ❤️`, 'success');
+    alert(`🎉 WELCOME TO SELFCARE LIFESAVERS!\n\nYour Permanent 4-Digit PIN is: [ ${permanentPin} ]\n\nWhenever you donate blood at a hospital, give this PIN to the attender to verify your donation.`);
     setTimeout(() => this.openMyCertificateModal(), 800);
   },
 
@@ -834,8 +1029,7 @@ const BloodPage = {
 
     let myProfile = null;
     try {
-      const stored = localStorage.getItem('selfcare_my_donor_profile');
-      if (stored) myProfile = JSON.parse(stored);
+      myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile'));
     } catch (e) {}
 
     const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
@@ -854,7 +1048,6 @@ const BloodPage = {
     if (countEl) countEl.textContent = `${count} ${count > 1 ? 'Times' : 'Time'}`;
     if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
-    // Determine Gamified Tier Badge
     if (badgeEl) {
       badgeEl.className = 'cert-badge-tag';
       if (count === 1) {
@@ -881,9 +1074,6 @@ const BloodPage = {
     this.openModal('modal-certificate');
   },
 
-  /**
-   * DIRECT IMAGE SHARE TO WHATSAPP VIA HTML2CANVAS & WEB SHARE API
-   */
   async shareCertificateDirect() {
     this.triggerHaptic();
     const certNode = document.getElementById('certificate-render-node');
@@ -913,27 +1103,25 @@ const BloodPage = {
 
         const file = new File([blob], 'Selfcare-Lifesaver-Certificate.png', { type: 'image/png' });
 
-        // Native Web Share API (Direct WhatsApp File Share)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
               files: [file],
               title: 'Selfcare Lifesaver Certificate',
-              text: 'Proud to be a voluntary blood donor with Selfcare Diagnostics! 🩸 Join the circle: https://selfcarediagnostics.in/blood.html'
+              text: 'Proud to be a voluntary blood donor with Selfcare Diagnostics! 🩸 Join: https://selfcarediagnostics.in/blood.html'
             });
             if (shareBtn) shareBtn.textContent = originalText;
           } catch (shareErr) {
             if (shareBtn) shareBtn.textContent = originalText;
           }
         } else {
-          // Fallback: Download file and open WhatsApp chat
           const link = document.createElement('a');
           link.download = 'Selfcare-Lifesaver-Certificate.png';
           link.href = canvas.toDataURL('image/png');
           link.click();
 
           const text = encodeURIComponent(
-            `Proud to be a voluntary blood donor with Selfcare Diagnostics! 🩸 (Attached is my Lifesaver Certificate). Join us: https://selfcarediagnostics.in/blood.html`
+            `Proud to be a voluntary blood donor with Selfcare Diagnostics! 🩸 (Attached is my Lifesaver Certificate). Join: https://selfcarediagnostics.in/blood.html`
           );
           setTimeout(() => {
             window.location.href = `https://wa.me/?text=${text}`;
