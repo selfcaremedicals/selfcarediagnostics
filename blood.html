@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Emergency Blood Connect - Selfcare Diagnostics</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#DC2626">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="stylesheet" href="assets/css/global.css?v=6.3.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=6.3.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=6.3.0">
+  <link rel="stylesheet" href="assets/css/blood.css?v=2.0.0">
+
+  <!-- HTML2Canvas Library for Direct WhatsApp Image Conversion -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body class="glass-bg-body">
+
+  <!-- Floating Glass App Header -->
+  <header class="app-header glass-nav-3d">
+    <div class="header-left" onclick="window.location.href='customer.html'" style="cursor: pointer;">
+      <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="header-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="fallback-logo" style="display:none;">
+        <h1 class="logo-text">SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
+        <p class="tagline">Empowering Wellness</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="blood-sos-pill animate-pulse">● Tamil Nadu SOS</span>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container blood-container">
+
+    <!-- Mandatory Donor Safety Advisory -->
+    <section class="safety-shield-box animate-pop">
+      <div class="safety-shield-icon">🛡️</div>
+      <div class="safety-shield-content">
+        <div class="safety-shield-head">
+          <span class="warning-tag">⚠️ MANDATORY DONOR SAFETY ADVISORY</span>
+        </div>
+        <h4>Never Donate at Private or Isolated Locations!</h4>
+        <p>Always ensure donations occur <strong>strictly inside a recognized Hospital, Government/Private Blood Bank, or Registered Clinical premises</strong>. Never meet anyone at private homes or unknown isolated venues.</p>
+      </div>
+    </section>
+
+    <!-- Dual Action Gateway Hero (Receiver vs Donor) -->
+    <section class="gateway-hero-grid">
+      <!-- Action 1: Receiver SOS -->
+      <div class="gateway-card receiver-card" onclick="BloodPage.openRequestModal()">
+        <div class="gateway-badge urgent-badge">🚨 IMMEDIATE SOS</div>
+        <div class="gateway-icon">🏥</div>
+        <h3>Need Blood Urgently?</h3>
+        <p>Post emergency patient request with hospital details. Alerts nearby donors across Tamil Nadu.</p>
+        <button type="button" class="gateway-btn receiver-btn">Post Urgent Request →</button>
+      </div>
+
+      <!-- Action 2: Volunteer Donor -->
+      <div class="gateway-card donor-card" onclick="BloodPage.openDonorRegisterModal()">
+        <div class="gateway-badge donor-badge">🩸 BE A HERO</div>
+        <div class="gateway-icon">❤️</div>
+        <h3>Volunteer as Donor</h3>
+        <p>Join Tamil Nadu's lifesaver network. Get notified when your blood group is needed.</p>
+        <button type="button" class="gateway-btn donor-btn">Register as Donor →</button>
+      </div>
+    </section>
+
+    <!-- Live Donation Stats & Certificate Access -->
+    <section class="glass-panel-3d hero-stats-bar">
+      <div class="stat-item">
+        <span class="stat-num" id="stat-active-requests">0</span>
+        <span class="stat-lbl">Active Requests</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-num" id="stat-registered-donors">0</span>
+        <span class="stat-lbl">Verified Donors</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item stat-action" onclick="BloodPage.openMyCertificateModal()">
+        <span class="stat-num">📜</span>
+        <span class="stat-lbl certificate-link">My Certificate</span>
+      </div>
+    </section>
+
+    <!-- 3-Segment Navigation Tabs -->
+    <div class="blood-nav-tabs">
+      <button type="button" class="blood-tab-btn active" id="tab-btn-requests" onclick="BloodPage.switchTab('requests')">
+        🚨 Active SOS (<span id="count-tab-requests">0</span>)
+      </button>
+      <button type="button" class="blood-tab-btn" id="tab-btn-donors" onclick="BloodPage.switchTab('donors')">
+        🩸 Donors (<span id="count-tab-donors">0</span>)
+      </button>
+      <button type="button" class="blood-tab-btn" id="tab-btn-history" onclick="BloodPage.switchTab('history')">
+        📜 Completed Archive (<span id="count-tab-history">0</span>)
+      </button>
+    </div>
+
+    <!-- Filter & Search Bar (38 Districts + All Blood Groups) -->
+    <section class="blood-filter-box glass-panel-3d" id="filters-container">
+      <div class="filter-inputs-grid">
+        <div class="filter-field">
+          <label>Blood Group</label>
+          <select id="filter-blood-group" onchange="BloodPage.applyFilters()">
+            <option value="ALL">All Blood Groups</option>
+            <option value="ANY">Any / Compatible SOS</option>
+            <option value="A+">A +ve</option>
+            <option value="A-">A -ve</option>
+            <option value="B+">B +ve</option>
+            <option value="B-">B -ve</option>
+            <option value="O+">O +ve</option>
+            <option value="O-">O -ve</option>
+            <option value="AB+">AB +ve</option>
+            <option value="AB-">AB -ve</option>
+            <option value="Bombay">Bombay Blood</option>
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label>District (All 38 Districts)</label>
+          <select id="filter-district" onchange="BloodPage.applyFilters()">
+            <option value="ALL">All Tamil Nadu</option>
+            <option value="Ariyalur">Ariyalur</option>
+            <option value="Chengalpattu">Chengalpattu</option>
+            <option value="Chennai">Chennai</option>
+            <option value="Coimbatore">Coimbatore</option>
+            <option value="Cuddalore">Cuddalore</option>
+            <option value="Dharmapuri">Dharmapuri</option>
+            <option value="Dindigul">Dindigul</option>
+            <option value="Erode">Erode</option>
+            <option value="Kallakurichi">Kallakurichi</option>
+            <option value="Kanchipuram">Kanchipuram</option>
+            <option value="Kanyakumari">Kanyakumari</option>
+            <option value="Karur">Karur</option>
+            <option value="Krishnagiri">Krishnagiri</option>
+            <option value="Madurai">Madurai</option>
+            <option value="Mayiladuthurai">Mayiladuthurai</option>
+            <option value="Nagapattinam">Nagapattinam</option>
+            <option value="Namakkal">Namakkal</option>
+            <option value="The Nilgiris">The Nilgiris</option>
+            <option value="Perambalur">Perambalur</option>
+            <option value="Pudukkottai">Pudukkottai</option>
+            <option value="Ramanathapuram">Ramanathapuram</option>
+            <option value="Ranipet">Ranipet</option>
+            <option value="Salem">Salem</option>
+            <option value="Sivaganga">Sivaganga</option>
+            <option value="Tenkasi">Tenkasi</option>
+            <option value="Thanjavur">Thanjavur</option>
+            <option value="Theni">Theni</option>
+            <option value="Thoothukudi">Thoothukudi</option>
+            <option value="Tiruchirappalli">Tiruchirappalli</option>
+            <option value="Tirunelveli">Tirunelveli</option>
+            <option value="Tirupathur">Tirupathur</option>
+            <option value="Tiruppur">Tiruppur</option>
+            <option value="Tiruvallur">Tiruvallur</option>
+            <option value="Tiruvannamalai">Tiruvannamalai</option>
+            <option value="Tiruvarur">Tiruvarur</option>
+            <option value="Vellore">Vellore</option>
+            <option value="Viluppuram">Viluppuram</option>
+            <option value="Virudhunagar">Virudhunagar</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 1: LIVE ACTIVE EMERGENCY REQUESTS -->
+    <section id="view-requests-section" class="blood-view-section active">
+      <div class="section-title-row">
+        <h4>🚨 Live Urgent Requests</h4>
+        <span class="sub-counter" id="requests-counter-badge">Realtime Updates</span>
+      </div>
+      <div id="requests-list-container" class="blood-cards-vertical-list"></div>
+    </section>
+
+    <!-- SECTION 2: VERIFIED VOLUNTARY DONORS -->
+    <section id="view-donors-section" class="blood-view-section" style="display: none;">
+      <div class="section-title-row">
+        <h4>🩸 Verified Voluntary Donors</h4>
+        <span class="sub-counter" id="donors-counter-badge">Ready to Donate</span>
+      </div>
+      <div id="donors-list-container" class="blood-cards-vertical-list"></div>
+    </section>
+
+    <!-- SECTION 3: COMPLETED ARCHIVE (REQUESTS & DONATIONS) -->
+    <section id="view-history-section" class="blood-view-section" style="display: none;">
+      <div class="history-sub-tabs">
+        <button type="button" class="sub-tab-btn active" id="subtab-completed-requests" onclick="BloodPage.switchHistorySubTab('requests')">
+          ✅ Fulfilled Requests (<span id="count-history-req">0</span>)
+        </button>
+        <button type="button" class="sub-tab-btn" id="subtab-completed-donations" onclick="BloodPage.switchHistorySubTab('donations')">
+          🎖️ My Past Donations (<span id="count-history-don">0</span>)
+        </button>
+      </div>
+      <div id="history-list-container" class="blood-cards-vertical-list" style="margin-top: 10px;"></div>
+    </section>
+
+  </main>
+
+  <!-- ====================================================================
+       MODAL 1: POST EMERGENCY BLOOD REQUEST
+       ==================================================================== -->
+  <div id="modal-blood-request" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header emergency-header">
+        <div class="modal-title-wrap">
+          <span>🚨</span>
+          <h3>Post Urgent Blood Request</h3>
+        </div>
+        <button type="button" class="sia-close-btn" onclick="BloodPage.closeModal('modal-blood-request')">✕</button>
+      </div>
+
+      <div class="sia-modal-body">
+        <div class="modal-notice-box">
+          ℹ️ Once registered donors accept and attender verifies, units balance will update in realtime. When 0 units balance, post auto-completes.
+        </div>
+
+        <form id="form-blood-request" onsubmit="BloodPage.handleRequestSubmit(event)">
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Patient Full Name *</label>
+              <input type="text" id="req-patient-name" placeholder="Patient name" required>
+            </div>
+            <div class="form-field">
+              <label>Patient Age / Gender *</label>
+              <input type="text" id="req-patient-age-gender" placeholder="e.g. 45 / Male" required>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Attender Name *</label>
+              <input type="text" id="req-attender-name" placeholder="Your name" required>
+            </div>
+            <div class="form-field">
+              <label>Relation with Patient *</label>
+              <select id="req-attender-relation" required>
+                <option value="Father">Father</option>
+                <option value="Mother">Mother</option>
+                <option value="Brother">Brother</option>
+                <option value="Sister">Sister</option>
+                <option value="Spouse">Spouse (Husband/Wife)</option>
+                <option value="Son">Son</option>
+                <option value="Daughter">Daughter</option>
+                <option value="Relative">Relative</option>
+                <option value="Friend">Friend</option>
+                <option value="Self / Attender">Other Attender</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Attender Mobile Number *</label>
+              <input type="tel" id="req-attender-phone" maxlength="10" placeholder="10-digit mobile" required>
+            </div>
+            <div class="form-field">
+              <label>Urgency Level *</label>
+              <select id="req-urgency-level" required>
+                <option value="CRITICAL">🔴 Critical (Within 2 - 4 Hrs)</option>
+                <option value="TODAY" selected>🟡 Needed Today</option>
+                <option value="SCHEDULED">🟢 Scheduled Surgery</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Blood Group Required *</label>
+              <select id="req-blood-group" required>
+                <option value="ANY">Any / All Compatible (Emergency SOS)</option>
+                <option value="O+">O +ve</option>
+                <option value="A+">A +ve</option>
+                <option value="B+">B +ve</option>
+                <option value="AB+">AB +ve</option>
+                <option value="O-">O -ve</option>
+                <option value="A-">A -ve</option>
+                <option value="B-">B -ve</option>
+                <option value="AB-">AB -ve</option>
+                <option value="Bombay">Bombay Blood</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Units Needed *</label>
+              <select id="req-units" required>
+                <option value="1">1 Unit</option>
+                <option value="2" selected>2 Units</option>
+                <option value="3">3 Units</option>
+                <option value="4">4 Units</option>
+                <option value="5">5 Units</option>
+                <option value="6">6 Units</option>
+                <option value="7">7 Units</option>
+                <option value="8">8 Units</option>
+                <option value="10">10 Units</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label>Component Type</label>
+            <select id="req-component-type">
+              <option value="Whole Blood">Whole Blood (Standard)</option>
+              <option value="Single Donor Platelets (SDP)">Single Donor Platelets (SDP - Urgent Dengue/Cancer)</option>
+              <option value="Packed Red Blood Cells (PRBC)">Packed Red Blood Cells (PRBC)</option>
+              <option value="Fresh Frozen Plasma (FFP)">Fresh Frozen Plasma (FFP)</option>
+              <option value="Any Compatible Component">Any Compatible Component</option>
+            </select>
+          </div>
+
+          <!-- Mandatory Hospital Verification Details -->
+          <div class="hospital-sub-section">
+            <div class="sub-head-row">
+              <h5>🏥 Hospital / Clinical Destination (Mandatory)</h5>
+            </div>
+            
+            <div class="form-field">
+              <label>Hospital or Clinical Center Name *</label>
+              <input type="text" id="req-hospital-name" placeholder="e.g. Apollo Hospital, GH, etc." required>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-field">
+                <label>Ward / Room / Bed No.</label>
+                <input type="text" id="req-hospital-ward" placeholder="e.g. Emergency ICU, Bed 12">
+              </div>
+              <div class="form-field">
+                <label>District *</label>
+                <select id="req-hospital-district" required>
+                  <option value="Ariyalur">Ariyalur</option>
+                  <option value="Chengalpattu">Chengalpattu</option>
+                  <option value="Chennai" selected>Chennai</option>
+                  <option value="Coimbatore">Coimbatore</option>
+                  <option value="Cuddalore">Cuddalore</option>
+                  <option value="Dharmapuri">Dharmapuri</option>
+                  <option value="Dindigul">Dindigul</option>
+                  <option value="Erode">Erode</option>
+                  <option value="Kallakurichi">Kallakurichi</option>
+                  <option value="Kanchipuram">Kanchipuram</option>
+                  <option value="Kanyakumari">Kanyakumari</option>
+                  <option value="Karur">Karur</option>
+                  <option value="Krishnagiri">Krishnagiri</option>
+                  <option value="Madurai">Madurai</option>
+                  <option value="Mayiladuthurai">Mayiladuthurai</option>
+                  <option value="Nagapattinam">Nagapattinam</option>
+                  <option value="Namakkal">Namakkal</option>
+                  <option value="The Nilgiris">The Nilgiris</option>
+                  <option value="Perambalur">Perambalur</option>
+                  <option value="Pudukkottai">Pudukkottai</option>
+                  <option value="Ramanathapuram">Ramanathapuram</option>
+                  <option value="Ranipet">Ranipet</option>
+                  <option value="Salem">Salem</option>
+                  <option value="Sivaganga">Sivaganga</option>
+                  <option value="Tenkasi">Tenkasi</option>
+                  <option value="Thanjavur">Thanjavur</option>
+                  <option value="Theni">Theni</option>
+                  <option value="Thoothukudi">Thoothukudi</option>
+                  <option value="Tiruchirappalli">Tiruchirappalli</option>
+                  <option value="Tirunelveli">Tirunelveli</option>
+                  <option value="Tirupathur">Tirupathur</option>
+                  <option value="Tiruppur">Tiruppur</option>
+                  <option value="Tiruvallur">Tiruvallur</option>
+                  <option value="Tiruvannamalai">Tiruvannamalai</option>
+                  <option value="Tiruvarur">Tiruvarur</option>
+                  <option value="Vellore">Vellore</option>
+                  <option value="Viluppuram">Viluppuram</option>
+                  <option value="Virudhunagar">Virudhunagar</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label>Hospital Area / Landmark *</label>
+              <input type="text" id="req-hospital-area" placeholder="e.g. Greams Road, Thousand Lights" required>
+            </div>
+
+            <div class="form-field">
+              <div class="loc-head-flex">
+                <label>Hospital Google Maps Link</label>
+                <button type="button" class="gps-btn" onclick="BloodPage.detectGpsLocation('req-hospital-gps')">📍 Current GPS</button>
+              </div>
+              <input type="text" id="req-hospital-gps" placeholder="Paste Google Maps URL or tap 'Current GPS'">
+            </div>
+          </div>
+
+          <div class="btn-group-row">
+            <button type="button" class="cancel-btn" onclick="BloodPage.closeModal('modal-blood-request')">Cancel</button>
+            <button type="submit" class="modal-action-btn emergency-btn">Publish SOS Request 🚨</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL 2: REGISTER AS VOLUNTEER DONOR
+       ==================================================================== -->
+  <div id="modal-donor-register" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header donor-header">
+        <div class="modal-title-wrap">
+          <span>❤️</span>
+          <h3>Register as Voluntary Donor</h3>
+        </div>
+        <button type="button" class="sia-close-btn" onclick="BloodPage.closeModal('modal-donor-register')">✕</button>
+      </div>
+
+      <div class="sia-modal-body">
+        <div class="modal-notice-box donor-notice">
+          🌱 Registered lifesavers receive emergency alerts. You will earn digital certificate tier upgrades with every confirmed hospital donation!
+        </div>
+
+        <form id="form-donor-register" onsubmit="BloodPage.handleDonorSubmit(event)">
+          <div class="form-field">
+            <label>Your Full Name *</label>
+            <input type="text" id="donor-name" placeholder="Enter full name" required>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Mobile Number *</label>
+              <input type="tel" id="donor-phone" maxlength="10" placeholder="10-digit mobile" required>
+            </div>
+            <div class="form-field">
+              <label>Blood Group *</label>
+              <select id="donor-blood-group" required>
+                <option value="O+">O +ve</option>
+                <option value="A+">A +ve</option>
+                <option value="B+">B +ve</option>
+                <option value="AB+">AB +ve</option>
+                <option value="O-">O -ve</option>
+                <option value="A-">A -ve</option>
+                <option value="B-">B -ve</option>
+                <option value="AB-">AB -ve</option>
+                <option value="Bombay">Bombay Blood</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Age (18 - 65 Yrs) *</label>
+              <input type="number" id="donor-age" min="18" max="65" placeholder="e.g. 26" required>
+            </div>
+            <div class="form-field">
+              <label>Gender *</label>
+              <select id="donor-gender" required>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>District *</label>
+              <select id="donor-district" required>
+                <option value="Ariyalur">Ariyalur</option>
+                <option value="Chengalpattu">Chengalpattu</option>
+                <option value="Chennai" selected>Chennai</option>
+                <option value="Coimbatore">Coimbatore</option>
+                <option value="Cuddalore">Cuddalore</option>
+                <option value="Dharmapuri">Dharmapuri</option>
+                <option value="Dindigul">Dindigul</option>
+                <option value="Erode">Erode</option>
+                <option value="Kallakurichi">Kallakurichi</option>
+                <option value="Kanchipuram">Kanchipuram</option>
+                <option value="Kanyakumari">Kanyakumari</option>
+                <option value="Karur">Karur</option>
+                <option value="Krishnagiri">Krishnagiri</option>
+                <option value="Madurai">Madurai</option>
+                <option value="Mayiladuthurai">Mayiladuthurai</option>
+                <option value="Nagapattinam">Nagapattinam</option>
+                <option value="Namakkal">Namakkal</option>
+                <option value="The Nilgiris">The Nilgiris</option>
+                <option value="Perambalur">Perambalur</option>
+                <option value="Pudukkottai">Pudukkottai</option>
+                <option value="Ramanathapuram">Ramanathapuram</option>
+                <option value="Ranipet">Ranipet</option>
+                <option value="Salem">Salem</option>
+                <option value="Sivaganga">Sivaganga</option>
+                <option value="Tenkasi">Tenkasi</option>
+                <option value="Thanjavur">Thanjavur</option>
+                <option value="Theni">Theni</option>
+                <option value="Thoothukudi">Thoothukudi</option>
+                <option value="Tiruchirappalli">Tiruchirappalli</option>
+                <option value="Tirunelveli">Tirunelveli</option>
+                <option value="Tirupathur">Tirupathur</option>
+                <option value="Tiruppur">Tiruppur</option>
+                <option value="Tiruvallur">Tiruvallur</option>
+                <option value="Tiruvannamalai">Tiruvannamalai</option>
+                <option value="Tiruvarur">Tiruvarur</option>
+                <option value="Vellore">Vellore</option>
+                <option value="Viluppuram">Viluppuram</option>
+                <option value="Virudhunagar">Virudhunagar</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Living Area / Town *</label>
+              <input type="text" id="donor-area" placeholder="e.g. Adyar, KK Nagar" required>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <div class="loc-head-flex">
+              <label>Current Location Map Link (Optional)</label>
+              <button type="button" class="gps-btn" onclick="BloodPage.detectGpsLocation('donor-gps')">📍 Current GPS</button>
+            </div>
+            <input type="text" id="donor-gps" placeholder="Paste Google Maps URL or tap 'Current GPS'">
+          </div>
+
+          <div class="form-field">
+            <label>Last Donated Date (Leave blank if first time)</label>
+            <input type="date" id="donor-last-date">
+            <small class="helper-text">Medical safety protocol requires 90-day cooldown between donations.</small>
+          </div>
+
+          <div class="form-field" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 0;">
+            <div>
+              <strong style="font-size: 12px; color: #1E293B;">Available to Donate Now</strong>
+              <p style="font-size: 10px; color: #64748B; margin: 0;">Toggle OFF when travelling or unwell</p>
+            </div>
+            <input type="checkbox" id="donor-available-toggle" checked style="width: 22px; height: 22px; accent-color: #078866; cursor: pointer;">
+          </div>
+
+          <div class="btn-group-row">
+            <button type="button" class="cancel-btn" onclick="BloodPage.closeModal('modal-donor-register')">Cancel</button>
+            <button type="submit" class="modal-action-btn primary-glow-btn">Register Lifesaver ✓</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL 3: PATIENT HISTORY & FULL DETAILS CARD TOUCH MODAL
+       ==================================================================== -->
+  <div id="modal-patient-details" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header emergency-header">
+        <div class="modal-title-wrap">
+          <span>🩺</span>
+          <h3>Patient Emergency Details</h3>
+        </div>
+        <button type="button" class="sia-close-btn" onclick="BloodPage.closeModal('modal-patient-details')">✕</button>
+      </div>
+
+      <div class="sia-modal-body" id="patient-details-body">
+        <!-- Rendered dynamically via BloodPage.openPatientDetails(id) -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL 4: DYNAMIC E-CERTIFICATE WITH REAL LOGO & TIERS
+       ==================================================================== -->
+  <div id="modal-certificate" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop certificate-modal-wrap">
+      <div class="sia-modal-header" style="background: linear-gradient(135deg, #045D49, #078866);">
+        <div class="modal-title-wrap">
+          <span>🏅</span>
+          <h3>Digital Lifesaver Certificate</h3>
+        </div>
+        <button type="button" class="sia-close-btn" onclick="BloodPage.closeModal('modal-certificate')">✕</button>
+      </div>
+
+      <div class="sia-modal-body">
+        <!-- Renderable Certificate Paper Node (Target for HTML2Canvas Image Share) -->
+        <div class="certificate-paper-3d" id="certificate-render-node">
+          <div class="cert-border-inner" id="cert-border-wrapper">
+            <div class="cert-header">
+              <!-- Official Selfcare Diagnostics Logo -->
+              <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="cert-official-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+              <div class="cert-fallback-logo" style="display: none;">
+                <span class="cert-org-logo">🌿 SELFCARE DIAGNOSTICS</span>
+              </div>
+              <p class="cert-org-sub">NABL Accredited Healthcare Network • Tamil Nadu</p>
+            </div>
+
+            <div class="cert-title-wrap">
+              <h2>CERTIFICATE OF APPRECIATION</h2>
+              <!-- Dynamic Gamified Tier Tag -->
+              <div id="cert-tier-badge" class="cert-badge-tag tier-bronze">🥉 BRONZE LIFESAVER (1 DONATION)</div>
+            </div>
+
+            <p class="cert-body-text">
+              This citation is proudly presented in grateful recognition of voluntary blood donation and selfless service saving critical lives to:
+            </p>
+
+            <h3 class="cert-recipient-name" id="cert-donor-name">Valued Lifesaver</h3>
+
+            <div class="cert-meta-row">
+              <div class="cert-meta-col">
+                <span class="meta-lbl">Blood Group:</span>
+                <strong class="meta-val highlight-red" id="cert-donor-group">O +ve</strong>
+              </div>
+              <div class="cert-meta-col">
+                <span class="meta-lbl">Total Donations:</span>
+                <strong class="meta-val" id="cert-donations-count">1 Time</strong>
+              </div>
+              <div class="cert-meta-col">
+                <span class="meta-lbl">Issue Date:</span>
+                <strong class="meta-val" id="cert-issue-date">23 Oct 2026</strong>
+              </div>
+            </div>
+
+            <p class="cert-quote">
+              "Your noble gesture has gifted precious time, health, and a second chance of life to someone in urgent critical need."
+            </p>
+
+            <div class="cert-footer-row">
+              <div class="cert-seal-badge">
+                <div class="seal-inner">⭐ VERIFIED LIFESAVER ⭐</div>
+              </div>
+              <div class="cert-sig-block">
+                <span class="sig-line">Dr. Medical Director</span>
+                <p>Chief Pathologist, Selfcare Diagnostics</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Certificate Sharing Actions -->
+        <div class="cert-actions-grid">
+          <button type="button" class="modal-action-btn primary-glow-btn" id="btn-share-certificate" onclick="BloodPage.shareCertificateDirect()">
+            📲 Share Image to WhatsApp
+          </button>
+          <button type="button" class="cancel-btn" onclick="BloodPage.downloadCertificateImage()">
+            📥 Download Image (PNG)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <a href="customer.html" class="nav-item">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="reports.html" class="nav-item">
+      <span class="nav-icon">📑</span>
+      <span class="nav-label">Reports</span>
+    </a>
+    <a href="bookings.html" class="nav-item">
+      <span class="nav-icon">📍</span>
+      <span class="nav-label">Track Booking</span>
+    </a>
+    <a href="profile.html" class="nav-item">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">My Account</span>
+    </a>
+    <a href="cart.html" class="nav-item">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">Cart</span>
+      <span class="cart-badge" style="display:none;">0</span>
+    </a>
+  </nav>
+
+  <script src="assets/js/config.js?v=6.3.0"></script>
+  <script src="assets/js/utils.js?v=12.1.0"></script>
+  <script src="assets/js/api.js?v=6.0.0"></script>
+  <script src="assets/js/auth.js?v=3.4.0"></script>
+  <script src="assets/js/blood.js?v=2.0.0"></script>
+</body>
+</html>
