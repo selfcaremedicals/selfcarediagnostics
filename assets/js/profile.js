@@ -1,6 +1,6 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v8.1.0
+ * Selfcare Diagnostics - My Account Controller v15.1.0
  * Features:
  * - Dynamic VIP Crown 👑 Engine: Displays crown on User & paid Family Members only
  * - Automatic Expiry Awareness: Crown disappears automatically once 1-year pass expires
@@ -12,6 +12,7 @@
  * - Binds primaryUserId, primaryUserName & primaryMobile to backend Family Vault
  * - Mobile Haptic feedback (vibration on click)
  * - Full Directory Card View: Displays Relationship, Mobile, Age, Gender, Blood Group, Email, Address & GPS
+ * - Realtime Blood Connect Live Badges Engine (Live SOS & Verified Donors Count)
  */
 
 const ProfilePage = {
@@ -24,6 +25,7 @@ const ProfilePage = {
     try {
       this.loadAccountData();
       this.updateCartBadgeUI();
+      this.renderBloodConnectBadges();
 
       const loader = document.getElementById('profile-loading-overlay') || document.getElementById('page-loader');
       if (loader) loader.style.display = 'none';
@@ -32,6 +34,7 @@ const ProfilePage = {
         setTimeout(() => {
           this.syncLiveCloudProfile().catch(e => console.warn('[Profile] Background profile sync notice:', e));
           this.syncLiveCloudFamilyMembers().catch(e => console.warn('[Profile] Background family sync notice:', e));
+          this.syncBloodConnectLive();
         }, 150);
       }
     } catch (err) {
@@ -435,9 +438,6 @@ const ProfilePage = {
     }
   },
 
-  /**
-   * Family Member Cards Render (Crown 👑 appears only for paid family members)
-   */
   renderFamilyCards() {
     const countEl = document.getElementById('family-total-count');
     const container = document.getElementById('family-cards-container');
@@ -782,6 +782,72 @@ const ProfilePage = {
         b.style.display = 'none';
       }
     });
+  },
+
+  /**
+   * Renders Live Blood Badges Instantly from LocalStorage / Synced Data
+   */
+  renderBloodConnectBadges() {
+    try {
+      const storedReq = localStorage.getItem('selfcare_blood_requests');
+      const storedDonors = localStorage.getItem('selfcare_blood_donors');
+
+      const requests = storedReq ? JSON.parse(storedReq) : [];
+      const donors = storedDonors ? JSON.parse(storedDonors) : [];
+
+      const activeSosList = requests.filter(r => (parseInt(r.unitsNeeded || 1, 10) - (r.unitsDonated || 0)) > 0);
+      const sosCount = activeSosList.length;
+      const donorCount = donors.length;
+
+      const sosChip = document.getElementById('chip-active-sos');
+      const donorChip = document.getElementById('chip-total-donors');
+      const urgentPill = document.getElementById('urgent-live-pill');
+
+      if (sosChip) {
+        if (sosCount > 0) {
+          sosChip.textContent = `🚨 ${sosCount} Active SOS`;
+          sosChip.style.background = '#FEE2E2';
+          sosChip.style.color = '#DC2626';
+          sosChip.style.fontWeight = '900';
+        } else {
+          sosChip.textContent = `✅ 0 Urgent SOS`;
+          sosChip.style.background = '#F1F5F9';
+          sosChip.style.color = '#64748B';
+          sosChip.style.fontWeight = '700';
+        }
+      }
+
+      if (donorChip) {
+        donorChip.textContent = `🩸 ${donorCount} Donors`;
+      }
+
+      if (urgentPill) {
+        urgentPill.style.display = sosCount > 0 ? 'inline-block' : 'none';
+      }
+    } catch (e) {
+      console.warn('[Profile] Blood badge error:', e);
+    }
+  },
+
+  /**
+   * Syncs latest Blood Data directly from Cloud & Refreshes Badges in Background
+   */
+  async syncBloodConnectLive() {
+    if (!navigator.onLine || typeof Api === 'undefined' || typeof Api.request !== 'function') return;
+    try {
+      const res = await Api.request('getBloodData', {}, false).catch(() => null);
+      if (res && res.status === 'success') {
+        if (Array.isArray(res.requests)) {
+          localStorage.setItem('selfcare_blood_requests', JSON.stringify(res.requests));
+        }
+        if (Array.isArray(res.donors)) {
+          localStorage.setItem('selfcare_blood_donors', JSON.stringify(res.donors));
+        }
+        this.renderBloodConnectBadges();
+      }
+    } catch (e) {
+      console.warn('[Profile] Blood live sync error:', e);
+    }
   }
 };
 
