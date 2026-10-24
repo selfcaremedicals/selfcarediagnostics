@@ -13,10 +13,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Versioned Stylesheets -->
-  <link rel="stylesheet" href="assets/css/global.css?v=6.0.0">
-  <link rel="stylesheet" href="assets/css/components.css?v=6.0.0">
-  <link rel="stylesheet" href="assets/css/responsive.css?v=6.0.0">
-  <link rel="stylesheet" href="assets/css/profile.css?v=6.3.0">
+  <link rel="stylesheet" href="assets/css/global.css?v=15.1.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=15.1.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=15.1.0">
+  <link rel="stylesheet" href="assets/css/profile.css?v=15.1.0">
 </head>
 <body>
 
@@ -72,13 +72,22 @@
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 4. Blood Connect (Redirects to blood.html) -->
-      <div class="menu-item-row" onclick="window.location.href='blood.html'">
+      <!-- 4. Blood Connect (Live Highlight Badges Added) -->
+      <div class="menu-item-row blood-menu-row" onclick="window.location.href='blood.html'">
         <div class="menu-left">
-          <span class="menu-icon">🩸</span>
-          <span class="menu-label">Blood Connect</span>
+          <span class="menu-icon animate-pulse-heart">🩸</span>
+          <div class="menu-text-col">
+            <span class="menu-label">Blood Connect</span>
+            <div class="blood-badge-group" id="profile-blood-badges">
+              <span class="blood-chip chip-sos" id="chip-active-sos">🚨 0 Active SOS</span>
+              <span class="blood-chip chip-donors" id="chip-total-donors">🩸 0 Donors</span>
+            </div>
+          </div>
         </div>
-        <span class="menu-chevron">›</span>
+        <div class="menu-right-flex">
+          <span class="urgent-live-indicator" id="urgent-live-pill" style="display: none;">URGENT</span>
+          <span class="menu-chevron">›</span>
+        </div>
       </div>
 
       <!-- 5. Refer And Earn (Redirects to refer.html) -->
@@ -443,13 +452,13 @@
   </nav>
 
   <!-- Core Scripts -->
-  <script src="assets/js/config.js?v=6.0.0"></script>
-  <script src="assets/js/utils.js?v=6.0.0"></script>
-  <script src="assets/js/api.js?v=6.0.0"></script>
-  <script src="assets/js/offline-db.js?v=6.0.0"></script>
-  <script src="assets/js/offline-sync.js?v=6.0.0"></script>
-  <script src="assets/js/auth.js?v=6.0.0"></script>
-  <script src="assets/js/app.js?v=6.0.0"></script>
-  <script src="assets/js/profile.js?v=6.8.0"></script>
+  <script src="assets/js/config.js?v=15.1.0"></script>
+  <script src="assets/js/utils.js?v=15.1.0"></script>
+  <script src="assets/js/api.js?v=15.1.0"></script>
+  <script src="assets/js/offline-db.js?v=15.1.0"></script>
+  <script src="assets/js/offline-sync.js?v=15.1.0"></script>
+  <script src="assets/js/auth.js?v=15.1.0"></script>
+  <script src="assets/js/app.js?v=15.1.0"></script>
+  <script src="assets/js/profile.js?v=15.1.0"></script>
 </body>
 </html>
