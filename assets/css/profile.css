@@ -1,11 +1,12 @@
 /* file: assets/css/profile.css */
 /**
- * Selfcare Diagnostics - My Account Page CSS v6.3.0
+ * Selfcare Diagnostics - My Account Page CSS v15.1.0
  * Features:
  * - 3D Tactile Bounce & Press Feedback on all buttons/cards (:active)
  * - Anti-multi-click disabled visual state
  * - Clean List Menu matching BloodOxy reference layout
  * - Dual-View Family Members Management
+ * - Blood Connect Live Highlight Badges & Pulse Animations
  */
 
 :root {
@@ -59,7 +60,6 @@ button,
   cursor: pointer;
 }
 
-/* Button-ah press pannum pothu amungi mela varum physical feel */
 button:active,
 .modal-action-btn:active,
 .add-member-top-btn:active,
@@ -77,7 +77,6 @@ button:active,
   filter: brightness(0.92);
 }
 
-/* Save aagum pothu disabled state */
 button:disabled,
 .modal-action-btn:disabled {
   opacity: 0.65 !important;
@@ -226,6 +225,85 @@ button:disabled,
 }
 
 /* ==========================================================================
+   BLOOD CONNECT LIVE MENU HIGHLIGHT BADGES
+   ========================================================================== */
+.blood-menu-row {
+  position: relative;
+  background: #FFFDFD !important;
+}
+
+.menu-text-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.blood-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.blood-chip {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.chip-sos {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.chip-donors {
+  background: #ECFDF5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+}
+
+.menu-right-flex {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.urgent-live-indicator {
+  background: #DC2626;
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  animation: pulseAlert 1.4s infinite ease-in-out;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.4);
+}
+
+@keyframes pulseAlert {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.85; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-pulse-heart {
+  display: inline-block;
+  animation: beatHeart 1.5s infinite;
+}
+
+@keyframes beatHeart {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.15); }
+  35% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+}
+
+/* ==========================================================================
    FAMILY MEMBERS DUAL-VIEW STYLING
    ========================================================================== */
 .family-top-bar {
@@ -274,7 +352,6 @@ button:disabled,
   padding-right: 2px;
 }
 
-/* Member Card */
 .member-display-card {
   background: #F9FAFB;
   border: 1px solid #E5E7EB;
@@ -573,7 +650,6 @@ button:disabled,
   gap: 12px;
 }
 
-/* Profile Details Box */
 .profile-meta-head {
   display: flex;
   align-items: center;
@@ -631,7 +707,6 @@ button:disabled,
   font-size: 10.5px;
 }
 
-/* Forms */
 .form-field {
   display: flex;
   flex-direction: column;
