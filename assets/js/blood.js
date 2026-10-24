@@ -2,10 +2,10 @@
 /**
  * Selfcare Diagnostics - Emergency Blood Connect Controller v15.0.0
  * Backend Cloud Synchronized Edition:
- * 1. Zero-Typing Smart Auto-Fill: Form open aanaale logged-in user-oda Name, Phone, Blood Group, Age, Gender, District, Area ellam automatic-aa pre-fill aagum.
- * 2. Realtime Two-Way Cloud Handshake: Pledging, PIN Verification, and Status updates are saved directly to Google Sheets (BloodRequests & BloodDonors).
- * 3. Permanent Donor Profile Hydration: Cloud-la irunthu donor profile, donation count, and permanent PIN auto-restores even after browser cache clear.
- * 4. Strict Ownership Guard & Pinned 'YOU' card preserved.
+ * 1. Zero-Typing Smart Auto-Fill: Profile details are auto-filled across forms.
+ * 2. Realtime Two-Way Cloud Handshake: Pledging, PIN Verification, and Status updates saved to Google Sheets.
+ * 3. Strict Ownership Guard: Completed requests show ONLY to the attender who posted the SOS.
+ * 4. Dynamic Donor History: Confirmed donations automatically appear under "My Past Donations" for the donor.
  */
 
 const BloodPage = {
@@ -146,14 +146,44 @@ const BloodPage = {
   },
 
   /**
+   * DYNAMIC DONATION HISTORY FOR LOGGED-IN DONOR:
+   * Finds all completed donations matching current user's phone from synced blood requests.
+   */
+  getMyDonationHistory() {
+    const myPhone = this.getMyPhone();
+    if (!myPhone) return [];
+
+    const history = [];
+    if (Array.isArray(this.bloodRequests)) {
+      this.bloodRequests.forEach(req => {
+        if (Array.isArray(req.donorsList)) {
+          const myDonation = req.donorsList.find(d =>
+            String(d.donorPhone || '').replace(/\D/g, '').slice(-10) === myPhone &&
+            d.status === 'CONFIRMED'
+          );
+          if (myDonation) {
+            history.push({
+              patientName: req.patientName,
+              hospitalName: req.hospitalName,
+              district: req.district,
+              date: myDonation.timestamp
+                ? new Date(myDonation.timestamp).toLocaleDateString('en-GB')
+                : new Date().toLocaleDateString('en-GB')
+            });
+          }
+        }
+      });
+    }
+    return history;
+  },
+
+  /**
    * ZERO-TYPING SMART AUTO-FILL ENGINE
-   * Pre-populates all inputs from Backend User Profile / Donor Profile
    */
   populateUserContext() {
     try {
       const prof = this.getMyProfile();
 
-      // 1. Auto-fill Request Modal Inputs (SOS Form)
       const reqAttender = document.getElementById('req-attender-name');
       const reqPhone = document.getElementById('req-attender-phone');
       const reqDist = document.getElementById('req-hospital-district');
@@ -172,7 +202,6 @@ const BloodPage = {
         }
       }
 
-      // 2. Auto-fill Donor Registration Modal Inputs
       const donName = document.getElementById('donor-name');
       const donPhone = document.getElementById('donor-phone');
       const donGroup = document.getElementById('donor-blood-group');
@@ -250,7 +279,6 @@ const BloodPage = {
           this.bloodDonors = res.donors;
           localStorage.setItem('selfcare_blood_donors', JSON.stringify(this.bloodDonors));
 
-          // Hydrate current user's donor profile directly from backend
           const myPhone = this.getMyPhone();
           if (myPhone) {
             const myServerProfile = res.donors.find(d => String(d.phone).slice(-10) === myPhone);
@@ -337,7 +365,14 @@ const BloodPage = {
 
   renderHeroStats() {
     const activeReqs = this.bloodRequests.filter(r => (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) > 0);
-    const completedReqs = this.bloodRequests.filter(r => (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) <= 0);
+
+    // Completed Archive Tab Badge: Shows sum of user's fulfilled requests + user's donations
+    const myCompletedReqs = this.bloodRequests.filter(r =>
+      (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) <= 0 &&
+      this.isMyCreatedRequest(r.attenderPhone)
+    );
+    const myDonations = this.getMyDonationHistory();
+    const myTotalArchiveCount = myCompletedReqs.length + myDonations.length;
 
     const statReq = document.getElementById('stat-active-requests');
     const statDon = document.getElementById('stat-registered-donors');
@@ -349,7 +384,7 @@ const BloodPage = {
     if (statDon) statDon.textContent = this.bloodDonors.length;
     if (tabCountReq) tabCountReq.textContent = activeReqs.length;
     if (tabCountDon) tabCountDon.textContent = this.bloodDonors.length;
-    if (tabCountHist) tabCountHist.textContent = completedReqs.length;
+    if (tabCountHist) tabCountHist.textContent = myTotalArchiveCount;
   },
 
   renderRequests() {
@@ -704,7 +739,6 @@ const BloodPage = {
     req.donorsList.push(donorRecord);
     localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
 
-    // CLOUD SYNC: Update Google Sheets in background
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
       Api.request('updateBloodRequest', {
         id: req.id,
@@ -745,24 +779,26 @@ const BloodPage = {
     }
 
     donorObj.status = 'CONFIRMED';
+    donorObj.confirmedAt = new Date().toISOString();
     req.unitsDonated = (parseInt(req.unitsDonated || 0, 10)) + 1;
 
+    // Update verified donor's count in the donors list
+    const cleanDonorPhone = String(donorObj.donorPhone || '').replace(/\D/g, '').slice(-10);
+    const donorRecord = this.bloodDonors.find(d => String(d.phone || '').replace(/\D/g, '').slice(-10) === cleanDonorPhone);
+    if (donorRecord) {
+      donorRecord.donationCount = (parseInt(donorRecord.donationCount || 0, 10)) + 1;
+      donorRecord.lastDonationDate = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('selfcare_blood_donors', JSON.stringify(this.bloodDonors));
+    }
+
+    // If edge-case where donor is on their own phone
     try {
       let myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
-      if (myProfile && myProfile.phone === donorObj.donorPhone) {
+      if (myProfile && String(myProfile.phone || '').replace(/\D/g, '').slice(-10) === cleanDonorPhone) {
         myProfile.donationCount = (myProfile.donationCount || 0) + 1;
         myProfile.lastDonationDate = new Date().toISOString().slice(0, 10);
         localStorage.setItem('selfcare_my_donor_profile', JSON.stringify(myProfile));
       }
-
-      let myHistory = JSON.parse(localStorage.getItem('selfcare_my_donation_history') || '[]');
-      myHistory.unshift({
-        patientName: req.patientName,
-        hospitalName: req.hospitalName,
-        district: req.district,
-        date: new Date().toLocaleDateString('en-GB')
-      });
-      localStorage.setItem('selfcare_my_donation_history', JSON.stringify(myHistory));
     } catch (e) {}
 
     localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
@@ -770,7 +806,6 @@ const BloodPage = {
     const totalNeeded = parseInt(req.unitsNeeded || 1, 10);
     const balance = Math.max(0, totalNeeded - req.unitsDonated);
 
-    // CLOUD SYNC: Reflect in Google Sheets
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
       Api.request('updateBloodRequest', {
         id: req.id,
@@ -779,10 +814,8 @@ const BloodPage = {
         status: balance === 0 ? 'COMPLETED' : 'ACTIVE'
       }, false).catch(err => console.warn('[BloodConnect] Cloud verification sync notice:', err));
 
-      // Sync donor's updated donation count to Cloud sheet 'BloodDonors'
-      let myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
-      if (myProfile && myProfile.phone === donorObj.donorPhone) {
-        Api.request('registerBloodDonor', myProfile, false).catch(() => {});
+      if (donorRecord) {
+        Api.request('registerBloodDonor', donorRecord, false).catch(() => {});
       }
     }
 
@@ -834,7 +867,6 @@ const BloodPage = {
       list = list.filter(d => d.district.toLowerCase() === this.selectedDistrict.toLowerCase());
     }
 
-    // 🌟 PIN CURRENT USER FIXED AT THE VERY TOP
     if (myPhone) {
       const myIndex = list.findIndex(d => String(d.phone).replace(/\D/g, '').slice(-10) === myPhone);
       if (myIndex > -1) {
@@ -895,7 +927,6 @@ const BloodPage = {
             </div>
           </div>
 
-          <!-- SMART ACTIONS: IF 'YOU', SHOW CERTIFICATE & EDIT BUTTONS -->
           ${isMe ? `
             <div class="donor-actions-row">
               <button type="button" class="action-btn-my-profile" onclick="BloodPage.openMyCertificateModal()">
@@ -924,14 +955,17 @@ const BloodPage = {
     const container = document.getElementById('history-list-container');
     if (!container) return;
 
-    const completedReqs = this.bloodRequests.filter(r => (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) <= 0);
+    // 1. Shows fulfilled requests ONLY to the attender who created the SOS
+    const completedReqs = this.bloodRequests.filter(r => {
+      const isCompleted = (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) <= 0;
+      return isCompleted && this.isMyCreatedRequest(r.attenderPhone);
+    });
+
+    // 2. Dynamically gets completed donations for the current logged-in donor
+    const myHistory = this.getMyDonationHistory();
+
     const countReqEl = document.getElementById('count-history-req');
     const countDonEl = document.getElementById('count-history-don');
-
-    let myHistory = [];
-    try {
-      myHistory = JSON.parse(localStorage.getItem('selfcare_my_donation_history') || '[]');
-    } catch (e) {}
 
     if (countReqEl) countReqEl.textContent = completedReqs.length;
     if (countDonEl) countDonEl.textContent = myHistory.length;
@@ -940,7 +974,7 @@ const BloodPage = {
       if (completedReqs.length === 0) {
         container.innerHTML = `
           <div class="empty-family-state" style="padding: 24px; text-align: center; background: #FFFFFF; border-radius: 16px;">
-            <p style="font-size: 11px; color: #64748B;">No completed requests archived yet.</p>
+            <p style="font-size: 11px; color: #64748B;">You have no fulfilled emergency requests.</p>
           </div>
         `;
         return;
@@ -967,7 +1001,7 @@ const BloodPage = {
       if (myHistory.length === 0) {
         container.innerHTML = `
           <div class="empty-family-state" style="padding: 24px; text-align: center; background: #FFFFFF; border-radius: 16px;">
-            <p style="font-size: 11px; color: #64748B;">You have not made any donations through the app yet.</p>
+            <p style="font-size: 11px; color: #64748B;">You have not made any confirmed donations through the app yet.</p>
           </div>
         `;
         return;
@@ -1088,7 +1122,6 @@ const BloodPage = {
     this.bloodRequests.unshift(newRequest);
     localStorage.setItem('selfcare_blood_requests', JSON.stringify(this.bloodRequests));
 
-    // CLOUD PERSISTENCE: Save into Google Sheets
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
       Api.request('saveBloodRequest', newRequest, false).catch(err => console.warn('[BloodConnect] Save request cloud notice:', err));
     }
@@ -1147,7 +1180,6 @@ const BloodPage = {
     localStorage.setItem('selfcare_blood_donors', JSON.stringify(this.bloodDonors));
     localStorage.setItem('selfcare_my_donor_profile', JSON.stringify(newDonor));
 
-    // CLOUD PERSISTENCE: Save into Google Sheets
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
       Api.request('registerBloodDonor', newDonor, false).catch(err => console.warn('[BloodConnect] Save donor cloud notice:', err));
     }
@@ -1171,7 +1203,10 @@ const BloodPage = {
     const user = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
     const name = myProfile?.name || user.name || 'Valued Lifesaver';
     const group = myProfile?.bloodGroup || user.bloodGroup || 'O +ve';
-    const count = parseInt(myProfile?.donationCount ?? 0, 10);
+
+    // Accurately count confirmed donations from synced records
+    const myDonations = this.getMyDonationHistory();
+    const count = Math.max(parseInt(myProfile?.donationCount ?? 0, 10), myDonations.length);
 
     const nameEl = document.getElementById('cert-donor-name');
     const groupEl = document.getElementById('cert-donor-group');
@@ -1187,7 +1222,7 @@ const BloodPage = {
     if (badgeEl) {
       badgeEl.className = 'cert-badge-tag';
       if (count === 0) {
-        badgeEl.classList.add('tier-bronze');
+        badgeEl.classList.add('tier-bron');
         badgeEl.textContent = '🌱 PLEDGED LIFESAVER (READY TO DONATE)';
       } else if (count === 1) {
         badgeEl.classList.add('tier-bronze');
