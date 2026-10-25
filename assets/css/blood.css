@@ -1,11 +1,11 @@
 /* file: assets/css/blood.css */
 /**
- * Selfcare Diagnostics - Emergency Blood Connect CSS v14.0.0
+ * Selfcare Diagnostics - Emergency Blood Connect CSS v15.4.0
  * Fully Integrated:
  * 1. Mobile Viewport & Header Logo Zoom Constraint
  * 2. Highlighted Units Balance & Real-time Target Badges
  * 3. Live Card Donors Status Chips (Outer Feed Card)
- * 4. Pinned Current User Card ('YOU' Badge & Profile Actions)
+ * 4. Pinned Current User Card ('YOU' Badge, PIN Showcase Strip & Profile Actions)
  * 5. Permanent Giant PIN Highlight Showcase Box
  * 6. Attender PIN Handshake & Verification Forms
  * 7. Gamified Lifesaver Tiers (Bronze, Silver, Gold, Platinum, Diamond, Legendary)
@@ -521,7 +521,6 @@ body.glass-bg-body {
   border: 1px solid #A7F3D0;
 }
 
-/* Highlighted Units Progress Banner */
 .units-highlight-banner {
   background: #FFF7ED;
   border: 1px solid #FED7AA;
@@ -547,7 +546,6 @@ body.glass-bg-body {
   font-size: 9.5px;
 }
 
-/* Outer Card Donors Status Chips */
 .card-accepted-donors-box {
   background: #F0FDF4;
   border: 1px solid #BBF7D0;
@@ -813,7 +811,6 @@ body.glass-bg-body {
   border-radius: 6px;
 }
 
-/* Giant Permanent PIN Highlight Showcase */
 .donor-pin-showcase-box {
   background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
   border: 2px dashed #059669;
@@ -895,6 +892,55 @@ body.glass-bg-body {
   display: inline-block;
   vertical-align: middle;
   box-shadow: 0 2px 5px rgba(4, 93, 73, 0.3);
+}
+
+/* 🔐 EXCLUSIVE LIFESAVER PIN STRIP FOR LOGGED IN 'YOU' CARD */
+.my-pin-showcase-strip {
+  background: #ECFDF5;
+  border: 1.5px dashed #059669;
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.my-pin-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.my-pin-icon {
+  font-size: 18px;
+}
+
+.my-pin-title {
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  color: #065F46;
+  letter-spacing: 0.5px;
+}
+
+.my-pin-hint {
+  font-size: 8px;
+  color: #047857;
+  margin: 0;
+  font-weight: 600;
+}
+
+.my-pin-num {
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #045D49;
+  background: #FFFFFF;
+  border: 1.5px solid #A7F3D0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(4, 93, 73, 0.08);
 }
 
 .action-btn-my-profile {
@@ -1289,7 +1335,6 @@ body.glass-bg-body {
   text-transform: uppercase;
 }
 
-/* TIER COLORS */
 .tier-bronze {
   background: #FEF3C7;
   color: var(--bronze-color);
