@@ -1,11 +1,12 @@
 /* file: assets/js/blood.js */
 /**
- * Selfcare Diagnostics - Emergency Blood Connect Controller v15.0.0
- * Backend Cloud Synchronized Edition:
- * 1. Zero-Typing Smart Auto-Fill: Profile details are auto-filled across forms.
- * 2. Realtime Two-Way Cloud Handshake: Pledging, PIN Verification, and Status updates saved to Google Sheets.
- * 3. Strict Ownership Guard: Completed requests show ONLY to the attender who posted the SOS.
- * 4. Dynamic Donor History: Confirmed donations automatically appear under "My Past Donations" for the donor.
+ * Selfcare Diagnostics - Emergency Blood Connect Controller v15.3.0
+ * Backend Cloud Synchronized Edition with Medical Cooldown Protection:
+ * 1. Cooldown Call/WhatsApp Interceptor: Blocks outreach to donors currently in medical recovery.
+ * 2. Anti-Tamper Cooldown Guard: Locks past dates & prevents manual date manipulation.
+ * 3. Zero-Typing Smart Auto-Fill: Profile details are auto-filled across forms.
+ * 4. Realtime Two-Way Cloud Handshake: Pledging, PIN Verification, and Status updates saved to Google Sheets.
+ * 5. Dynamic Donor History: Confirmed donations automatically appear under "My Past Donations".
  */
 
 const BloodPage = {
@@ -146,8 +147,7 @@ const BloodPage = {
   },
 
   /**
-   * DYNAMIC DONATION HISTORY FOR LOGGED-IN DONOR:
-   * Finds all completed donations matching current user's phone from synced blood requests.
+   * DYNAMIC DONATION HISTORY FOR LOGGED-IN DONOR
    */
   getMyDonationHistory() {
     const myPhone = this.getMyPhone();
@@ -178,7 +178,7 @@ const BloodPage = {
   },
 
   /**
-   * ZERO-TYPING SMART AUTO-FILL ENGINE
+   * ZERO-TYPING SMART AUTO-FILL ENGINE & ANTI-TAMPER COOLDOWN FIELD LOCK
    */
   populateUserContext() {
     try {
@@ -210,12 +210,47 @@ const BloodPage = {
       const donDist = document.getElementById('donor-district');
       const donArea = document.getElementById('donor-area');
       const donLastDate = document.getElementById('donor-last-date');
+      const donHelpText = document.getElementById('donor-last-date-help');
 
       if (donName && prof.name) donName.value = prof.name;
       if (donPhone && prof.phone) donPhone.value = prof.phone;
       if (donAge && prof.age) donAge.value = prof.age;
       if (donArea && prof.area) donArea.value = prof.area;
-      if (donLastDate && prof.lastDonationDate) donLastDate.value = prof.lastDonationDate;
+
+      // 🛡️ ANTI-TAMPER GUARD 1: Prevent future dates
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (donLastDate) {
+        donLastDate.max = todayStr;
+      }
+
+      if (donLastDate && prof.lastDonationDate) {
+        donLastDate.value = prof.lastDonationDate;
+      }
+
+      // 🛡️ ANTI-TAMPER GUARD 2: Lock Date input if donor has verified donations
+      const myPhone = this.getMyPhone();
+      const existingDonor = this.bloodDonors.find(d => String(d.phone || '').replace(/\D/g, '').slice(-10) === myPhone);
+      const hasDonated = (existingDonor && existingDonor.donationCount > 0) || this.getMyDonationHistory().length > 0;
+
+      if (donLastDate) {
+        if (hasDonated) {
+          donLastDate.disabled = true;
+          donLastDate.style.backgroundColor = '#F1F5F9';
+          donLastDate.style.cursor = 'not-allowed';
+          if (donHelpText) {
+            donHelpText.innerHTML = '🔒 <strong>Verified Record:</strong> Last donation date is locked and managed automatically via Hospital PIN verification.';
+            donHelpText.style.color = '#B91C1C';
+          }
+        } else {
+          donLastDate.disabled = false;
+          donLastDate.style.backgroundColor = '#FFFFFF';
+          donLastDate.style.cursor = 'default';
+          if (donHelpText) {
+            donHelpText.innerHTML = 'Medical safety protocol requires 90-day cooldown between donations.';
+            donHelpText.style.color = '#64748B';
+          }
+        }
+      }
 
       if (donGroup && prof.bloodGroup) {
         for (let i = 0; i < donGroup.options.length; i++) {
@@ -366,7 +401,6 @@ const BloodPage = {
   renderHeroStats() {
     const activeReqs = this.bloodRequests.filter(r => (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) > 0);
 
-    // Completed Archive Tab Badge: Shows sum of user's fulfilled requests + user's donations
     const myCompletedReqs = this.bloodRequests.filter(r =>
       (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) <= 0 &&
       this.isMyCreatedRequest(r.attenderPhone)
@@ -595,7 +629,6 @@ const BloodPage = {
         </div>
       </div>
 
-      <!-- CONDITIONAL VIEW: OWNER SEES VERIFY PIN, ALL OTHERS SEE ACCEPT -->
       ${isOwner ? `
         <div class="handshake-box">
           <h5>🔐 Attender PIN Verification Panel</h5>
@@ -755,7 +788,7 @@ const BloodPage = {
   },
 
   /**
-   * ATTENDER PIN VERIFICATION -> SAVED TO LOCAL + GOOGLE SHEETS
+   * ATTENDER PIN VERIFICATION -> REALTIME 90-DAY COOLDOWN ENFORCEMENT
    */
   verifyDonorPin(reqId, donorId) {
     this.triggerHaptic();
@@ -778,25 +811,28 @@ const BloodPage = {
       return;
     }
 
+    const confirmedIsoDate = new Date().toISOString();
+    const todayDateStr = confirmedIsoDate.slice(0, 10);
+
     donorObj.status = 'CONFIRMED';
-    donorObj.confirmedAt = new Date().toISOString();
+    donorObj.confirmedAt = confirmedIsoDate;
     req.unitsDonated = (parseInt(req.unitsDonated || 0, 10)) + 1;
 
-    // Update verified donor's count in the donors list
     const cleanDonorPhone = String(donorObj.donorPhone || '').replace(/\D/g, '').slice(-10);
     const donorRecord = this.bloodDonors.find(d => String(d.phone || '').replace(/\D/g, '').slice(-10) === cleanDonorPhone);
     if (donorRecord) {
       donorRecord.donationCount = (parseInt(donorRecord.donationCount || 0, 10)) + 1;
-      donorRecord.lastDonationDate = new Date().toISOString().slice(0, 10);
+      donorRecord.lastDonationDate = todayDateStr;
+      donorRecord.isAvailable = false;
       localStorage.setItem('selfcare_blood_donors', JSON.stringify(this.bloodDonors));
     }
 
-    // If edge-case where donor is on their own phone
     try {
       let myProfile = JSON.parse(localStorage.getItem('selfcare_my_donor_profile') || '{}');
       if (myProfile && String(myProfile.phone || '').replace(/\D/g, '').slice(-10) === cleanDonorPhone) {
-        myProfile.donationCount = (myProfile.donationCount || 0) + 1;
-        myProfile.lastDonationDate = new Date().toISOString().slice(0, 10);
+        myProfile.donationCount = (parseInt(myProfile.donationCount || 0, 10)) + 1;
+        myProfile.lastDonationDate = todayDateStr;
+        myProfile.isAvailable = false;
         localStorage.setItem('selfcare_my_donor_profile', JSON.stringify(myProfile));
       }
     } catch (e) {}
@@ -851,6 +887,31 @@ const BloodPage = {
     this.safeShowToast('Donor removed. Slot opened for others.', 'info');
     this.renderAll();
     this.openPatientDetails(reqId);
+  },
+
+  /**
+   * 🛡️ COOLDOWN OUTREACH INTERCEPTOR
+   * Blocks calling or texting donors who are in medical cooldown recovery.
+   */
+  contactDonor(type, phone, name, daysRemaining, whatsappText = '') {
+    this.triggerHaptic();
+
+    if (daysRemaining > 0) {
+      alert(
+        `⚠️ DONOR IN MEDICAL COOLDOWN!\n\n` +
+        `This donor (${name}) already donated blood recently.\n` +
+        `Medical protocol requires a mandatory 90-day recovery gap.\n\n` +
+        `⏳ Waiting for balance: ${daysRemaining} days to complete.\n\n` +
+        `Please contact other verified donors who are marked as "✅ Available".`
+      );
+      return;
+    }
+
+    if (type === 'call') {
+      window.location.href = `tel:${phone}`;
+    } else if (type === 'whatsapp') {
+      window.location.href = `https://wa.me/91${phone}?text=${whatsappText}`;
+    }
   },
 
   renderDonors() {
@@ -938,10 +999,16 @@ const BloodPage = {
             </div>
           ` : `
             <div class="donor-actions-row">
-              <button type="button" class="action-btn-call" onclick="window.location.href='tel:${d.phone}'">
+              <button type="button" 
+                      class="action-btn-call" 
+                      style="${!isEligible ? 'opacity: 0.65;' : ''}" 
+                      onclick="BloodPage.contactDonor('call', '${d.phone}', '${this.safeEscape(d.name)}', ${cooldown.daysRemaining})">
                 📞 Call Donor
               </button>
-              <button type="button" class="action-btn-whatsapp" onclick="window.location.href='https://wa.me/91${d.phone}?text=${whatsappText}'">
+              <button type="button" 
+                      class="action-btn-whatsapp" 
+                      style="${!isEligible ? 'opacity: 0.65;' : ''}" 
+                      onclick="BloodPage.contactDonor('whatsapp', '${d.phone}', '${this.safeEscape(d.name)}', ${cooldown.daysRemaining}, '${whatsappText}')">
                 💬 WhatsApp
               </button>
             </div>
@@ -955,13 +1022,11 @@ const BloodPage = {
     const container = document.getElementById('history-list-container');
     if (!container) return;
 
-    // 1. Shows fulfilled requests ONLY to the attender who created the SOS
     const completedReqs = this.bloodRequests.filter(r => {
       const isCompleted = (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) <= 0;
       return isCompleted && this.isMyCreatedRequest(r.attenderPhone);
     });
 
-    // 2. Dynamically gets completed donations for the current logged-in donor
     const myHistory = this.getMyDonationHistory();
 
     const countReqEl = document.getElementById('count-history-req');
@@ -1134,7 +1199,7 @@ const BloodPage = {
   },
 
   /**
-   * DONOR REGISTRATION SUBMIT -> CLOUD BACKEND SYNC
+   * DONOR REGISTRATION & PROFILE SUBMIT WITH ANTI-TAMPER COOLDOWN SAFEGUARD
    */
   handleDonorSubmit(event) {
     event.preventDefault();
@@ -1148,19 +1213,47 @@ const BloodPage = {
     const district = document.getElementById('donor-district').value;
     const area = document.getElementById('donor-area').value.trim();
     const gpsLink = document.getElementById('donor-gps').value.trim();
-    const lastDate = document.getElementById('donor-last-date').value;
-    const isAvailable = document.getElementById('donor-available-toggle').checked;
+    const donLastDateInput = document.getElementById('donor-last-date');
+    const inputDate = donLastDateInput ? donLastDateInput.value : '';
+    let isAvailable = document.getElementById('donor-available-toggle').checked;
 
     if (!name || phone.length !== 10) {
       this.safeShowToast('Please enter valid donor details and 10-digit phone', 'error');
       return;
     }
 
-    const permanentPin = this.ensurePermanentDonorPin();
-    const initialDonationCount = (lastDate && lastDate.trim() !== '') ? 1 : 0;
+    // 🛡️ ANTI-TAMPER GUARD 1: Prevent future dates
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (inputDate && inputDate > todayStr) {
+      this.safeShowToast('Last donation date cannot be in the future', 'error');
+      return;
+    }
 
-    const newDonor = {
-      id: `DON_${Date.now()}`,
+    const permanentPin = this.ensurePermanentDonorPin();
+
+    const existingIndex = this.bloodDonors.findIndex(d => String(d.phone || '').replace(/\D/g, '').slice(-10) === phone);
+    const existingDonor = existingIndex > -1 ? this.bloodDonors[existingIndex] : null;
+
+    let finalLastDate = '';
+    let finalCount = 0;
+
+    // 🛡️ ANTI-TAMPER GUARD 2: Preserve official hospital dates & count
+    if (existingDonor && existingDonor.donationCount > 0) {
+      finalCount = existingDonor.donationCount;
+      finalLastDate = existingDonor.lastDonationDate || inputDate;
+    } else {
+      finalLastDate = inputDate || '';
+      finalCount = (finalLastDate && finalLastDate.trim() !== '') ? 1 : 0;
+    }
+
+    // 🛡️ ANTI-TAMPER GUARD 3: If 90-day cooldown active, override 'Available' switch
+    const cooldown = this.calculateCooldown(finalLastDate);
+    if (!cooldown.canDonate) {
+      isAvailable = false;
+    }
+
+    const updatedDonor = {
+      id: existingDonor ? existingDonor.id : `DON_${Date.now()}`,
       name,
       phone,
       bloodGroup,
@@ -1169,27 +1262,30 @@ const BloodPage = {
       district,
       area,
       gpsLink: gpsLink || '',
-      lastDonationDate: lastDate || '',
-      donationCount: initialDonationCount,
+      lastDonationDate: finalLastDate,
+      donationCount: finalCount,
       isAvailable,
       permanentPin
     };
 
-    this.bloodDonors = this.bloodDonors.filter(d => d.phone !== phone);
-    this.bloodDonors.unshift(newDonor);
+    if (existingIndex > -1) {
+      this.bloodDonors[existingIndex] = updatedDonor;
+    } else {
+      this.bloodDonors.unshift(updatedDonor);
+    }
+
     localStorage.setItem('selfcare_blood_donors', JSON.stringify(this.bloodDonors));
-    localStorage.setItem('selfcare_my_donor_profile', JSON.stringify(newDonor));
+    localStorage.setItem('selfcare_my_donor_profile', JSON.stringify(updatedDonor));
 
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
-      Api.request('registerBloodDonor', newDonor, false).catch(err => console.warn('[BloodConnect] Save donor cloud notice:', err));
+      Api.request('registerBloodDonor', updatedDonor, false).catch(err => console.warn('[BloodConnect] Save donor cloud notice:', err));
     }
 
     this.renderAll();
     this.closeModal('modal-donor-register');
     this.switchTab('donors');
 
-    alert(`🎉 WELCOME TO SELFCARE LIFESAVERS!\n\nYour Permanent 4-Digit PIN is: [ ${permanentPin} ]\n\nWhenever you donate blood at a hospital, give this PIN to the attender to verify your donation.`);
-    setTimeout(() => this.openMyCertificateModal(), 800);
+    this.safeShowToast('Donor profile updated successfully! ✓', 'success');
   },
 
   openMyCertificateModal() {
@@ -1204,7 +1300,6 @@ const BloodPage = {
     const name = myProfile?.name || user.name || 'Valued Lifesaver';
     const group = myProfile?.bloodGroup || user.bloodGroup || 'O +ve';
 
-    // Accurately count confirmed donations from synced records
     const myDonations = this.getMyDonationHistory();
     const count = Math.max(parseInt(myProfile?.donationCount ?? 0, 10), myDonations.length);
 
@@ -1222,7 +1317,7 @@ const BloodPage = {
     if (badgeEl) {
       badgeEl.className = 'cert-badge-tag';
       if (count === 0) {
-        badgeEl.classList.add('tier-bron');
+        badgeEl.classList.add('tier-bronze');
         badgeEl.textContent = '🌱 PLEDGED LIFESAVER (READY TO DONATE)';
       } else if (count === 1) {
         badgeEl.classList.add('tier-bronze');
