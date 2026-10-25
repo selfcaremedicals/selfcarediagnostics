@@ -1,17 +1,17 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v15.3.0 (Emergency Blood Connect & Medical Cooldown Shield Edition)
+ * Selfcare Diagnostics - Service Worker v15.4.0 (Emergency Blood Connect & Exclusive PIN Strip Edition)
  * Upgrades:
- * - Upgraded Cache Storage to v15.3.0 (Instantly purges stale v15.2.0/v15.1.0/v15.0.0 cache and loads anti-tamper blood.js)
+ * - Upgraded Cache Storage to v15.4.0 (Instantly purges stale v15.3.0/v15.2.0/v15.1.0 cache)
  * - Automatic cache purge on activation & immediate client takeover (clients.claim())
- * - Fast precache with cache-busting timestamp (?sw_bust=15.3.0) to bypass mobile browser disk cache
+ * - Fast precache with cache-busting timestamp (?sw_bust=15.4.0) to bypass mobile browser disk cache
  * - Immediate postMessage broadcast (SW_UPDATED) to force-refresh all active PWA tabs
  * - Strict network bypass for Google Apps Script execution and central API calls
  * - Stale-While-Revalidate (SWR) for high-performance JS/CSS assets
  * - Network-First for HTML documents with seamless offline fallback
  */
 
-const CACHE_NAME = 'selfcare-cache-v15.3.0';
+const CACHE_NAME = 'selfcare-cache-v15.4.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -72,15 +72,14 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache Fresh Files & Skip Waiting Immediately
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Upgraded Engine v15.3.0 (Blood Connect Sync & Cooldown Guard)...');
+  console.log('[Selfcare SW] Installing Upgraded Engine v15.4.0 (Blood Connect PIN Strip)...');
   self.skipWaiting();
 
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
-          // Cache-busting query parameter forces fresh network fetch bypassing browser disk cache
-          const bustUrl = `${url}?sw_bust=15.3.0`;
+          const bustUrl = `${url}?sw_bust=15.4.0`;
           const response = await fetch(bustUrl, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
@@ -104,7 +103,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purge All Older Caches & Claim Clients Immediately
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v15.3.0 & Purging all stale caches...');
+  console.log('[Selfcare SW] Activating v15.4.0 & Purging all stale caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -117,10 +116,9 @@ self.addEventListener('activate', (event) => {
       );
     }).then(async () => {
       await self.clients.claim();
-      // Notify all open tabs/clients that new version is live
       const clients = await self.clients.matchAll({ type: 'window' });
       clients.forEach((client) => {
-        client.postMessage({ type: 'SW_UPDATED', version: 'v15.3.0' });
+        client.postMessage({ type: 'SW_UPDATED', version: 'v15.4.0' });
       });
     })
   );
@@ -130,12 +128,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // A. Bypass Non-GET Requests
   if (event.request.method !== 'GET') {
     return;
   }
 
-  // B. Bypass API Calls & Google Apps Script Execution URLs
   if (
     url.origin !== location.origin ||
     url.pathname.includes('/exec') ||
@@ -147,7 +143,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // C. Local Development Mode Bypass
   const isLocalDev = Boolean(
     url.hostname === 'localhost' ||
     url.hostname === '127.0.0.1' ||
@@ -162,7 +157,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // STRATEGY 1: JS & CSS Assets -> Stale-While-Revalidate with Background Cache Update
   if (
     event.request.destination === 'script' ||
     event.request.destination === 'style' ||
@@ -187,7 +181,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // STRATEGY 2: HTML Documents -> Network-First with Offline Fallback
   if (
     event.request.destination === 'document' ||
     url.pathname.endsWith('.html') ||
@@ -219,7 +212,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // STRATEGY 3: Images, Media & Fonts -> Cache-First with Revalidation
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
