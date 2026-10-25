@@ -1,12 +1,13 @@
 /* file: assets/js/blood.js */
 /**
- * Selfcare Diagnostics - Emergency Blood Connect Controller v15.3.0
- * Backend Cloud Synchronized Edition with Medical Cooldown Protection:
- * 1. Cooldown Call/WhatsApp Interceptor: Blocks outreach to donors currently in medical recovery.
- * 2. Anti-Tamper Cooldown Guard: Locks past dates & prevents manual date manipulation.
- * 3. Zero-Typing Smart Auto-Fill: Profile details are auto-filled across forms.
- * 4. Realtime Two-Way Cloud Handshake: Pledging, PIN Verification, and Status updates saved to Google Sheets.
- * 5. Dynamic Donor History: Confirmed donations automatically appear under "My Past Donations".
+ * Selfcare Diagnostics - Emergency Blood Connect Controller v15.4.0
+ * Backend Cloud Synchronized Edition with Exclusive Donor PIN Showcase:
+ * 1. Pinned 'YOU' Card PIN Highlight: Displays donor's personal 4-digit PIN on their own card only.
+ * 2. Cooldown Call/WhatsApp Interceptor: Blocks outreach to donors currently in medical recovery.
+ * 3. Anti-Tamper Cooldown Guard: Locks past dates & prevents manual date manipulation.
+ * 4. Zero-Typing Smart Auto-Fill: Profile details are auto-filled across forms.
+ * 5. Realtime Two-Way Cloud Handshake: Pledging, PIN Verification, and Status updates saved to Google Sheets.
+ * 6. Dynamic Donor History: Confirmed donations automatically appear under "My Past Donations".
  */
 
 const BloodPage = {
@@ -217,7 +218,7 @@ const BloodPage = {
       if (donAge && prof.age) donAge.value = prof.age;
       if (donArea && prof.area) donArea.value = prof.area;
 
-      // 🛡️ ANTI-TAMPER GUARD 1: Prevent future dates
+      // 🛡️ ANTI-TAMPER GUARD 1: Prevent selecting future dates
       const todayStr = new Date().toISOString().split('T')[0];
       if (donLastDate) {
         donLastDate.max = todayStr;
@@ -227,7 +228,7 @@ const BloodPage = {
         donLastDate.value = prof.lastDonationDate;
       }
 
-      // 🛡️ ANTI-TAMPER GUARD 2: Lock Date input if donor has verified donations
+      // 🛡️ ANTI-TAMPER GUARD 2: Lock Date input if user already has verified donations
       const myPhone = this.getMyPhone();
       const existingDonor = this.bloodDonors.find(d => String(d.phone || '').replace(/\D/g, '').slice(-10) === myPhone);
       const hasDonated = (existingDonor && existingDonor.donationCount > 0) || this.getMyDonationHistory().length > 0;
@@ -701,9 +702,6 @@ const BloodPage = {
     this.openModal('modal-patient-details');
   },
 
-  /**
-   * VOLUNTEER PLEDGE HANDSHAKE -> SAVED TO LOCAL + GOOGLE SHEETS
-   */
   volunteerForRequest(reqId) {
     this.triggerHaptic();
     const myPhone = this.getMyPhone();
@@ -787,9 +785,6 @@ const BloodPage = {
     this.openPatientDetails(reqId);
   },
 
-  /**
-   * ATTENDER PIN VERIFICATION -> REALTIME 90-DAY COOLDOWN ENFORCEMENT
-   */
   verifyDonorPin(reqId, donorId) {
     this.triggerHaptic();
     const req = this.bloodRequests.find(r => r.id === reqId);
@@ -891,7 +886,6 @@ const BloodPage = {
 
   /**
    * 🛡️ COOLDOWN OUTREACH INTERCEPTOR
-   * Blocks calling or texting donors who are in medical cooldown recovery.
    */
   contactDonor(type, phone, name, daysRemaining, whatsappText = '') {
     this.triggerHaptic();
@@ -914,6 +908,9 @@ const BloodPage = {
     }
   },
 
+  /**
+   * RENDER DONORS (WITH EXCLUSIVE PIN SHOWCASE FOR LOGGED IN 'YOU' CARD ONLY)
+   */
   renderDonors() {
     const container = document.getElementById('donors-list-container');
     if (!container) return;
@@ -989,6 +986,18 @@ const BloodPage = {
           </div>
 
           ${isMe ? `
+            <!-- 🔐 EXCLUSIVE LIFESAVER PIN SHOWCASE FOR LOGGED IN 'YOU' CARD ONLY -->
+            <div class="my-pin-showcase-strip">
+              <div class="my-pin-left">
+                <span class="my-pin-icon">🔐</span>
+                <div>
+                  <span class="my-pin-title">MY LIFESAVER PIN</span>
+                  <p class="my-pin-hint">Hospital-la attender-kitta indha PIN-ai sollunga</p>
+                </div>
+              </div>
+              <div class="my-pin-num">${this.getMyDonorPin()}</div>
+            </div>
+
             <div class="donor-actions-row">
               <button type="button" class="action-btn-my-profile" onclick="BloodPage.openMyCertificateModal()">
                 📜 My Certificate
@@ -1129,9 +1138,6 @@ const BloodPage = {
     }
   },
 
-  /**
-   * REQUEST SOS SUBMISSION -> CLOUD BACKEND SYNC
-   */
   handleRequestSubmit(event) {
     event.preventDefault();
     this.triggerHaptic();
@@ -1198,9 +1204,6 @@ const BloodPage = {
     this.safeShowToast('Emergency request posted to Cloud! 🚨', 'success');
   },
 
-  /**
-   * DONOR REGISTRATION & PROFILE SUBMIT WITH ANTI-TAMPER COOLDOWN SAFEGUARD
-   */
   handleDonorSubmit(event) {
     event.preventDefault();
     this.triggerHaptic();
@@ -1222,7 +1225,6 @@ const BloodPage = {
       return;
     }
 
-    // 🛡️ ANTI-TAMPER GUARD 1: Prevent future dates
     const todayStr = new Date().toISOString().split('T')[0];
     if (inputDate && inputDate > todayStr) {
       this.safeShowToast('Last donation date cannot be in the future', 'error');
@@ -1237,7 +1239,6 @@ const BloodPage = {
     let finalLastDate = '';
     let finalCount = 0;
 
-    // 🛡️ ANTI-TAMPER GUARD 2: Preserve official hospital dates & count
     if (existingDonor && existingDonor.donationCount > 0) {
       finalCount = existingDonor.donationCount;
       finalLastDate = existingDonor.lastDonationDate || inputDate;
@@ -1246,7 +1247,6 @@ const BloodPage = {
       finalCount = (finalLastDate && finalLastDate.trim() !== '') ? 1 : 0;
     }
 
-    // 🛡️ ANTI-TAMPER GUARD 3: If 90-day cooldown active, override 'Available' switch
     const cooldown = this.calculateCooldown(finalLastDate);
     if (!cooldown.canDonate) {
       isAvailable = false;
