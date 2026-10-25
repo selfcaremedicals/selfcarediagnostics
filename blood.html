@@ -10,11 +10,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <!-- Synced Cache-Busted Assets v15.1.0 -->
-  <link rel="stylesheet" href="assets/css/global.css?v=15.1.0">
-  <link rel="stylesheet" href="assets/css/components.css?v=15.1.0">
-  <link rel="stylesheet" href="assets/css/responsive.css?v=15.1.0">
-  <link rel="stylesheet" href="assets/css/blood.css?v=15.1.0">
+  <!-- Synced Cache-Busted Assets v15.3.0 -->
+  <link rel="stylesheet" href="assets/css/global.css?v=15.3.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=15.3.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=15.3.0">
+  <link rel="stylesheet" href="assets/css/blood.css?v=15.3.0">
 
   <!-- HTML2Canvas Library for Native WhatsApp Image Conversion -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -102,7 +102,7 @@
       </button>
     </div>
 
-    <!-- Filter & Search Bar (All 38 Tamil Nadu Districts + Blood Groups) -->
+    <!-- Filter & Search Bar -->
     <section class="blood-filter-box glass-panel-3d" id="filters-container">
       <div class="filter-inputs-grid">
         <div class="filter-field">
@@ -187,7 +187,7 @@
       <div id="donors-list-container" class="blood-cards-vertical-list"></div>
     </section>
 
-    <!-- SECTION 3: COMPLETED ARCHIVE (REQUESTS & DONATIONS) -->
+    <!-- SECTION 3: COMPLETED ARCHIVE -->
     <section id="view-history-section" class="blood-view-section" style="display: none;">
       <div class="history-sub-tabs">
         <button type="button" class="sub-tab-btn active" id="subtab-completed-requests" onclick="BloodPage.switchHistorySubTab('requests')">
@@ -310,7 +310,6 @@
             </select>
           </div>
 
-          <!-- Mandatory Hospital Verification Details -->
           <div class="hospital-sub-section">
             <div class="sub-head-row">
               <h5>🏥 Hospital / Clinical Destination (Mandatory)</h5>
@@ -513,7 +512,7 @@
           <div class="form-field">
             <label for="donor-last-date">Last Donated Date (Leave blank if first time)</label>
             <input type="date" id="donor-last-date">
-            <small class="helper-text">Medical safety protocol requires 90-day cooldown between donations.</small>
+            <small class="helper-text" id="donor-last-date-help">Medical safety protocol requires 90-day cooldown between donations.</small>
           </div>
 
           <div class="form-field" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 0;">
@@ -533,7 +532,7 @@
     </div>
   </div>
 
-  <!-- MODAL 3: PATIENT HISTORY & FULL DETAILS CARD TOUCH MODAL -->
+  <!-- MODAL 3: PATIENT EMERGENCY DETAILS -->
   <div id="modal-patient-details" class="sia-modal-overlay" style="display: none;">
     <div class="sia-modal-content glass-modal-3d animate-3d-pop">
       <div class="sia-modal-header emergency-header">
@@ -548,7 +547,7 @@
     </div>
   </div>
 
-  <!-- MODAL 4: DYNAMIC E-CERTIFICATE WITH REAL LOGO & TIERS -->
+  <!-- MODAL 4: DYNAMIC E-CERTIFICATE -->
   <div id="modal-certificate" class="sia-modal-overlay" style="display: none;">
     <div class="sia-modal-content glass-modal-3d animate-3d-pop certificate-modal-wrap">
       <div class="sia-modal-header" style="background: linear-gradient(135deg, #045D49, #078866);">
@@ -563,7 +562,6 @@
         <div class="certificate-paper-3d" id="certificate-render-node">
           <div class="cert-border-inner" id="cert-border-wrapper">
             <div class="cert-header">
-              <!-- Official Selfcare Diagnostics Logo -->
               <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="cert-official-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
               <div class="cert-fallback-logo" style="display: none;">
                 <span class="cert-org-logo">🌿 SELFCARE DIAGNOSTICS</span>
@@ -650,14 +648,13 @@
     </a>
   </nav>
 
-  <!-- Cache-Busted Scripts v15.1.0 -->
-  <script src="assets/js/config.js?v=15.1.0"></script>
-  <script src="assets/js/utils.js?v=15.1.0"></script>
-  <script src="assets/js/api.js?v=15.1.0"></script>
-  <script src="assets/js/auth.js?v=15.1.0"></script>
-  <script src="assets/js/blood.js?v=15.1.0"></script>
+  <!-- Cache-Busted Scripts v15.3.0 -->
+  <script src="assets/js/config.js?v=15.3.0"></script>
+  <script src="assets/js/utils.js?v=15.3.0"></script>
+  <script src="assets/js/api.js?v=15.3.0"></script>
+  <script src="assets/js/auth.js?v=15.3.0"></script>
+  <script src="assets/js/blood.js?v=15.3.0"></script>
 
-  <!-- PWA Service Worker Registration & Realtime Upgrade Listener -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -676,7 +673,6 @@
           })
           .catch(err => console.warn('[BloodConnect] SW registration skipped:', err));
 
-        // Listen for SW_UPDATED message from service-worker.js to auto-refresh
         navigator.serviceWorker.addEventListener('message', event => {
           if (event.data && event.data.type === 'SW_UPDATED') {
             console.log('[BloodConnect] SW_UPDATED signal received. Reloading with fresh cache...');
