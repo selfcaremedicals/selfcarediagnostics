@@ -11,7 +11,7 @@
  */
 
 const MembershipPage = {
-  PER_HEAD_PRICE: 99,
+  PER_HEAD_PRICE: 49,
   currentUser: null,
   familyMembers: [],
   selectedMemberIds: new Set(),
@@ -226,7 +226,7 @@ const MembershipPage = {
             </div>
             <span class="member-sub">${displayMobile}</span>
           </div>
-          <div class="row-price">₹99</div>
+          <div class="row-price">₹49</div>
         </div>
       `;
     }
@@ -290,7 +290,7 @@ const MembershipPage = {
               </div>
               <span class="member-sub">${memberSub}</span>
             </div>
-            <div class="row-price">+₹99</div>
+            <div class="row-price">+₹49</div>
           </div>
         `;
       }

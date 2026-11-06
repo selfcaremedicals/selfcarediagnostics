@@ -1,18 +1,12 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v15.1.0
+ * Selfcare Diagnostics - My Account Controller v15.6.0
  * Features:
- * - Dynamic VIP Crown 👑 Engine: Displays crown on User & paid Family Members only
- * - Automatic Expiry Awareness: Crown disappears automatically once 1-year pass expires
- * - Seamless Cloud Sync for Profile & Family Vault across devices & browsers
- * - Auto-hydrates Family Members from getProfile & getFamilyMembers
- * - Dual Array & Object response compatibility
- * - Anti-multi-click execution lock & dynamic button state
- * - Strict duplicate member prevention & preserves Membership status across edits
- * - Binds primaryUserId, primaryUserName & primaryMobile to backend Family Vault
- * - Mobile Haptic feedback (vibration on click)
- * - Full Directory Card View: Displays Relationship, Mobile, Age, Gender, Blood Group, Email, Address & GPS
- * - Realtime Blood Connect Live Badges Engine (Live SOS & Verified Donors Count)
+ * - Dynamic VIP Crown Engine
+ * - Cloud Sync for Profile & Family Vault
+ * - Branches Modal (Vettuvankeni & Velachery Upcoming)
+ * - 5.0 Star Google Review & Future Growth Modal
+ * - Realtime Blood Badges Engine
  */
 
 const ProfilePage = {
@@ -709,6 +703,18 @@ const ProfilePage = {
     this.safeShowToast(`${memberName} removed.`, 'info');
   },
 
+  /* ================= 📍 BRANCHES & DIRECTIONS MODAL ================= */
+  openBranchesModal() {
+    this.triggerHaptic();
+    this.openModal('modal-branches');
+  },
+
+  /* ================= ⭐ GOOGLE REVIEW MODAL ================= */
+  openReviewModal() {
+    this.triggerHaptic();
+    this.openModal('modal-review');
+  },
+
   openGeneralInfoModal() {
     this.triggerHaptic();
     this.openModal('modal-general-info');
@@ -784,9 +790,6 @@ const ProfilePage = {
     });
   },
 
-  /**
-   * Renders Live Blood Badges Instantly from LocalStorage / Synced Data
-   */
   renderBloodConnectBadges() {
     try {
       const storedReq = localStorage.getItem('selfcare_blood_requests');
@@ -829,9 +832,6 @@ const ProfilePage = {
     }
   },
 
-  /**
-   * Syncs latest Blood Data directly from Cloud & Refreshes Badges in Background
-   */
   async syncBloodConnectLive() {
     if (!navigator.onLine || typeof Api === 'undefined' || typeof Api.request !== 'function') return;
     try {

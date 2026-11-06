@@ -1,13 +1,7 @@
 /* file: assets/js/blood.js */
 /**
- * Selfcare Diagnostics - Emergency Blood Connect Controller v15.4.0
- * Backend Cloud Synchronized Edition with Exclusive Donor PIN Showcase:
- * 1. Pinned 'YOU' Card PIN Highlight: Displays donor's personal 4-digit PIN on their own card only.
- * 2. Cooldown Call/WhatsApp Interceptor: Blocks outreach to donors currently in medical recovery.
- * 3. Anti-Tamper Cooldown Guard: Locks past dates & prevents manual date manipulation.
- * 4. Zero-Typing Smart Auto-Fill: Profile details are auto-filled across forms.
- * 5. Realtime Two-Way Cloud Handshake: Pledging, PIN Verification, and Status updates saved to Google Sheets.
- * 6. Dynamic Donor History: Confirmed donations automatically appear under "My Past Donations".
+ * Selfcare Diagnostics - Emergency Blood Connect Controller v15.5.0
+ * Backend Cloud Synchronized Edition with Exclusive Donor PIN Showcase & 30-Day Auto-Expiry
  */
 
 const BloodPage = {
@@ -179,6 +173,32 @@ const BloodPage = {
   },
 
   /**
+   * 1 MONTH (30 DAYS) EXPIRY & DATE/TIME FORMATTER ENGINE
+   */
+  getRequestDateInfo(createdAtStr) {
+    const created = createdAtStr ? new Date(createdAtStr) : new Date();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const expires = new Date(created.getTime() + thirtyDaysMs);
+    const now = new Date();
+
+    const isExpired = now.getTime() >= expires.getTime();
+    const diffMs = expires.getTime() - now.getTime();
+    const daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+    const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+    const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+
+    return {
+      postedDate: created.toLocaleDateString('en-GB', dateOptions),
+      postedTime: created.toLocaleTimeString('en-GB', timeOptions),
+      endDate: expires.toLocaleDateString('en-GB', dateOptions),
+      endTime: expires.toLocaleTimeString('en-GB', timeOptions),
+      daysLeft,
+      isExpired
+    };
+  },
+
+  /**
    * ZERO-TYPING SMART AUTO-FILL ENGINE & ANTI-TAMPER COOLDOWN FIELD LOCK
    */
   populateUserContext() {
@@ -218,7 +238,6 @@ const BloodPage = {
       if (donAge && prof.age) donAge.value = prof.age;
       if (donArea && prof.area) donArea.value = prof.area;
 
-      // 🛡️ ANTI-TAMPER GUARD 1: Prevent selecting future dates
       const todayStr = new Date().toISOString().split('T')[0];
       if (donLastDate) {
         donLastDate.max = todayStr;
@@ -228,7 +247,6 @@ const BloodPage = {
         donLastDate.value = prof.lastDonationDate;
       }
 
-      // 🛡️ ANTI-TAMPER GUARD 2: Lock Date input if user already has verified donations
       const myPhone = this.getMyPhone();
       const existingDonor = this.bloodDonors.find(d => String(d.phone || '').replace(/\D/g, '').slice(-10) === myPhone);
       const hasDonated = (existingDonor && existingDonor.donationCount > 0) || this.getMyDonationHistory().length > 0;
@@ -400,7 +418,12 @@ const BloodPage = {
   },
 
   renderHeroStats() {
-    const activeReqs = this.bloodRequests.filter(r => (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) > 0);
+    const activeReqs = this.bloodRequests.filter(r => {
+      const needed = parseInt(r.unitsNeeded, 10);
+      const donated = r.unitsDonated || 0;
+      const dateInfo = this.getRequestDateInfo(r.createdAt);
+      return (needed - donated) > 0 && !dateInfo.isExpired;
+    });
 
     const myCompletedReqs = this.bloodRequests.filter(r =>
       (parseInt(r.unitsNeeded, 10) - (r.unitsDonated || 0)) <= 0 &&
@@ -428,10 +451,12 @@ const BloodPage = {
 
     const myPhone = this.getMyPhone();
 
+    // 1 Month (30 Days) mudinjudha filter pannum, auto-disappear aagidum
     let list = this.bloodRequests.filter(r => {
       const needed = parseInt(r.unitsNeeded || 1, 10);
       const donated = parseInt(r.unitsDonated || 0, 10);
-      return (needed - donated) > 0;
+      const dateInfo = this.getRequestDateInfo(r.createdAt);
+      return (needed - donated) > 0 && !dateInfo.isExpired;
     });
 
     if (this.selectedBloodGroup !== 'ALL') {
@@ -465,6 +490,8 @@ const BloodPage = {
       const donatedCount = parseInt(req.unitsDonated || 0, 10);
       const balance = Math.max(0, totalNeeded - donatedCount);
 
+      const dateInfo = this.getRequestDateInfo(req.createdAt);
+
       const donorsList = req.donorsList || [];
       const acceptedCount = donorsList.filter(d => d.status === 'ACCEPTED' || d.status === 'CONFIRMED').length;
       const isSlotsFull = acceptedCount >= totalNeeded;
@@ -488,6 +515,16 @@ const BloodPage = {
               <span class="req-meta-sub">Attender: ${this.safeEscape(req.attenderName)} (${this.safeEscape(req.attenderRelation || 'Attender')})</span>
             </div>
             <span class="urgency-pill ${urgencyClass}">${urgencyLabel}</span>
+          </div>
+
+          <!-- 🕒 POSTED DATE & ⏳ END DATE STRIP -->
+          <div class="request-validity-strip">
+            <span class="validity-item">
+              📅 <strong>Posted:</strong> ${dateInfo.postedDate}, ${dateInfo.postedTime}
+            </span>
+            <span class="validity-item validity-end">
+              ⏳ <strong>Valid Till:</strong> ${dateInfo.endDate} (${dateInfo.daysLeft}d left)
+            </span>
           </div>
 
           <div class="units-highlight-banner">
@@ -562,6 +599,7 @@ const BloodPage = {
     const totalNeeded = parseInt(req.unitsNeeded || 1, 10);
     const donatedCount = parseInt(req.unitsDonated || 0, 10);
     const balance = Math.max(0, totalNeeded - donatedCount);
+    const dateInfo = this.getRequestDateInfo(req.createdAt);
 
     const isOwner = this.isMyCreatedRequest(req.attenderPhone);
     const myPhone = this.getMyPhone();
@@ -589,6 +627,14 @@ const BloodPage = {
         <div class="detail-row-item">
           <span class="detail-lbl">Component Type:</span>
           <span class="detail-val">${this.safeEscape(req.componentType || 'Whole Blood')}</span>
+        </div>
+        <div class="detail-row-item">
+          <span class="detail-lbl">Posted On:</span>
+          <span class="detail-val">${dateInfo.postedDate} at ${dateInfo.postedTime}</span>
+        </div>
+        <div class="detail-row-item">
+          <span class="detail-lbl">Valid Till (1 Month):</span>
+          <span class="detail-val" style="color: #DC2626; font-weight: 800;">${dateInfo.endDate} (${dateInfo.daysLeft} days left)</span>
         </div>
       </div>
 
@@ -908,9 +954,6 @@ const BloodPage = {
     }
   },
 
-  /**
-   * RENDER DONORS (WITH EXCLUSIVE PIN SHOWCASE FOR LOGGED IN 'YOU' CARD ONLY)
-   */
   renderDonors() {
     const container = document.getElementById('donors-list-container');
     if (!container) return;
@@ -986,7 +1029,6 @@ const BloodPage = {
           </div>
 
           ${isMe ? `
-            <!-- 🔐 EXCLUSIVE LIFESAVER PIN SHOWCASE FOR LOGGED IN 'YOU' CARD ONLY -->
             <div class="my-pin-showcase-strip">
               <div class="my-pin-left">
                 <span class="my-pin-icon">🔐</span>

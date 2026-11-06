@@ -1,11 +1,12 @@
 /* file: assets/js/cart.js */
 /**
- * Selfcare Diagnostics - Direct Booking Cart Engine v15.0.0
+ * Selfcare Diagnostics - Direct Booking Cart Engine v15.4.0
  * Features:
- * 1. Dedicated Multi-Patient Payload Binding: Binds real Family Member Name, Phone & Relation per item.
- * 2. Primary Mobile Preservation: Ensures backend links all sub-bookings to the primary user account.
- * 3. Dynamic Addon Mode: Locks patient and test details accurately.
- * 4. Per-Person VIP Membership Engine: Calculates 10% discount strictly for VIP holders only.
+ * 1. Open Time Slots: Slot blocking fully removed. Any customer can choose any slot freely.
+ * 2. Server-Side Referral Verification: Calls Apps Script 'validateReferralCode' with cold-start tolerance.
+ * 3. One-Time Use Guard: Prevents repeat referral code usage by the same customer.
+ * 4. Refer Reward Reset: Calls 'claimReferralReward' upon booking to reset the referrer's milestone back to 0%.
+ * 5. Dedicated Multi-Patient Payload Binding & VIP 10% Membership Engine.
  */
 
 const CartPage = {
@@ -40,6 +41,7 @@ const CartPage = {
   addonBooking: null,
   existingBookingItems: [],
 
+  appliedReferral: null,
   isProcessingCheckout: false,
 
   formatMoney(amount) {
@@ -109,6 +111,7 @@ const CartPage = {
       this.detectAddonBookingMode();
       this.loadPatientAndAddressData();
       this.loadCartData();
+      this.loadAppliedReferral();
       this.restorePersistedWizardState();
 
       this.populateTimeSlotsDropdown();
@@ -148,6 +151,130 @@ const CartPage = {
       Utils.showToast(message, type);
     } else {
       alert(message);
+    }
+  },
+
+  /* =========================================================
+     REFERRAL & COUPON BACKEND VERIFICATION ENGINE
+     ========================================================= */
+  loadAppliedReferral() {
+    try {
+      const raw = localStorage.getItem('selfcare_applied_referral_coupon');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.percent > 0 || parsed.code)) {
+          this.appliedReferral = parsed;
+        }
+      }
+    } catch (e) {
+      this.appliedReferral = null;
+    }
+  },
+
+  async applyReferralCode() {
+    const input = document.getElementById('cart-referral-input');
+    const code = (input ? input.value : '').trim().toUpperCase();
+
+    if (!code) {
+      this.safeShowToast('Referral code enter pannunga!', 'error');
+      return;
+    }
+
+    const myMobile = this.getPrimaryUserMobile();
+    const myOwnCode = `SCD${myMobile.slice(-6)}`;
+
+    // 1. Sontha code check
+    if (code === myOwnCode) {
+      this.safeShowToast('Ungaludaiya sontha referral code-ah neengale use panna mudiyathu!', 'error');
+      return;
+    }
+
+    const subtotal = this.getNewTestsSubtotal();
+    if (subtotal < 500) {
+      this.safeShowToast('Referral code kedaikka minimum ₹500 booking thevai!', 'error');
+      return;
+    }
+
+    const applyBtn = document.querySelector('.referral-apply-btn');
+    if (applyBtn) {
+      applyBtn.disabled = true;
+      applyBtn.textContent = 'Verifying...';
+    }
+
+    try {
+      if (!navigator.onLine) {
+        throw new Error('Internet connection thevai referral code verify seiya.');
+      }
+
+      let res = null;
+      if (typeof Api !== 'undefined' && typeof Api.request === 'function') {
+        res = await Api.request('validateReferralCode', {
+          code: code,
+          mobile: myMobile,
+          amount: subtotal
+        });
+      } else {
+        throw new Error('API gateway connection unavailable');
+      }
+
+      if (!res || res.status !== 'success' || !res.valid) {
+        throw new Error((res && res.message) ? res.message : 'Invalid Referral Code! Indha code database-il illai.');
+      }
+
+      this.appliedReferral = {
+        code: code,
+        referrerMobile: res.referrerMobile || '',
+        referrerName: res.referrerName || 'Referrer',
+        percent: res.discountPercent || 10,
+        maxDiscountCap: res.maxCap || 2499,
+        appliedAt: new Date().toISOString()
+      };
+
+      localStorage.setItem('selfcare_applied_referral_coupon', JSON.stringify(this.appliedReferral));
+      this.safeShowToast('Verified! 10% Referral Discount Applied ✓', 'success');
+
+      this.calculateBillSummary();
+      this.renderReferralUI();
+
+    } catch (err) {
+      let errMsg = err.message || 'Referral verification failed';
+      if (errMsg.includes('Failed to fetch') || errMsg.includes('timed out')) {
+        errMsg = 'Server connecting... Please tap Apply again in 5 seconds.';
+      }
+      this.safeShowToast(errMsg, 'error');
+      if (input) input.focus();
+    } finally {
+      if (applyBtn) {
+        applyBtn.disabled = false;
+        applyBtn.textContent = 'Apply';
+      }
+    }
+  },
+
+  removeReferralCode() {
+    this.appliedReferral = null;
+    localStorage.removeItem('selfcare_applied_referral_coupon');
+    this.safeShowToast('Referral discount removed', 'info');
+    this.calculateBillSummary();
+    this.renderReferralUI();
+  },
+
+  renderReferralUI() {
+    const inputRow = document.getElementById('referral-input-row');
+    const activeBadge = document.getElementById('referral-active-badge');
+    const titleEl = document.getElementById('applied-ref-title');
+    const subEl = document.getElementById('applied-ref-sub');
+
+    if (this.appliedReferral && this.appliedReferral.percent > 0) {
+      if (inputRow) inputRow.style.display = 'none';
+      if (activeBadge) activeBadge.style.display = 'flex';
+      if (titleEl) titleEl.textContent = `🎉 ${this.appliedReferral.percent}% Referral Discount (${this.appliedReferral.code})`;
+      if (subEl) subEl.textContent = `Max cap ₹${this.appliedReferral.maxDiscountCap || 2499} • Min ₹500 spend`;
+    } else {
+      if (inputRow) inputRow.style.display = 'flex';
+      if (activeBadge) activeBadge.style.display = 'none';
+      const input = document.getElementById('cart-referral-input');
+      if (input) input.value = '';
     }
   },
 
@@ -503,15 +630,25 @@ const CartPage = {
 
     const subtotalAfterVip = Math.max(0, totalGrossPrice - totalVipDiscount);
 
+    let referralDiscount = 0;
+    if (this.appliedReferral && subtotalAfterVip >= 500) {
+      const percent = Number(this.appliedReferral.percent) || 0;
+      const maxCap = Number(this.appliedReferral.maxDiscountCap) || 2499;
+      const calculatedAmt = Math.round((subtotalAfterVip * percent) / 100);
+      referralDiscount = Math.min(calculatedAmt, maxCap);
+    }
+
+    const subtotalAfterReferral = Math.max(0, subtotalAfterVip - referralDiscount);
+
     if (anyPatientHasVip || this.isAddonMode || this.collectionType === 'lab') {
       this.doorstepCharge = 0;
     } else {
-      this.doorstepCharge = this.calculateDoorstepCharge(subtotalAfterVip);
+      this.doorstepCharge = this.calculateDoorstepCharge(subtotalAfterReferral);
     }
 
-    this.updateHomeCollectionBadge(subtotalAfterVip, anyPatientHasVip);
+    this.updateHomeCollectionBadge(subtotalAfterReferral, anyPatientHasVip);
 
-    const finalPayable = Math.max(0, subtotalAfterVip + this.doorstepCharge);
+    const finalPayable = Math.max(0, subtotalAfterReferral + this.doorstepCharge);
 
     const stickyPayableEl = document.getElementById('sticky-payable-amount');
     if (stickyPayableEl) stickyPayableEl.textContent = this.formatMoney(finalPayable);
@@ -529,12 +666,13 @@ const CartPage = {
     const standardSavings = Math.max(0, totalGrossMrp - totalGrossPrice);
     if (labSavingsEl) labSavingsEl.textContent = `- ${this.formatMoney(standardSavings)}`;
 
+    // VIP Discount Line
     let vipRow = document.getElementById('bill-vip-discount-row');
     if (!vipRow && totalVipDiscount > 0) {
       vipRow = document.createElement('div');
       vipRow.id = 'bill-vip-discount-row';
-      vipRow.className = 'bill-row';
-      vipRow.style.cssText = 'display:flex; justify-content:space-between; color:#047857; font-weight:700; margin:6px 0; font-size:12.5px;';
+      vipRow.className = 'summary-row highlight-savings';
+      vipRow.style.cssText = 'background:#FEF3C7; padding:5px 8px; border-radius:7px; margin-bottom:4px;';
       const subtotalRow = document.getElementById('bill-subtotal-price')?.parentElement;
       if (subtotalRow && subtotalRow.parentNode) {
         subtotalRow.parentNode.insertBefore(vipRow, subtotalRow.nextSibling);
@@ -544,9 +682,25 @@ const CartPage = {
     if (vipRow) {
       if (totalVipDiscount > 0) {
         vipRow.style.display = 'flex';
-        vipRow.innerHTML = `<span>👑 VIP 10% Member Discount:</span><span style="color:#047857;">- ${this.formatMoney(totalVipDiscount)}</span>`;
+        vipRow.innerHTML = `<span class="s-label" style="color:#92400E;">👑 VIP 10% Member Discount:</span><span class="s-value" style="color:#92400E;">- ${this.formatMoney(totalVipDiscount)}</span>`;
       } else {
         vipRow.style.display = 'none';
+      }
+    }
+
+    // Referral Discount Line
+    const refRow = document.getElementById('bill-referral-discount-row');
+    const refVal = document.getElementById('bill-referral-val');
+    const refLabel = document.getElementById('bill-referral-label');
+    if (refRow && refVal) {
+      if (referralDiscount > 0) {
+        refRow.style.display = 'flex';
+        refVal.textContent = `- ${this.formatMoney(referralDiscount)}`;
+        if (refLabel && this.appliedReferral) {
+          refLabel.textContent = `🎁 Referral (${this.appliedReferral.percent}% OFF):`;
+        }
+      } else {
+        refRow.style.display = 'none';
       }
     }
 
@@ -1199,6 +1353,9 @@ const CartPage = {
     }
   },
 
+  /**
+   * OPEN SLOTS: Slot-locking logic removed. Any customer can choose any slot freely.
+   */
   populateTimeSlotsDropdown() {
     const select = document.getElementById('cart-slot-select');
     if (!select) return;
@@ -1216,22 +1373,7 @@ const CartPage = {
     select.innerHTML = '';
     const now = new Date();
     const isToday = this.selectedSlotDay === 'Today';
-    const bufferTime = new Date(now.getTime() + 60 * 60 * 1000);
-
-    let bookedSlots = [];
-    try {
-      const storedBookings = localStorage.getItem('selfcare_booked_slots');
-      if (storedBookings) {
-        const parsed = JSON.parse(storedBookings);
-        if (Array.isArray(parsed)) bookedSlots = parsed;
-      }
-    } catch (e) {
-      bookedSlots = [];
-    }
-
-    const targetDate = new Date();
-    if (!isToday) targetDate.setDate(targetDate.getDate() + 1);
-    const dateKey = targetDate.toISOString().split('T')[0];
+    const bufferTime = new Date(now.getTime() + 60 * 60 * 1000); // 1-hour buffer for today
 
     let firstSelectableSlot = '';
 
@@ -1251,7 +1393,6 @@ const CartPage = {
         };
 
         const slotLabel = `${formatTime(startHour, startMin)} - ${formatTime(endHour, endMin)}`;
-        const slotDateKey = `${dateKey}_${slotLabel}`;
 
         let isPassed = false;
         if (isToday) {
@@ -1260,14 +1401,10 @@ const CartPage = {
           if (slotStartTime < bufferTime) isPassed = true;
         }
 
-        const isBooked = Array.isArray(bookedSlots) && bookedSlots.includes(slotDateKey);
         const opt = document.createElement('option');
         opt.value = slotLabel;
 
-        if (isBooked) {
-          opt.textContent = `❌ ${slotLabel} [Already Booked]`;
-          opt.disabled = true;
-        } else if (isPassed) {
+        if (isPassed) {
           opt.textContent = `⏳ ${slotLabel} (Passed)`;
           opt.disabled = true;
         } else {
@@ -1337,6 +1474,7 @@ const CartPage = {
     this.renderAddonBannerHeader();
     this.renderPatientChips();
     this.renderItemsList();
+    this.renderReferralUI();
     this.calculateBillSummary();
   },
 
@@ -1411,8 +1549,18 @@ const CartPage = {
       }
     });
 
+    const subtotalAfterVip = Math.max(0, subtotalNewGross - totalVipDiscount);
+
+    let referralDiscount = 0;
+    if (this.appliedReferral && subtotalAfterVip >= 500) {
+      const percent = Number(this.appliedReferral.percent) || 0;
+      const maxCap = Number(this.appliedReferral.maxDiscountCap) || 2499;
+      const calcAmt = Math.round((subtotalAfterVip * percent) / 100);
+      referralDiscount = Math.min(calcAmt, maxCap);
+    }
+
     const doorstepCharge = this.doorstepCharge;
-    const finalPayable = Math.max(0, (subtotalNewGross - totalVipDiscount) + doorstepCharge);
+    const finalPayable = Math.max(0, (subtotalAfterVip - referralDiscount) + doorstepCharge);
 
     const targetDate = new Date();
     if (this.selectedSlotDay === 'Tomorrow') {
@@ -1438,7 +1586,7 @@ const CartPage = {
       : newItems;
 
     const existingTotal = this.existingBookingItems.reduce((sum, it) => sum + Number(it.originalPrice || it.price || 0), 0);
-    const finalTotalWithExisting = existingTotal + (subtotalNewGross - totalVipDiscount) + doorstepCharge;
+    const finalTotalWithExisting = existingTotal + (subtotalAfterVip - referralDiscount) + doorstepCharge;
 
     const primaryMobileNum = this.getPrimaryUserMobile();
 
@@ -1489,6 +1637,10 @@ const CartPage = {
       timeSlot: this.selectedTimeSlot,
       subtotal: existingTotal + subtotalNewGross,
       vipDiscount: totalVipDiscount,
+      referralCode: this.appliedReferral ? this.appliedReferral.code : null,
+      referralDiscount: referralDiscount,
+      referrerMobile: this.appliedReferral ? this.appliedReferral.referrerMobile : '',
+      referrerName: this.appliedReferral ? this.appliedReferral.referrerName : '',
       doorstepCharge: doorstepCharge,
       finalAmount: finalTotalWithExisting,
       paymentMode: (this.selectedPaymentMode === 'online') ? 'ONLINE_RAZORPAY' : 'CASH',
@@ -1497,6 +1649,17 @@ const CartPage = {
       isAddon: this.isAddonMode,
       addonBookingId: this.addonBookingId,
       targetBookingId: this.addonBookingId
+    };
+
+    // Helper: Mark referral reward as redeemed if earned discount was used
+    const claimRewardIfEarned = async () => {
+      if (this.appliedReferral && String(this.appliedReferral.code || '').startsWith('REFER_')) {
+        try {
+          if (typeof Api !== 'undefined' && Api.request) {
+            await Api.request('claimReferralReward', { mobile: primaryMobileNum });
+          }
+        } catch (e) {}
+      }
     };
 
     if (this.selectedPaymentMode === 'cash') {
@@ -1513,14 +1676,15 @@ const CartPage = {
           }
         }
 
+        await claimRewardIfEarned();
+
         this.persistConfirmedBookingLocally({
           ...bookingPayload,
           bookingId: resBookingId,
           currentStage: 1
         });
 
-        this.saveBookedSlot(collectionDateStr, this.selectedTimeSlot);
-        this.safeShowToast('Tests booked successfully with VIP discount!', 'success');
+        this.safeShowToast('Booking confirmed successfully!', 'success');
         this.finalizeConfirmedMultiBooking([bookingPayload]);
       } catch (err) {
         console.error('Booking confirmation failed:', err);
@@ -1586,8 +1750,9 @@ const CartPage = {
                 await Api.createBooking(confirmedData).catch(() => {});
               }
 
+              await claimRewardIfEarned();
+
               this.persistConfirmedBookingLocally(confirmedData);
-              this.saveBookedSlot(collectionDateStr, this.selectedTimeSlot);
               this.safeShowToast('Payment successful! Booking confirmed.', 'success');
               this.finalizeConfirmedMultiBooking([confirmedData]);
             } else {
@@ -1630,9 +1795,11 @@ const CartPage = {
     
     localStorage.removeItem('selfcare_active_addon_booking_id');
     localStorage.removeItem('selfcare_active_addon_booking_data');
+    localStorage.removeItem('selfcare_applied_referral_coupon');
     sessionStorage.removeItem('selfcare_addon_booking');
 
     this.cart = [];
+    this.appliedReferral = null;
     this.saveCartState();
     this.renderCartUI();
     this.updateCartBadgeUI();
@@ -1653,18 +1820,6 @@ const CartPage = {
   resetCheckoutButtonState() {
     this.isProcessingCheckout = false;
     this.updateBottomControlBarUI();
-  },
-
-  saveBookedSlot(dateStr, slotLabel) {
-    try {
-      const stored = localStorage.getItem('selfcare_booked_slots');
-      const booked = stored ? JSON.parse(stored) : [];
-      const key = `${dateStr}_${slotLabel}`;
-      if (Array.isArray(booked) && !booked.includes(key)) {
-        booked.push(key);
-        localStorage.setItem('selfcare_booked_slots', JSON.stringify(booked));
-      }
-    } catch (e) {}
   },
 
   removeItem(index) {

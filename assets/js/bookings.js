@@ -1,10 +1,13 @@
 /* file: assets/js/bookings.js */
 /**
- * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v7.2.0
- * Fixed:
- * 1. Automatic Parent Booking Deduplication (Hides un-split parent booking when split -1, -2 exist).
- * 2. Cross-Linked Sibling Order Total Calculation for Split Sub-Bookings.
- * 3. Strict Tab Isolation (Mohamed only sees -1, Jazeerah only sees -2).
+ * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v7.4.0
+ * Features:
+ * 1. Accurate Payable Calculation: Properly extracts and calculates finalAmount (handles both finalAmount & FinalAmount).
+ * 2. VIP & Referral Discount Breakdown: Deducts VIP 10% & Referral discounts before computing totals.
+ * 3. Transparent Order Summary: Renders Base Test Price, VIP Savings, Referral Savings & Grand Total Paid.
+ * 4. Automatic Parent Booking Deduplication (Hides un-split parent booking when split -1, -2 exist).
+ * 5. Cross-Linked Sibling Order Total Calculation for Split Sub-Bookings.
+ * 6. Strict Tab Isolation (Self only sees -1, Family member only sees -2).
  */
 
 const BookingsPage = {
@@ -246,7 +249,7 @@ const BookingsPage = {
       }
     } catch (e) {}
 
-    // DEDUPLICATION: Split aaya sub-bookings (-1, -2) undenkil unsplit parent booking list-il ninnu kalayunnu
+    // Deduplication: Hide un-split parent booking if split sub-bookings exist
     const subParentBIds = new Set();
     savedBookings.forEach(b => {
       const bId = String(b.bookingId || '');
@@ -475,7 +478,6 @@ const BookingsPage = {
 
       const isSubBooking = /-\d+$/.test(bId);
 
-      // Self account-il ninnu family split booking-kal (-2, -3) maati nirthunnu
       if (isSelf) {
         if (bPatientId.startsWith('fam_')) return false;
         if (isSubBooking && !bId.endsWith('-1')) return false;
@@ -483,7 +485,6 @@ const BookingsPage = {
           return true;
         }
       } else {
-        // Family member tab-il Self booking-kal (-1) varilla
         if (bPatientId === 'self' || bPatientId === 'patient_self') return false;
         if (isSubBooking && bId.endsWith('-1')) return false;
 
@@ -680,9 +681,21 @@ const BookingsPage = {
       }
     }
 
+    // 1. Accurate Amount Calculation: Priority to saved final payable
     const patientItems = this.getPatientItemsForBooking(booking);
-    const patientSum = patientItems.reduce((acc, it) => acc + Number(it.price || it.OfferPrice || 0), 0);
-    const currentBookingAmount = Number(booking.finalAmount || patientSum || 0);
+    const patientGrossSum = patientItems.reduce((acc, it) => acc + Number(it.originalPrice || it.price || it.OfferPrice || 0), 0);
+
+    const rawFinal = (booking.finalAmount !== undefined && booking.finalAmount !== null) ? booking.finalAmount :
+                     ((booking.FinalAmount !== undefined && booking.FinalAmount !== null) ? booking.FinalAmount :
+                     ((booking.amount !== undefined && booking.amount !== null) ? booking.amount : null));
+
+    const vipDiscount = Number(booking.vipDiscount || booking.VIPDiscount || 0);
+    const referralDiscount = Number(booking.referralDiscount || booking.CouponDiscount || booking.couponDiscount || 0);
+    const doorstepCharge = Number(booking.doorstepCharge || booking.DoorstepCharge || 0);
+
+    // Fallback if finalAmount wasn't directly passed from sheet
+    const calculatedPayable = Math.max(0, patientGrossSum - vipDiscount - referralDiscount + doorstepCharge);
+    const currentBookingAmount = Number(rawFinal !== null ? rawFinal : calculatedPayable);
 
     // Cross-Linked Sibling Order Total Calculation
     const bId = String(booking.bookingId || '');
@@ -695,7 +708,10 @@ const BookingsPage = {
       const siblings = this.allBookings.filter(b => String(b.bookingId || '').startsWith(basePrefix + '-'));
       if (siblings.length > 1) {
         hasSiblings = true;
-        orderGrandTotal = siblings.reduce((sum, b) => sum + Number(b.finalAmount || 0), 0);
+        orderGrandTotal = siblings.reduce((sum, b) => {
+          const sFinal = b.finalAmount !== undefined ? b.finalAmount : (b.FinalAmount !== undefined ? b.FinalAmount : b.amount);
+          return sum + Number(sFinal || 0);
+        }, 0);
       }
     }
 
@@ -710,8 +726,8 @@ const BookingsPage = {
           <span style="display:block; font-size:9.5px; font-weight:600; color:#536E66; margin-top:2px;">(Order Total: ${this.safeFormatCurrency(orderGrandTotal)})</span>
         `;
       } else {
-        if (amtLabel) amtLabel.textContent = '💰 Amount:';
-        amtEl.innerHTML = `<span style="color:#10231E; font-size:14px; font-weight:800;">${this.safeFormatCurrency(currentBookingAmount)}</span>`;
+        if (amtLabel) amtLabel.textContent = '💰 Total Paid:';
+        amtEl.innerHTML = `<span style="color:#078866; font-size:14.5px; font-weight:900;">${this.safeFormatCurrency(currentBookingAmount)}</span>`;
       }
     }
 
@@ -802,7 +818,10 @@ const BookingsPage = {
     const items = this.getPatientItemsForBooking(booking);
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
     const isLab = booking.collectionType === 'lab' || String(booking.address || '').includes('Direct Lab');
-    const doorstepCharge = Number(booking.doorstepCharge || 0);
+    
+    const doorstepCharge = Number(booking.doorstepCharge || booking.DoorstepCharge || 0);
+    const vipDiscount = Number(booking.vipDiscount || booking.VIPDiscount || 0);
+    const referralDiscount = Number(booking.referralDiscount || booking.CouponDiscount || booking.couponDiscount || 0);
 
     let html = items.map(item => `
       <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f5f9;">
@@ -812,29 +831,54 @@ const BookingsPage = {
             👤 For: ${this.safeEscape(activePatient.name)}
           </span>
         </div>
-        <strong style="color:#045D49; font-size:13px;">${this.safeFormatCurrency(item.price || item.OfferPrice || 0)}</strong>
+        <strong style="color:#1E293B; font-size:13px;">${this.safeFormatCurrency(item.originalPrice || item.price || item.OfferPrice || 0)}</strong>
       </div>
     `).join('');
 
-    if (!isLab && doorstepCharge > 0) {
+    // 1. VIP 10% Discount Deduction Line
+    if (vipDiscount > 0) {
       html += `
-        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 8px; border-bottom:1px solid #f1f5f9; background:#fff7ed; border-radius:8px; margin-top:8px;">
-          <div style="display:flex; flex-direction:column; gap:1px;">
-            <span style="font-size:12px; font-weight:700; color:#9a3412;">🏠 Home Sample Collection Fee</span>
-            <span style="font-size:9.5px; color:#c2410c; font-weight:600;">Standard doorstep charge</span>
-          </div>
-          <strong style="color:#c2410c; font-size:13px;">${this.safeFormatCurrency(doorstepCharge)}</strong>
+        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#FEF3C7; border-radius:8px; margin-top:6px;">
+          <span style="font-size:11.5px; font-weight:800; color:#92400E;">👑 VIP 10% Member Discount:</span>
+          <strong style="color:#92400E; font-size:12.5px;">- ${this.safeFormatCurrency(vipDiscount)}</strong>
         </div>
       `;
     }
 
+    // 2. Referral Discount Deduction Line
+    if (referralDiscount > 0) {
+      html += `
+        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#ECFDF5; border-radius:8px; margin-top:6px;">
+          <span style="font-size:11.5px; font-weight:800; color:#047857;">🎁 Referral Discount:</span>
+          <strong style="color:#047857; font-size:12.5px;">- ${this.safeFormatCurrency(referralDiscount)}</strong>
+        </div>
+      `;
+    }
+
+    // 3. Doorstep Collection Fee Line
+    if (!isLab && doorstepCharge > 0) {
+      html += `
+        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#fff7ed; border-radius:8px; margin-top:6px;">
+          <span style="font-size:11.5px; font-weight:700; color:#9a3412;">🏠 Home Sample Collection Fee:</span>
+          <strong style="color:#c2410c; font-size:12.5px;">${this.safeFormatCurrency(doorstepCharge)}</strong>
+        </div>
+      `;
+    }
+
+    // 4. Final Total Paid (Exact amount paid by customer at cart checkout)
+    html += `
+      <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:12px 6px 4px 6px; border-top:1.5px solid #078866; margin-top:8px;">
+        <div>
+          <strong style="font-size:13px; color:#10231E; display:block;">Total Paid:</strong>
+          <span style="font-size:9.5px; color:#536E66;">(Certified NABL Reports & Taxes Included)</span>
+        </div>
+        <strong style="color:#078866; font-size:16px; font-weight:900;">${this.safeFormatCurrency(currentBookingAmount)}</strong>
+      </div>
+    `;
+
     if (hasSiblings) {
       html += `
-        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 4px 6px 4px; border-top:1.5px solid #E5E7EB; margin-top:6px;">
-          <span style="font-size:12px; font-weight:800; color:#10231E;">👤 ${this.safeEscape(activePatient.name)}'s Share:</span>
-          <strong style="color:#078866; font-size:14px; font-weight:900;">${this.safeFormatCurrency(currentBookingAmount)}</strong>
-        </div>
-        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:2px 4px 6px 4px; font-size:11px; color:#6B7280;">
+        <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:4px 6px; font-size:11px; color:#6B7280;">
           <span>🧾 Family Order Combined Total:</span>
           <strong style="color:#1F2937; font-size:12px; font-weight:800;">${this.safeFormatCurrency(orderGrandTotal)}</strong>
         </div>

@@ -1,11 +1,12 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - API Gateway v6.3.0 (Emergency Blood Connect Cloud Edition)
- * Features:
+ * Selfcare Diagnostics - API Gateway v6.5.1 (Referral & Emergency Blood Cloud Edition)
+ * Updates:
  * - High-speed In-Memory TTL Response Caching for Instant UI updates (Zero GAS delay)
- * - Automatic cache invalidation on write/update mutations (VIP, Bookings, & Blood SOS)
+ * - Automatic cache invalidation on write/update mutations (VIP, Bookings, Referrals & Blood SOS)
+ * - Fixed Cold-Start Timeout: Referral verification increased to 35s (Prevents 'Failed to fetch' error)
+ * - Dedicated endpoints for Referral & Reward Engine (validateReferralCode, getReferralData, claimReferralReward)
  * - Dedicated endpoints for Emergency Blood Connect (getBloodData, saveBloodRequest, updateBloodRequest, registerBloodDonor)
- * - Fast-Read timeout optimization for instant live blood feeds
  * - Concurrent In-Flight request deduplication
  */
 
@@ -15,6 +16,7 @@ const Api = {
 
   CACHE_TTL: {
     getBloodData: 20000,
+    getReferralData: 30000,
     getFamilyMembers: 45000,
     getProfile: 45000,
     getTests: 180000,
@@ -45,6 +47,11 @@ const Api = {
 
     if (fastReadActions.includes(action)) {
       return 8500;
+    }
+
+    // Extended 35-second threshold to allow Google Apps Script cold start without throwing 'Failed to fetch'
+    if (action === 'validateReferralCode' || action === 'claimReferralReward' || action === 'getReferralData') {
+      return 35000;
     }
 
     if (action === 'processPrescriptionOCR' || action === 'uploadPrescription') {
@@ -160,7 +167,24 @@ const Api = {
   },
 
   // ==========================================================
-  // EMERGENCY BLOOD CONNECT CLOUD APIS (NEW)
+  // REFERRAL & REWARD ENGINE APIS
+  // ==========================================================
+
+  async validateReferralCode(code, mobile, amount) {
+    return this.request('validateReferralCode', { code, mobile, amount }, false);
+  },
+
+  async getReferralData(mobile) {
+    return this.request('getReferralData', { mobile }, false);
+  },
+
+  async claimReferralReward(mobile) {
+    this.invalidateCache('getReferralData');
+    return this.request('claimReferralReward', { mobile }, false);
+  },
+
+  // ==========================================================
+  // EMERGENCY BLOOD CONNECT CLOUD APIS
   // ==========================================================
 
   async getBloodData() {
@@ -307,6 +331,7 @@ const Api = {
 
   async createBooking(bookingData) {
     this.invalidateCache('getBookingsByPatient');
+    this.invalidateCache('getReferralData');
     return this.request('createBooking', bookingData, false);
   },
 
