@@ -1,6 +1,6 @@
 /* file: assets/css/blood.css */
 /**
- * Selfcare Diagnostics - Emergency Blood Connect CSS v15.4.0
+ * Selfcare Diagnostics - Emergency Blood Connect CSS v15.5.0
  * Fully Integrated:
  * 1. Mobile Viewport & Header Logo Zoom Constraint
  * 2. Highlighted Units Balance & Real-time Target Badges
@@ -10,6 +10,7 @@
  * 6. Attender PIN Handshake & Verification Forms
  * 7. Gamified Lifesaver Tiers (Bronze, Silver, Gold, Platinum, Diamond, Legendary)
  * 8. Dynamic E-Certificate Paper 3D Card for Native WhatsApp Image Sharing
+ * 9. Posted Date, Time & 1-Month Validity Expiry Badges
  */
 
 :root {
@@ -521,6 +522,32 @@ body.glass-bg-body {
   border: 1px solid #A7F3D0;
 }
 
+/* 🕒 REQUEST CARD POSTED & EXPIRY DATE STRIP */
+.request-validity-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 6px 9px;
+  font-size: 9.5px;
+  color: #475569;
+}
+
+.validity-item strong {
+  color: #0F172A;
+}
+
+.validity-end {
+  color: #991B1B !important;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-weight: 700;
+}
+
 .units-highlight-banner {
   background: #FFF7ED;
   border: 1px solid #FED7AA;
@@ -894,7 +921,6 @@ body.glass-bg-body {
   box-shadow: 0 2px 5px rgba(4, 93, 73, 0.3);
 }
 
-/* 🔐 EXCLUSIVE LIFESAVER PIN STRIP FOR LOGGED IN 'YOU' CARD */
 .my-pin-showcase-strip {
   background: #ECFDF5;
   border: 1.5px dashed #059669;

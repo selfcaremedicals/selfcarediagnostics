@@ -1,12 +1,11 @@
 /* file: assets/css/profile.css */
 /**
- * Selfcare Diagnostics - My Account Page CSS v15.1.0
+ * Selfcare Diagnostics - My Account Page CSS v15.6.0
  * Features:
  * - 3D Tactile Bounce & Press Feedback on all buttons/cards (:active)
- * - Anti-multi-click disabled visual state
- * - Clean List Menu matching BloodOxy reference layout
- * - Dual-View Family Members Management
- * - Blood Connect Live Highlight Badges & Pulse Animations
+ * - Blood Connect & Refer And Earn Live Highlight Badges
+ * - Branch Directions (Vettuvankeni & Velachery Upcoming)
+ * - 5.0 Star Google Review & Future Growth Showcase Box
  */
 
 :root {
@@ -40,7 +39,7 @@ body {
 }
 
 /* ==========================================================================
-   BUTTON TACTILE PRESS & BOUNCE FEEL (GLOBAL TO ACCOUNT PAGE)
+   BUTTON TACTILE PRESS & BOUNCE FEEL (GLOBAL)
    ========================================================================== */
 button,
 .modal-action-btn,
@@ -52,8 +51,8 @@ button,
 .menu-item-row,
 .sia-close-btn,
 .support-channel-card,
-.whatsapp-share-btn,
-.apply-coupon-btn {
+.btn-direction-link,
+.btn-write-review {
   transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.12s ease, filter 0.12s ease !important;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
@@ -70,8 +69,8 @@ button:active,
 .menu-item-row:active,
 .sia-close-btn:active,
 .support-channel-card:active,
-.whatsapp-share-btn:active,
-.apply-coupon-btn:active {
+.btn-direction-link:active,
+.btn-write-review:active {
   transform: scale(0.95) translateY(2px) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
   filter: brightness(0.92);
@@ -171,7 +170,7 @@ button:disabled,
 }
 
 /* ==========================================================================
-   MENU LIST GROUP WITH DIVIDERS & CHEVRONS
+   MENU LIST GROUP
    ========================================================================== */
 .account-menu-list {
   background: #ffffff;
@@ -186,7 +185,7 @@ button:disabled,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--border-line);
   cursor: pointer;
   background: #ffffff;
@@ -200,7 +199,7 @@ button:disabled,
 .menu-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .menu-icon {
@@ -213,23 +212,15 @@ button:disabled,
 }
 
 .menu-label {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 700;
   color: #1F2937;
 }
 
 .menu-chevron {
   font-size: 20px;
-  color: #111827;
+  color: #94A3B8;
   font-weight: 400;
-}
-
-/* ==========================================================================
-   BLOOD CONNECT LIVE MENU HIGHLIGHT BADGES
-   ========================================================================== */
-.blood-menu-row {
-  position: relative;
-  background: #FFFDFD !important;
 }
 
 .menu-text-col {
@@ -238,21 +229,33 @@ button:disabled,
   gap: 3px;
 }
 
+.menu-right-flex {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   BLOOD CONNECT HIGHLIGHT BADGES
+   ========================================================================== */
+.blood-menu-row {
+  background: #FFFDFD !important;
+}
+
 .blood-badge-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   margin-top: 2px;
 }
 
 .blood-chip {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 800;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
-  line-height: 1.2;
 }
 
 .chip-sos {
@@ -267,12 +270,6 @@ button:disabled,
   border: 1px solid #A7F3D0;
 }
 
-.menu-right-flex {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .urgent-live-indicator {
   background: #DC2626;
   color: #FFFFFF;
@@ -280,7 +277,6 @@ button:disabled,
   font-weight: 900;
   padding: 2px 6px;
   border-radius: 4px;
-  letter-spacing: 0.5px;
   animation: pulseAlert 1.4s infinite ease-in-out;
   box-shadow: 0 0 8px rgba(220, 38, 38, 0.4);
 }
@@ -301,6 +297,336 @@ button:disabled,
   25% { transform: scale(1.15); }
   35% { transform: scale(1); }
   45% { transform: scale(1.12); }
+}
+
+/* ==========================================================================
+   🎁 REFER AND EARN (GET FREE HEALTH CHECKUP HIGHLIGHT)
+   ========================================================================== */
+.refer-menu-row {
+  background: linear-gradient(135deg, #FFFFFF 0%, #FAF5FF 100%) !important;
+  border-left: 3px solid #7C3AED;
+}
+
+.refer-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.refer-chip {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.chip-free-checkup {
+  background: #F3E8FF;
+  color: #6B21A8;
+  border: 1px solid #D8B4FE;
+  font-weight: 900;
+}
+
+.chip-earn-off {
+  background: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #86EFAC;
+}
+
+.refer-live-indicator {
+  background: #7C3AED;
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.35);
+}
+
+.animate-bounce-gift {
+  display: inline-block;
+  animation: giftBounce 2s infinite ease-in-out;
+}
+
+@keyframes giftBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px) scale(1.08); }
+}
+
+/* ==========================================================================
+   📍 BRANCH DIRECTIONS MENU & MODAL
+   ========================================================================== */
+.branch-menu-row {
+  background: #FFFFFF;
+}
+
+.branch-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.branch-chip {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.chip-active-branch {
+  background: #ECFDF5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+}
+
+.chip-upcoming-branch {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+
+.branch-live-pill {
+  background: #0284C7;
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.branch-card-item {
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.active-branch-box {
+  background: #F0FDF9;
+  border: 1.5px solid #A7F3D0;
+  box-shadow: 0 4px 12px rgba(4, 93, 73, 0.06);
+}
+
+.upcoming-branch-box {
+  background: #FFFBEB;
+  border: 1.5px dashed #FCD34D;
+}
+
+.branch-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.branch-card-head h4 {
+  font-size: 13px;
+  font-weight: 900;
+  color: #0F172A;
+  margin-top: 2px;
+}
+
+.branch-status-tag {
+  font-size: 8.5px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.tag-live {
+  background: #059669;
+  color: #FFFFFF;
+}
+
+.tag-upcoming {
+  background: #D97706;
+  color: #FFFFFF;
+}
+
+.branch-icon-pill {
+  font-size: 22px;
+}
+
+.branch-address-text {
+  font-size: 11px;
+  color: #334155;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.upcoming-note-text {
+  font-size: 10px;
+  color: #78350F;
+  font-weight: 700;
+}
+
+.btn-direction-link {
+  background: linear-gradient(135deg, #078866, #045D49);
+  color: #FFFFFF !important;
+  text-decoration: none;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 9px 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+  box-shadow: 0 3px 10px rgba(7, 136, 102, 0.25);
+}
+
+/* ==========================================================================
+   ⭐ 5.0 GOOGLE REVIEW & FUTURE GROWTH CALLOUT
+   ========================================================================== */
+.review-menu-row {
+  background: linear-gradient(135deg, #FFFFFF 0%, #FFFDF5 100%) !important;
+  border-left: 3px solid #D97706;
+}
+
+.review-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.review-chip-star {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.review-top-pill {
+  background: #D97706;
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.animate-pulse-star {
+  display: inline-block;
+  animation: starPulse 2s infinite ease-in-out;
+}
+
+@keyframes starPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2) rotate(15deg); }
+}
+
+.review-modal-body {
+  text-align: center;
+}
+
+.review-showcase-box {
+  background: #FFFBEB;
+  border: 1.5px solid #FCD34D;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.review-score-giant {
+  font-size: 38px;
+  font-weight: 900;
+  color: #B45309;
+  line-height: 1;
+}
+
+.review-stars-row {
+  font-size: 20px;
+  color: #F59E0B;
+  letter-spacing: 2px;
+}
+
+.review-platform-lbl {
+  font-size: 10px;
+  font-weight: 800;
+  color: #78350F;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.review-growth-callout {
+  background: linear-gradient(135deg, #FEF3C7 0%, #ECFDF5 100%);
+  border: 1.8px solid #F59E0B;
+  border-radius: 14px;
+  padding: 12px 14px;
+  text-align: left;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 4px;
+}
+
+.growth-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.growth-content h4 {
+  font-size: 12px;
+  font-weight: 900;
+  color: #78350F;
+  margin: 0 0 4px 0;
+  line-height: 1.35;
+}
+
+.growth-content p {
+  font-size: 10.5px;
+  color: #064E3B;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.review-sub-instruction {
+  font-size: 11px;
+  color: #64748B;
+  margin-top: 4px;
+}
+
+.btn-write-review {
+  background: linear-gradient(135deg, #D97706, #B45309);
+  color: #FFFFFF !important;
+  text-decoration: none;
+  font-size: 12.5px;
+  font-weight: 800;
+  padding: 12px 16px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 4px 15px rgba(217, 119, 6, 0.35);
+}
+
+.animate-pulse-glow {
+  animation: calloutGlow 2.2s infinite ease-in-out;
+}
+
+@keyframes calloutGlow {
+  0% { box-shadow: 0 0 0 rgba(245, 158, 11, 0.2); }
+  50% { box-shadow: 0 0 14px rgba(245, 158, 11, 0.4); }
+  100% { box-shadow: 0 0 0 rgba(245, 158, 11, 0.2); }
 }
 
 /* ==========================================================================

@@ -1,11 +1,10 @@
 /* file: assets/css/cart.css */
 /**
- * Selfcare Diagnostics - Complete 3D Glassmorphism Cart & Checkout Engine v10.0.0
- * Clean & Streamlined Edition:
- * - Unused Coupon & Referral Modal Styles Purged
- * - Added Patient Overview Tags & Verification Modal Grid Styling
- * - Compact Mobile-First 3D Glassmorphic Cards & Tactile Buttons
- * - Perfectly Docked Fixed Control Bar above Footer
+ * Selfcare Diagnostics - 3D Glassmorphism Cart & Checkout Engine v11.0.0
+ * Features:
+ * - Clean Multi-Patient Selection Carousel & Card Groups
+ * - Added 3D Referral & Promotion Card Styling with Applied Banner
+ * - Tactile Controls & Docked Fixed Control Bar
  */
 
 :root {
@@ -558,20 +557,6 @@ body.glass-bg-body {
   cursor: pointer;
 }
 
-/* Patient Overview Tags in Slide 2 */
-.patient-overview-tag {
-  font-size: 10px;
-  font-weight: 700;
-  color: #045D49;
-  background: #D1FAE5;
-  border: 1px solid #A7F3D0;
-  padding: 3px 8px;
-  border-radius: 7px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .info-row {
   display: flex;
   gap: 10px;
@@ -599,6 +584,100 @@ body.glass-bg-body {
   font-size: 10px;
   color: #0284C7;
   word-break: break-all;
+}
+
+/* =========================================================
+   🎁 3D REFERRAL & COUPON CARD STYLING
+   ========================================================= */
+.referral-card-3d {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(240, 253, 250, 0.88));
+  border: 1.5px solid #A7F3D0;
+}
+
+.referral-input-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.referral-input-wrapper input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #CBD5E1;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #045D49;
+  letter-spacing: 0.5px;
+  outline: none;
+  background: #FFFFFF;
+}
+
+.referral-input-wrapper input:focus {
+  border-color: #078866;
+  box-shadow: 0 0 0 2px rgba(7, 136, 102, 0.15);
+}
+
+.referral-apply-btn {
+  padding: 8px 14px !important;
+  font-size: 11.5px !important;
+  background: #078866 !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  border-radius: 9px !important;
+  box-shadow: 0 3px 8px rgba(7, 136, 102, 0.25) !important;
+}
+
+.applied-referral-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ECFDF5;
+  border: 1.5px solid #059669;
+  border-radius: 11px;
+  padding: 9px 12px;
+  margin-top: 8px;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.08);
+}
+
+.applied-info strong {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #045D49;
+}
+
+.applied-info span {
+  font-size: 9.5px;
+  color: #059669;
+  font-weight: 600;
+}
+
+.remove-coupon-btn {
+  background: #FEE2E2;
+  border: 1px solid #FECACA;
+  color: #DC2626;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.referral-savings-row {
+  background: #ECFDF5 !important;
+}
+
+.referral-savings-row .s-label,
+.referral-savings-row .s-value {
+  color: #047857 !important;
+  font-weight: 800;
 }
 
 /* Slot Picker */
@@ -704,7 +783,7 @@ body.glass-bg-body {
 }
 
 /* =========================================================
-   3D GLASS PATIENT TEST CARDS & ACTION BUTTONS (COMPACT)
+   3D GLASS PATIENT TEST CARDS & ACTION BUTTONS
    ========================================================= */
 .cart-items-vertical-list {
   display: flex;
@@ -871,39 +950,10 @@ body.glass-bg-body {
   color: #078866;
 }
 
-.item-paid-note {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: #536E66;
-}
-
 .item-actions-row {
   display: flex;
   align-items: center;
   gap: 5px;
-}
-
-.patient-reassign-select {
-  font-size: 9.5px;
-  font-weight: 700;
-  padding: 3px 5px;
-  border-radius: 7px;
-  border: 1.5px solid #CBD5E1;
-  background: #FFFFFF;
-  color: #334155;
-  outline: none;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-}
-
-.item-paid-badge {
-  font-size: 9px;
-  font-weight: 800;
-  color: #047857;
-  background: #ECFDF5;
-  padding: 2.5px 6px;
-  border-radius: 5px;
-  border: 1px solid #A7F3D0;
 }
 
 .item-delete-btn {
@@ -925,7 +975,6 @@ body.glass-bg-body {
   background: rgba(239, 68, 68, 0.2);
 }
 
-/* 3D Glass Per-Patient Action Buttons */
 .patient-card-actions-row {
   display: flex;
   gap: 8px;
@@ -962,19 +1011,11 @@ body.glass-bg-body {
   box-shadow: 0 3px 8px rgba(7, 136, 102, 0.1), inset 0 1px 1px #FFFFFF;
 }
 
-.patient-action-btn.add-test-sub-btn:hover {
-  box-shadow: 0 5px 11px rgba(7, 136, 102, 0.18), inset 0 1px 1px #FFFFFF;
-}
-
 .patient-action-btn.add-pkg-sub-btn {
   background: linear-gradient(135deg, rgba(253, 242, 248, 0.95), rgba(255, 228, 230, 0.85));
   border: 1.5px solid #E11D48;
   color: #BE123C;
   box-shadow: 0 3px 8px rgba(225, 29, 72, 0.1), inset 0 1px 1px #FFFFFF;
-}
-
-.patient-action-btn.add-pkg-sub-btn:hover {
-  box-shadow: 0 5px 11px rgba(225, 29, 72, 0.18), inset 0 1px 1px #FFFFFF;
 }
 
 /* =========================================================
@@ -1286,90 +1327,6 @@ body.glass-bg-body {
   text-decoration: none;
 }
 
-/* Patient Verification Modal Card & Grid Styles */
-.patient-verify-card-3d {
-  background: #F8FAFC;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 12px;
-  margin: 6px 0;
-}
-
-.patient-verify-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #E2E8F0;
-}
-
-.verify-relation-badge {
-  font-size: 9px;
-  font-weight: 800;
-  color: #045D49;
-  background: #ECFDF5;
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-
-.verified-check-pill {
-  font-size: 9.5px;
-  font-weight: 800;
-  color: #059669;
-  background: #D1FAE5;
-  padding: 2px 7px;
-  border-radius: 5px;
-}
-
-.verify-details-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.verify-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.verify-lbl {
-  font-size: 9px;
-  font-weight: 700;
-  color: #64748B;
-}
-
-.verify-val {
-  font-size: 11px;
-  font-weight: 800;
-  color: #1E293B;
-}
-
-.green-phone {
-  color: #078866;
-}
-
-.verify-pay-summary-3d {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 9px 12px;
-  background: #ECFDF5;
-  border: 1.5px solid #A7F3D0;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.verify-actions-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-/* Edit Address Modal Form Fields */
 .form-field {
   display: flex;
   flex-direction: column;
