@@ -1,17 +1,16 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v16.0.0 (Refer & Earn Engine Edition)
+ * Selfcare Diagnostics - Service Worker v17.0.0 (Strict Isolation & Zero-Stale Release)
  * Upgrades:
- * - Upgraded Cache Storage to v16.0.0 (Automatically purges old v15.x caches)
- * - Added refer.html, refer.css, and refer.js to ASSETS_TO_CACHE for complete PWA offline support
- * - Fast precache with cache-busting query (?sw_bust=16.0.0)
- * - Broadcasts SW_UPDATED to refresh all active client tabs seamlessly
- * - Strict network bypass for Google Apps Script (/exec) and backend API requests
- * - Stale-While-Revalidate (SWR) for high-performance JS/CSS assets
- * - Network-First for HTML documents with offline fallbacks
+ * - Upgraded Cache Storage to v17.0.0 (Instantly purges older v16.x & v15.x cached scripts/bookings)
+ * - Fresh asset busting via (?sw_bust=17.0.0) ensuring instant adoption of isolated bookings engine
+ * - Seamless client claim and SW_UPDATED broadcast for live tab refreshing
+ * - Comprehensive Network Bypass for Google Apps Script (/exec), Razorpay SDK, WhatsApp, and external APIs
+ * - Resilient Offline Fallback for dynamic query URLs (e.g. bookings.html?id=... & cart.html?addonBookingId=...)
+ * - High-speed Stale-While-Revalidate (SWR) for local scripts & stylesheets
  */
 
-const CACHE_NAME = 'selfcare-cache-v16.0.0';
+const CACHE_NAME = 'selfcare-cache-v17.0.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -75,14 +74,14 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache Fresh Files & Skip Waiting Immediately
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Upgraded Engine v16.0.0 (Refer & Earn Integrated)...');
+  console.log('[Selfcare SW] Installing Upgraded Engine v17.0.0 (Booking Isolation Edition)...');
   self.skipWaiting();
 
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
-          const bustUrl = `${url}?sw_bust=16.0.0`;
+          const bustUrl = `${url}?sw_bust=17.0.0`;
           const response = await fetch(bustUrl, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
@@ -106,7 +105,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purge All Older Caches & Claim Clients Immediately
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v16.0.0 & Purging all stale caches...');
+  console.log('[Selfcare SW] Activating v17.0.0 & Purging all stale caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -119,9 +118,9 @@ self.addEventListener('activate', (event) => {
       );
     }).then(async () => {
       await self.clients.claim();
-      const clients = await self.clients.matchAll({ type: 'window' });
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       clients.forEach((client) => {
-        client.postMessage({ type: 'SW_UPDATED', version: 'v16.0.0' });
+        client.postMessage({ type: 'SW_UPDATED', version: 'v17.0.0' });
       });
     })
   );
@@ -131,22 +130,28 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // Ignore non-GET requests
   if (event.request.method !== 'GET') {
     return;
   }
 
-  // Network bypass for backend API and Google Apps Script requests
+  // Strict network bypass for payment gateways, WhatsApp, external APIs and Google Apps Script
   if (
     url.origin !== location.origin ||
     url.pathname.includes('/exec') ||
     url.pathname.includes('/api/') ||
     url.search.includes('action=') ||
     url.hostname.includes('script.google.com') ||
-    url.hostname.includes('script.googleusercontent.com')
+    url.hostname.includes('script.googleusercontent.com') ||
+    url.hostname.includes('razorpay.com') ||
+    url.hostname.includes('wa.me') ||
+    url.hostname.includes('whatsapp.com') ||
+    url.protocol.startsWith('chrome-extension')
   ) {
     return;
   }
 
+  // Development bypass
   const isLocalDev = Boolean(
     url.hostname === 'localhost' ||
     url.hostname === '127.0.0.1' ||
@@ -161,7 +166,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-While-Revalidate for Scripts & Styles
+  // Stale-While-Revalidate for Scripts & Styles (CSS / JS)
   if (
     event.request.destination === 'script' ||
     event.request.destination === 'style' ||
@@ -186,7 +191,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-First for HTML documents with offline fallbacks
+  // Network-First for HTML Documents (Handles direct & query-param routes e.g. bookings.html?id=...)
   if (
     event.request.destination === 'document' ||
     url.pathname.endsWith('.html') ||
@@ -203,8 +208,14 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(async () => {
+          // Fallback to cached version ignoring URL params
           const cachedDirect = await caches.match(event.request, { ignoreSearch: true });
           if (cachedDirect) return cachedDirect;
+
+          // Strip search query to find matching shell page
+          const cleanPath = url.pathname.split('/').pop() || 'customer.html';
+          const matchedShell = await caches.match(`./${cleanPath}`, { ignoreSearch: true });
+          if (matchedShell) return matchedShell;
 
           const customerFallback = await caches.match('./customer.html');
           if (customerFallback) return customerFallback;
@@ -218,6 +229,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Cache-First with Network Revalidation for static images and assets
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
