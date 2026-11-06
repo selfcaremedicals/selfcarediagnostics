@@ -13,10 +13,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Versioned Stylesheets -->
-  <link rel="stylesheet" href="assets/css/global.css?v=15.1.0">
-  <link rel="stylesheet" href="assets/css/components.css?v=15.1.0">
-  <link rel="stylesheet" href="assets/css/responsive.css?v=15.1.0">
-  <link rel="stylesheet" href="assets/css/profile.css?v=15.1.0">
+  <link rel="stylesheet" href="assets/css/global.css?v=15.7.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=15.7.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=15.7.0">
+  <link rel="stylesheet" href="assets/css/profile.css?v=15.7.0">
 </head>
 <body>
 
@@ -63,7 +63,7 @@
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 3. Membership (Redirects to membership.html) -->
+      <!-- 3. Membership -->
       <div class="menu-item-row" onclick="window.location.href='membership.html'">
         <div class="menu-left">
           <span class="menu-icon">👑</span>
@@ -72,7 +72,7 @@
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 4. Blood Connect (Live Highlight Badges Added) -->
+      <!-- 4. Blood Connect -->
       <div class="menu-item-row blood-menu-row" onclick="window.location.href='blood.html'">
         <div class="menu-left">
           <span class="menu-icon animate-pulse-heart">🩸</span>
@@ -90,16 +90,60 @@
         </div>
       </div>
 
-      <!-- 5. Refer And Earn (Redirects to refer.html) -->
-      <div class="menu-item-row" onclick="window.location.href='refer.html'">
+      <!-- 5. Refer And Earn (Get Free Health Checkup Highlight) -->
+      <div class="menu-item-row refer-menu-row" onclick="window.location.href='refer.html'">
         <div class="menu-left">
-          <span class="menu-icon">🎁</span>
-          <span class="menu-label">Refer And Earn</span>
+          <span class="menu-icon animate-bounce-gift">🎁</span>
+          <div class="menu-text-col">
+            <span class="menu-label">Refer And Earn</span>
+            <div class="refer-badge-group">
+              <span class="refer-chip chip-free-checkup">🎁 Get Free Health Checkup</span>
+              <span class="refer-chip chip-earn-off">100% OFF</span>
+            </div>
+          </div>
         </div>
-        <span class="menu-chevron">›</span>
+        <div class="menu-right-flex">
+          <span class="refer-live-indicator">FREE</span>
+          <span class="menu-chevron">›</span>
+        </div>
       </div>
 
-      <!-- 6. General Info -->
+      <!-- 6. Get Directions (Branches) -->
+      <div class="menu-item-row branch-menu-row" onclick="ProfilePage.openBranchesModal()">
+        <div class="menu-left">
+          <span class="menu-icon">📍</span>
+          <div class="menu-text-col">
+            <span class="menu-label">Get Directions</span>
+            <div class="branch-badge-group">
+              <span class="branch-chip chip-active-branch">● Vettuvankeni</span>
+              <span class="branch-chip chip-upcoming-branch">⏳ Velachery</span>
+            </div>
+          </div>
+        </div>
+        <div class="menu-right-flex">
+          <span class="branch-live-pill">MAP</span>
+          <span class="menu-chevron">›</span>
+        </div>
+      </div>
+
+      <!-- 7. Rate & Review Us (5.0 Google Star Highlight) -->
+      <div class="menu-item-row review-menu-row" onclick="ProfilePage.openReviewModal()">
+        <div class="menu-left">
+          <span class="menu-icon animate-pulse-star">⭐</span>
+          <div class="menu-text-col">
+            <span class="menu-label">Rate & Review Us</span>
+            <div class="review-badge-group">
+              <span class="review-chip-star">⭐⭐⭐⭐⭐ 5.0 Google Rating</span>
+            </div>
+          </div>
+        </div>
+        <div class="menu-right-flex">
+          <span class="review-top-pill">5.0 ★</span>
+          <span class="menu-chevron">›</span>
+        </div>
+      </div>
+
+      <!-- 8. General Info -->
       <div class="menu-item-row" onclick="ProfilePage.openGeneralInfoModal()">
         <div class="menu-left">
           <span class="menu-icon">ℹ️</span>
@@ -108,7 +152,7 @@
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 7. Logout -->
+      <!-- 9. Logout -->
       <div class="menu-item-row" onclick="ProfilePage.handleLogout()">
         <div class="menu-left">
           <span class="menu-icon">🚪</span>
@@ -117,7 +161,7 @@
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 8. Support Desk -->
+      <!-- 10. Support Desk -->
       <div class="menu-item-row" onclick="ProfilePage.openSupportDeskModal()">
         <div class="menu-left">
           <span class="menu-icon">🎧</span>
@@ -146,7 +190,6 @@
       </div>
 
       <div class="sia-modal-body">
-
         <!-- View Mode -->
         <div id="profile-view-mode">
           <div class="profile-meta-head">
@@ -240,7 +283,7 @@
     </div>
   </div>
 
-  <!-- Modal 2: Family & Friends Members Management -->
+  <!-- Modal 2: Family & Friends Directory -->
   <div id="modal-family-members" class="sia-modal-overlay">
     <div class="sia-modal-content glass-modal-3d animate-3d-pop">
       <div class="sia-modal-header">
@@ -252,7 +295,6 @@
       </div>
 
       <div class="sia-modal-body">
-        
         <div id="family-list-view">
           <div class="family-top-bar">
             <div>
@@ -263,7 +305,6 @@
               <span>+</span> Add Member
             </button>
           </div>
-
           <div id="family-cards-container" class="family-cards-scroll"></div>
         </div>
 
@@ -358,7 +399,107 @@
             <button id="family-save-btn" type="button" class="modal-action-btn" onclick="ProfilePage.saveFamilyMember()">Save Member ✓</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
 
+  <!-- Modal 3: Selfcare Diagnostics Branches (Get Directions) -->
+  <div id="modal-branches" class="sia-modal-overlay">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header" style="background: linear-gradient(135deg, #045D49, #078866);">
+        <div class="modal-title-wrap">
+          <span>📍</span>
+          <h3>Our Clinical Diagnostic Centers</h3>
+        </div>
+        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-branches')">✕</button>
+      </div>
+
+      <div class="sia-modal-body">
+        <p style="font-size: 11.5px; color: #475569; margin-bottom: 4px;">
+          Visit our laboratory directly for walk-in testing or schedule a home sample collection.
+        </p>
+
+        <!-- Branch 1: Vettuvankeni (Active) -->
+        <div class="branch-card-item active-branch-box">
+          <div class="branch-card-head">
+            <div>
+              <span class="branch-status-tag tag-live">● Open & Active Branch</span>
+              <h4>Selfcare Diagnostics - Vettuvankeni</h4>
+            </div>
+            <span class="branch-icon-pill">🏥</span>
+          </div>
+
+          <p class="branch-address-text">
+            📍 East Coast Road (ECR), Vettuvankeni, Chennai, Tamil Nadu - 600115
+          </p>
+
+          <div class="branch-action-row">
+            <a href="https://maps.app.goo.gl/XXgRMvUwv4scBRqL7?g_st=ac" target="_blank" rel="noopener noreferrer" class="btn-direction-link">
+              🗺️ Get Directions (Google Maps) →
+            </a>
+          </div>
+        </div>
+
+        <!-- Branch 2: Velachery (Upcoming) -->
+        <div class="branch-card-item upcoming-branch-box">
+          <div class="branch-card-head">
+            <div>
+              <span class="branch-status-tag tag-upcoming">⏳ Upcoming Center</span>
+              <h4>Selfcare Diagnostics - Velachery</h4>
+            </div>
+            <span class="branch-icon-pill">🚧</span>
+          </div>
+
+          <p class="branch-address-text">
+            📍 Velachery Main Road, Chennai, Tamil Nadu (Launching Shortly)
+          </p>
+          <div class="upcoming-note-text">
+            🌱 Diagnostic testing & doorstep phlebotomy hub opening soon!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Rate & Review Us -->
+  <div id="modal-review" class="sia-modal-overlay">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header" style="background: linear-gradient(135deg, #B45309, #D97706);">
+        <div class="modal-title-wrap">
+          <span>⭐</span>
+          <h3>Rate & Review Us</h3>
+        </div>
+        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-review')">✕</button>
+      </div>
+
+      <div class="sia-modal-body review-modal-body">
+        <!-- 5.0 Star Rating Box -->
+        <div class="review-showcase-box">
+          <span class="review-score-giant">5.0</span>
+          <div class="review-stars-row">★★★★★</div>
+          <span class="review-platform-lbl">Official Google Customer Rating</span>
+        </div>
+
+        <!-- Future Growth Callout -->
+        <div class="review-growth-callout animate-pulse-glow">
+          <span class="growth-icon">🌱</span>
+          <div class="growth-content">
+            <h4>Your Review is important to us for future growth!</h4>
+            <p>Your honest feedback helps us elevate our clinical care and enables us to provide high-precision, affordable diagnostics to more families.</p>
+          </div>
+        </div>
+
+        <p class="review-sub-instruction">
+          Click the button below to share your experience and rate us 5 stars on Google:
+        </p>
+
+        <!-- Direct Google Review Link Button -->
+        <a href="https://www.google.com/search?client=ms-android-samsung-rvo1&hs=3Jqq&sca_esv=bd9c22ed1e338c70&biw=384&bih=710&sxsrf=AKL5yDgCm95XDE4UXdMSDFGOAZDy8jH_fw:1793494962814&q=selfcare+diagnostics+-+chennai+reviews&uds=AE2AFgZ1mCZtyFaKGASvh9jAw7YXHq65cI_DrJsjZKqR2cKr-UlvnIynDOn1CgE04eSa3TTMJSR2L0ps57hNAWpDeTFjUkM4ki_oBqgUN1AplQeIxYZ6tMXV4rMez5qrIWytJdxQEl23afc3PGTS-di7CkdaLPmCRas08AqVtUiPu-VyEUEeMullLvK0Bd90j3SDq2Z2Tb0bqw9VTlp84MLn5bJ5_BoupExuIrZKgYDYCFBU3FgBHkjK4lgUE7SNY_Po736KlcT07fYVFkKFY5eFNDDfEBwVqFHkoeJkpEWgagqYMSpoBsgK-_RiLb5JVNL3yTIarKMM5MxiOWFy_RaMl5cupDWOy6KVwy2IV4S6J8eN3Tj4a44ZiP4wVVSX-97PnzejmffMChLUnwVTB-XW0SjlCcyuWuPyYpyPn2y_tfAe9iubmOajXbLf7JIJdPvKTHtj08NXrm8YunbTdesA90X6nbi849u-ntrqj6Au2Vu-5tcDzcYDiRfmLkD3AdRBmX0fMzO66eD0JlTb791YjiLnngucxv6fRf2q8gqmaTrUmIcVfQM&si=AE1YtOqiKPb2pdLXAi8quZ9vbH4aVq_aX8-3H9iFBLRNK95c7WXML8BjLNXbrVFQMH0I5fTtXZwRsdfnewhWVocRQ7EAViU_tfS_ISWzM6YpSRBp5HDR346N5sgIR7WyDmUgMm6u3xtiwrFddFIBcKCNnfP8Z1_xQ%3D%3D&sa=X&ved=2ahUKEwjptqixyeWXAxXJS2cHHXRdATYQk8gLegQIGhAB&ictx=1" 
+           target="_blank" 
+           rel="noopener noreferrer" 
+           class="btn-write-review">
+          ⭐ Write 5-Star Review on Google →
+        </a>
       </div>
     </div>
   </div>
@@ -452,13 +593,13 @@
   </nav>
 
   <!-- Core Scripts -->
-  <script src="assets/js/config.js?v=15.1.0"></script>
-  <script src="assets/js/utils.js?v=15.1.0"></script>
-  <script src="assets/js/api.js?v=15.1.0"></script>
-  <script src="assets/js/offline-db.js?v=15.1.0"></script>
-  <script src="assets/js/offline-sync.js?v=15.1.0"></script>
-  <script src="assets/js/auth.js?v=15.1.0"></script>
-  <script src="assets/js/app.js?v=15.1.0"></script>
-  <script src="assets/js/profile.js?v=15.1.0"></script>
+  <script src="assets/js/config.js?v=15.7.0"></script>
+  <script src="assets/js/utils.js?v=15.7.0"></script>
+  <script src="assets/js/api.js?v=15.7.0"></script>
+  <script src="assets/js/offline-db.js?v=15.7.0"></script>
+  <script src="assets/js/offline-sync.js?v=15.7.0"></script>
+  <script src="assets/js/auth.js?v=15.7.0"></script>
+  <script src="assets/js/app.js?v=15.7.0"></script>
+  <script src="assets/js/profile.js?v=15.7.0"></script>
 </body>
 </html>

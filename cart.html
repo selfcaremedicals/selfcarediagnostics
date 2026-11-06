@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="assets/css/global.css?v=6.3.0">
   <link rel="stylesheet" href="assets/css/components.css?v=6.3.0">
   <link rel="stylesheet" href="assets/css/responsive.css?v=6.3.0">
-  <link rel="stylesheet" href="assets/css/cart.css?v=10.0.0">
+  <link rel="stylesheet" href="assets/css/cart.css?v=11.0.0">
 
   <!-- Official Razorpay Checkout SDK -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
@@ -87,6 +87,29 @@
           <div id="cart-items-list" class="cart-items-vertical-list"></div>
         </div>
 
+        <!-- Referral & Coupon Redemption Box -->
+        <div class="glass-panel-3d group-box referral-card-3d">
+          <div class="group-title-row">
+            <h4>🎁 Referral & Coupon Code</h4>
+            <span class="sub-counter" id="referral-status-tag">Min ₹500 Booking</span>
+          </div>
+
+          <!-- Unapplied State: Promo Input -->
+          <div id="referral-input-row" class="referral-input-wrapper">
+            <input type="text" id="cart-referral-input" placeholder="Enter Referral Code (e.g. SCD123456)" maxlength="16" autocomplete="off">
+            <button type="button" class="mini-glass-btn referral-apply-btn" onclick="CartPage.applyReferralCode()">Apply</button>
+          </div>
+
+          <!-- Applied State: Active Discount Pill -->
+          <div id="referral-active-badge" class="applied-referral-banner" style="display: none;">
+            <div class="applied-info">
+              <strong id="applied-ref-title">10% Referral Discount Applied</strong>
+              <span id="applied-ref-sub">Max cap ₹2,499 • Min ₹500 spend</span>
+            </div>
+            <button type="button" class="remove-coupon-btn" onclick="CartPage.removeReferralCode()" title="Remove Coupon">✕</button>
+          </div>
+        </div>
+
         <!-- Comprehensive Order Summary Card -->
         <div class="glass-panel-3d group-box order-summary-3d-card">
           <h4 class="summary-card-title">🧾 Order Summary</h4>
@@ -105,6 +128,12 @@
             <div class="summary-row highlight-savings">
               <span class="s-label">Diagnostic Package Savings:</span>
               <span class="s-value" id="bill-lab-savings">- ₹0</span>
+            </div>
+
+            <!-- Dynamic Referral Discount Breakdown Row -->
+            <div class="summary-row highlight-savings referral-savings-row" id="bill-referral-discount-row" style="display: none;">
+              <span class="s-label" id="bill-referral-label">🎁 Referral Discount:</span>
+              <span class="s-value" id="bill-referral-val">- ₹0</span>
             </div>
 
             <div class="summary-row">
@@ -372,6 +401,6 @@
   <script src="assets/js/offline-sync.js?v=5.0.0"></script>
   <script src="assets/js/auth.js?v=3.4.0"></script>
   <script src="assets/js/app.js?v=4.1.0"></script>
-  <script src="assets/js/cart.js?v=12.0.0"></script>
+  <script src="assets/js/cart.js?v=15.1.0"></script>
 </body>
 </html>

@@ -1,17 +1,17 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v15.4.0 (Emergency Blood Connect & Exclusive PIN Strip Edition)
+ * Selfcare Diagnostics - Service Worker v16.0.0 (Refer & Earn Engine Edition)
  * Upgrades:
- * - Upgraded Cache Storage to v15.4.0 (Instantly purges stale v15.3.0/v15.2.0/v15.1.0 cache)
- * - Automatic cache purge on activation & immediate client takeover (clients.claim())
- * - Fast precache with cache-busting timestamp (?sw_bust=15.4.0) to bypass mobile browser disk cache
- * - Immediate postMessage broadcast (SW_UPDATED) to force-refresh all active PWA tabs
- * - Strict network bypass for Google Apps Script execution and central API calls
+ * - Upgraded Cache Storage to v16.0.0 (Automatically purges old v15.x caches)
+ * - Added refer.html, refer.css, and refer.js to ASSETS_TO_CACHE for complete PWA offline support
+ * - Fast precache with cache-busting query (?sw_bust=16.0.0)
+ * - Broadcasts SW_UPDATED to refresh all active client tabs seamlessly
+ * - Strict network bypass for Google Apps Script (/exec) and backend API requests
  * - Stale-While-Revalidate (SWR) for high-performance JS/CSS assets
- * - Network-First for HTML documents with seamless offline fallback
+ * - Network-First for HTML documents with offline fallbacks
  */
 
-const CACHE_NAME = 'selfcare-cache-v15.4.0';
+const CACHE_NAME = 'selfcare-cache-v16.0.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -22,6 +22,7 @@ const ASSETS_TO_CACHE = [
   './tests.html',
   './packages.html',
   './cart.html',
+  './refer.html',
   './reports.html',
   './bookings.html',
   './profile.html',
@@ -38,6 +39,7 @@ const ASSETS_TO_CACHE = [
   './assets/css/tests.css',
   './assets/css/packages.css',
   './assets/css/cart.css',
+  './assets/css/refer.css',
   './assets/css/reports.css',
   './assets/css/bookings.css',
   './assets/css/profile.css',
@@ -58,6 +60,7 @@ const ASSETS_TO_CACHE = [
   './assets/js/tests.js',
   './assets/js/packages.js',
   './assets/js/cart.js',
+  './assets/js/refer.js',
   './assets/js/reports.js',
   './assets/js/bookings.js',
   './assets/js/profile.js',
@@ -72,14 +75,14 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache Fresh Files & Skip Waiting Immediately
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Upgraded Engine v15.4.0 (Blood Connect PIN Strip)...');
+  console.log('[Selfcare SW] Installing Upgraded Engine v16.0.0 (Refer & Earn Integrated)...');
   self.skipWaiting();
 
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
-          const bustUrl = `${url}?sw_bust=15.4.0`;
+          const bustUrl = `${url}?sw_bust=16.0.0`;
           const response = await fetch(bustUrl, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
@@ -103,7 +106,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purge All Older Caches & Claim Clients Immediately
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v15.4.0 & Purging all stale caches...');
+  console.log('[Selfcare SW] Activating v16.0.0 & Purging all stale caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -118,7 +121,7 @@ self.addEventListener('activate', (event) => {
       await self.clients.claim();
       const clients = await self.clients.matchAll({ type: 'window' });
       clients.forEach((client) => {
-        client.postMessage({ type: 'SW_UPDATED', version: 'v15.4.0' });
+        client.postMessage({ type: 'SW_UPDATED', version: 'v16.0.0' });
       });
     })
   );
@@ -132,6 +135,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network bypass for backend API and Google Apps Script requests
   if (
     url.origin !== location.origin ||
     url.pathname.includes('/exec') ||
@@ -157,6 +161,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Stale-While-Revalidate for Scripts & Styles
   if (
     event.request.destination === 'script' ||
     event.request.destination === 'style' ||
@@ -181,6 +186,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-First for HTML documents with offline fallbacks
   if (
     event.request.destination === 'document' ||
     url.pathname.endsWith('.html') ||
