@@ -1,13 +1,15 @@
 /* file: assets/js/bookings.js */
 /**
- * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v7.4.0
+ * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v7.5.0
  * Features:
- * 1. Accurate Payable Calculation: Properly extracts and calculates finalAmount (handles both finalAmount & FinalAmount).
- * 2. VIP & Referral Discount Breakdown: Deducts VIP 10% & Referral discounts before computing totals.
- * 3. Transparent Order Summary: Renders Base Test Price, VIP Savings, Referral Savings & Grand Total Paid.
- * 4. Automatic Parent Booking Deduplication (Hides un-split parent booking when split -1, -2 exist).
- * 5. Cross-Linked Sibling Order Total Calculation for Split Sub-Bookings.
- * 6. Strict Tab Isolation (Self only sees -1, Family member only sees -2).
+ * 1. Strict User & Mobile Isolation: Only shows bookings & family belonging to the logged-in user.
+ * 2. Scoped LocalStorage Caching (selfcare_bookings_{mobile}) preventing cross-user data leaks.
+ * 3. Accurate Payable Calculation: Properly extracts and calculates finalAmount.
+ * 4. VIP & Referral Discount Breakdown: Deducts VIP 10% & Referral discounts before computing totals.
+ * 5. Transparent Order Summary: Renders Base Test Price, VIP Savings, Referral Savings & Grand Total Paid.
+ * 6. Automatic Parent Booking Deduplication (Hides un-split parent booking when split -1, -2 exist).
+ * 7. Cross-Linked Sibling Order Total Calculation for Split Sub-Bookings.
+ * 8. Strict Tab Isolation (Self only sees -1, Family member only sees -2).
  */
 
 const BookingsPage = {
@@ -222,11 +224,14 @@ const BookingsPage = {
       currentMobile = localStorage.getItem('selfcare_active_user') || '';
     }
 
+    const cleanMobile = currentMobile ? String(currentMobile).replace(/\D/g, '').slice(-10) : '';
+
+    // 1. Logged-in user-oda direct family members mattum fetch seiyavum
     let familyMembers = [];
     try {
       let famStored = null;
-      if (currentMobile) {
-        famStored = localStorage.getItem(`selfcare_family_${currentMobile}`);
+      if (cleanMobile) {
+        famStored = localStorage.getItem(`selfcare_family_${cleanMobile}`);
       }
       if (!famStored) {
         famStored = localStorage.getItem('selfcare_family_members');
@@ -239,12 +244,24 @@ const BookingsPage = {
       }
     } catch (e) {}
 
+    // 2. Logged-in mobile-ku uriya bookings mattum load seiyavum (Phone isolation)
     try {
-      const storedBookings = localStorage.getItem('selfcare_recent_bookings') || localStorage.getItem('selfcare_all_bookings');
+      let storedBookings = null;
+      if (cleanMobile) {
+        storedBookings = localStorage.getItem(`selfcare_bookings_${cleanMobile}`);
+      }
+      if (!storedBookings) {
+        storedBookings = localStorage.getItem('selfcare_recent_bookings') || localStorage.getItem('selfcare_all_bookings');
+      }
+
       if (storedBookings) {
         const parsed = JSON.parse(storedBookings);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          savedBookings = parsed;
+          savedBookings = parsed.filter(b => {
+            if (!cleanMobile) return true;
+            const bPhone = String(b.patientPhone || b.customerPhone || b.mobile || b.phone || b.userPhone || '').replace(/\D/g, '').slice(-10);
+            return !bPhone || bPhone === cleanMobile;
+          });
         }
       }
     } catch (e) {}
@@ -267,10 +284,9 @@ const BookingsPage = {
 
     const isPrimaryVip = this.isMembershipActive();
     const patientMap = new Map();
-    const cleanMobile = currentMobile ? String(currentMobile).replace(/\D/g, '').slice(-10) : '';
     const normalizedSelfName = selfName.trim().toLowerCase();
 
-    // Primary Account User
+    // Primary Account User (Self)
     patientMap.set('self', {
       id: 'self',
       name: selfName,
@@ -293,6 +309,7 @@ const BookingsPage = {
       return false;
     };
 
+    // User-oda confirmed family members list
     familyMembers.forEach((fm, idx) => {
       if (!fm) return;
       if (isSelfIdentifier(fm.id, fm.name, fm.relation)) return;
@@ -313,6 +330,7 @@ const BookingsPage = {
       }
     });
 
+    // Intha user book panna items-la irukkira members mattum add seivom
     savedBookings.forEach(b => {
       const pName = b.patientName || selfName;
       const pId = b.patientId || pName;
@@ -343,22 +361,35 @@ const BookingsPage = {
     const mobile = user ? (user.mobile || user.phone) : (localStorage.getItem('selfcare_active_user') || null);
     if (!mobile) return;
 
+    const cleanMobile = String(mobile).replace(/\D/g, '').slice(-10);
+    if (!cleanMobile) return;
+
     try {
       let liveBookings = null;
       if (typeof Api.getBookingsByPatient === 'function') {
-        liveBookings = await Api.getBookingsByPatient(mobile);
+        liveBookings = await Api.getBookingsByPatient(cleanMobile);
       } else if (typeof Api.request === 'function') {
-        liveBookings = await Api.request('getBookingsByPatient', { patientPhone: mobile }, false);
+        liveBookings = await Api.request('getBookingsByPatient', { patientPhone: cleanMobile }, false);
       }
 
-      if (Array.isArray(liveBookings) && liveBookings.length > 0) {
+      if (Array.isArray(liveBookings)) {
         const isMock = (id) => ['SCDBOOK000214', 'SCDBOOK000198', 'SCDBOOK000185'].includes(id);
-        const existing = this.allBookings.filter(b => !isMock(b.bookingId));
+        
+        // Pazhaya mock matrum current user-kku thodarbu illatha bookings-ai filter seivom
+        const existing = this.allBookings.filter(b => {
+          if (isMock(b.bookingId)) return false;
+          const bPhone = String(b.patientPhone || b.customerPhone || b.mobile || b.phone || '').replace(/\D/g, '').slice(-10);
+          return !bPhone || bPhone === cleanMobile;
+        });
 
         const bookingMap = new Map();
-        liveBookings.forEach(b => bookingMap.set(b.bookingId, b));
+        liveBookings.forEach(b => {
+          if (b && b.bookingId) bookingMap.set(b.bookingId, b);
+        });
         existing.forEach(b => {
-          if (!bookingMap.has(b.bookingId)) bookingMap.set(b.bookingId, b);
+          if (b && b.bookingId && !bookingMap.has(b.bookingId)) {
+            bookingMap.set(b.bookingId, b);
+          }
         });
 
         let merged = Array.from(bookingMap.values());
@@ -377,6 +408,9 @@ const BookingsPage = {
         }
 
         this.allBookings = merged;
+
+        // User-isolated storage-la save seiyavum
+        localStorage.setItem(`selfcare_bookings_${cleanMobile}`, JSON.stringify(this.allBookings));
         localStorage.setItem('selfcare_recent_bookings', JSON.stringify(this.allBookings));
 
         this.loadPatientsAndBookings(true);
@@ -681,7 +715,7 @@ const BookingsPage = {
       }
     }
 
-    // 1. Accurate Amount Calculation: Priority to saved final payable
+    // Amount Calculation: Final payable priority
     const patientItems = this.getPatientItemsForBooking(booking);
     const patientGrossSum = patientItems.reduce((acc, it) => acc + Number(it.originalPrice || it.price || it.OfferPrice || 0), 0);
 
@@ -693,7 +727,6 @@ const BookingsPage = {
     const referralDiscount = Number(booking.referralDiscount || booking.CouponDiscount || booking.couponDiscount || 0);
     const doorstepCharge = Number(booking.doorstepCharge || booking.DoorstepCharge || 0);
 
-    // Fallback if finalAmount wasn't directly passed from sheet
     const calculatedPayable = Math.max(0, patientGrossSum - vipDiscount - referralDiscount + doorstepCharge);
     const currentBookingAmount = Number(rawFinal !== null ? rawFinal : calculatedPayable);
 
