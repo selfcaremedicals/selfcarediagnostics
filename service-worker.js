@@ -1,16 +1,16 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v17.0.0 (Strict Isolation & Zero-Stale Release)
+ * Selfcare Diagnostics - Service Worker v18.0.0 (High-Priority Search & Clinical Exemption Release)
  * Upgrades:
- * - Upgraded Cache Storage to v17.0.0 (Instantly purges older v16.x & v15.x cached scripts/bookings)
- * - Fresh asset busting via (?sw_bust=17.0.0) ensuring instant adoption of isolated bookings engine
+ * - Upgraded Cache Storage to v18.0.0 (Instantly purges older v17.x & v16.x cached scripts/utils)
+ * - Fresh asset busting via (?sw_bust=18.0.0) ensuring instant adoption of ranking & conflict fixes
  * - Seamless client claim and SW_UPDATED broadcast for live tab refreshing
  * - Comprehensive Network Bypass for Google Apps Script (/exec), Razorpay SDK, WhatsApp, and external APIs
- * - Resilient Offline Fallback for dynamic query URLs (e.g. bookings.html?id=... & cart.html?addonBookingId=...)
+ * - Resilient Offline Fallback for dynamic query URLs (e.g. tests.html?id=... & bookings.html?id=...)
  * - High-speed Stale-While-Revalidate (SWR) for local scripts & stylesheets
  */
 
-const CACHE_NAME = 'selfcare-cache-v17.0.0';
+const CACHE_NAME = 'selfcare-cache-v18.0.0';
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -74,14 +74,14 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache Fresh Files & Skip Waiting Immediately
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Upgraded Engine v17.0.0 (Booking Isolation Edition)...');
+  console.log('[Selfcare SW] Installing Upgraded Engine v18.0.0 (Search & Exemption Edition)...');
   self.skipWaiting();
 
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
-          const bustUrl = `${url}?sw_bust=17.0.0`;
+          const bustUrl = `${url}?sw_bust=18.0.0`;
           const response = await fetch(bustUrl, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
@@ -105,7 +105,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purge All Older Caches & Claim Clients Immediately
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v17.0.0 & Purging all stale caches...');
+  console.log('[Selfcare SW] Activating v18.0.0 & Purging all stale caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -120,7 +120,7 @@ self.addEventListener('activate', (event) => {
       await self.clients.claim();
       const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       clients.forEach((client) => {
-        client.postMessage({ type: 'SW_UPDATED', version: 'v17.0.0' });
+        client.postMessage({ type: 'SW_UPDATED', version: 'v18.0.0' });
       });
     })
   );
@@ -191,7 +191,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-First for HTML Documents (Handles direct & query-param routes e.g. bookings.html?id=...)
+  // Network-First for HTML Documents (Handles direct & query-param routes e.g. tests.html?id=...)
   if (
     event.request.destination === 'document' ||
     url.pathname.endsWith('.html') ||
