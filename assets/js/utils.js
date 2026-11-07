@@ -1,11 +1,11 @@
 /* file: assets/js/utils.js */
 /**
- * Selfcare Diagnostics - Dynamic 2-Tier Sheet Inspection Engine v14.0.0
+ * Selfcare Diagnostics - Dynamic 2-Tier Sheet Inspection Engine v14.1.0
  * Verified against live database:
  * - VIP Membership Expiry Engine & Independent Per-Person Crown (👑) Validator
  * - Allows family member VIP status even if primary user is regular
  * - Individual Patient 10% Discount Resolver
- * - Strict Exemption: GTT, OGTT & GCT have ZERO conflict with Urine Complete Analysis
+ * - Strict Clinical Exemption: GTT, OGTT, GCT & Urine Culture have ZERO conflict with Urine Complete Analysis
  */
 
 const Utils = {
@@ -45,13 +45,13 @@ const Utils = {
       document.body.appendChild(container);
     }
 
-    const toast = document.createElement('div');
     const bgColors = {
       success: 'linear-gradient(135deg, #078866, #045D49)',
       error: 'linear-gradient(135deg, #E4005A, #BE0048)',
       info: 'linear-gradient(135deg, #045D49, #033F33)'
     };
 
+    const toast = document.createElement('div');
     toast.style.cssText = `background: ${bgColors[type] || bgColors.success}; color: #FFFFFF; padding: 12px 18px; border-radius: 12px; font-size: 13px; font-weight: 700; box-shadow: 0 10px 28px rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); opacity: 0; transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s ease; transform: translateY(12px); pointer-events: auto; text-align: center; width: 100%; box-sizing: border-box;`;
     toast.textContent = message;
     container.appendChild(toast);
@@ -275,9 +275,7 @@ const ConflictValidator = {
     const code = String(item.TestCode || item.code || item.TestID || item.id || '').toUpperCase().replace(/[\s\-_]/g, '');
 
     return (
-      name.includes('OGTT') ||
-      name.includes('GTT') ||
-      name.includes('GCT') ||
+      /\b(OGTT|GTT|GCT)\b/i.test(name) ||
       name.includes('GLUCOSE TOLERANCE') ||
       name.includes('GLUCOSE CHALLENGE') ||
       code.includes('OGTT') ||
@@ -291,12 +289,18 @@ const ConflictValidator = {
   isUrineItem(item) {
     if (!item) return false;
     if (this.isPackage(item)) return false;
-    
+
     // GTT / OGTT / GCT is a specialized blood tolerance test, NOT a routine urine analysis
     if (this.isGlucoseToleranceTest(item)) return false;
 
+    const name = String(item.TestName || item.PackageName || item.name || '').toUpperCase();
+
+    // Urine Culture, Pregnancy (UPT) routine urine analysis உடன் மோதக்கூடாது
+    if (name.includes('CULTURE') || name.includes('PREGNANCY') || name.includes('UPT')) {
+      return false;
+    }
+
     const sample = String(item.SampleType || item.sample || '').toUpperCase();
-    const name = String(item.TestName || item.name || '').toUpperCase();
     const code = String(item.TestCode || item.code || item.TestID || item.id || '').toUpperCase().replace(/[\s\-_]/g, '');
 
     if (sample.includes('URINE')) return true;
@@ -309,7 +313,7 @@ const ConflictValidator = {
     if (!item) return false;
     if (this.isPackage(item)) return false;
     if (this.isUrineItem(item)) return false;
-    if (this.isGlucoseToleranceTest(item)) return false; // Exclude GTT/GCT from simple sugar conflicts
+    if (this.isGlucoseToleranceTest(item)) return false;
 
     const name = String(item.TestName || item.name || '').toUpperCase();
     const code = String(item.TestCode || item.code || item.TestID || item.id || '').toUpperCase().replace(/[\s\-_]/g, '');
@@ -684,7 +688,7 @@ const ConflictValidator = {
       const isCartUrine = this.isUrineItem(cartItem);
 
       // 🛡️ STRICT CLINICAL EXEMPTION:
-      // GTT / OGTT / GCT and Urine Complete Analysis / Routine have ZERO conflict. Allow simultaneous booking.
+      // GTT / OGTT / GCT and Urine Complete Analysis have ZERO conflict. Allow simultaneous booking.
       if ((isNewGtt && isCartUrine) || (isCartGtt && isNewUrine)) {
         continue;
       }

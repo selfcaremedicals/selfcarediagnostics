@@ -1,13 +1,14 @@
 /* file: assets/js/tests.js */
 /**
- * Selfcare Diagnostics - Tests Page JS (Zero-Flicker & Instant Action Edition) v6.6.0
+ * Selfcare Diagnostics - Tests Page JS (Relevance-Ranked Search Edition) v6.7.0
  * Features:
- * 1. Zero-Blink In-Place Button Updates (Only clicked card button changes without wiping list).
- * 2. Silent Background Sync with JSON Data Diffing (Zero flicker on load).
- * 3. Multi-Patient Isolated Conflict Validation.
- * 4. Add-on Booking Lock Guard.
- * 5. Fly-to-Cart Animation.
- * 6. Natural Language Symptom Search Engine.
+ * 1. Weighted Search Relevance Ranking: Tests with matching names always appear FIRST before parameters and symptoms.
+ * 2. Zero-Blink In-Place Button Updates (Only clicked card button changes without wiping list).
+ * 3. Silent Background Sync with JSON Data Diffing (Zero flicker on load).
+ * 4. Multi-Patient Isolated Conflict Validation.
+ * 5. Add-on Booking Lock Guard.
+ * 6. Fly-to-Cart Animation.
+ * 7. Natural Language & Voice Symptom Search Engine.
  */
 
 const TestsPage = {
@@ -76,6 +77,10 @@ const TestsPage = {
     } catch (error) {
       console.error('Tests page init error:', error);
     }
+  },
+
+  escapeRegExp(str) {
+    return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   },
 
   isPatientMatch(patientIdA, patientIdB) {
@@ -173,7 +178,7 @@ const TestsPage = {
       console.warn('Cache load error:', e);
     }
 
-    // SILENT SYNC: Compare data before re-rendering to prevent 1-second blink
+    // Silent background sync with data diffing
     if (navigator.onLine && typeof OfflineSync !== 'undefined') {
       setTimeout(async () => {
         try {
@@ -363,9 +368,6 @@ const TestsPage = {
     }
   },
 
-  /**
-   * ZERO-BLINK TARGETED DOM BUTTON UPDATE
-   */
   updateSingleCardButtonUI(testId, isAdded, isLocked) {
     const safeId = String(testId).replace(/[^a-zA-Z0-9_-]/g, '_');
     const container = document.getElementById(`action-btn-wrap-${safeId}`);
@@ -484,8 +486,6 @@ const TestsPage = {
     }
 
     this.updateCartBadgeUI();
-
-    // 🚀 IN-PLACE BUTTON UPDATE (Motha list-um azhinju re-render aagathu!)
     this.updateSingleCardButtonUI(testId, !isAdded, false);
   },
 
@@ -743,11 +743,10 @@ const TestsPage = {
     if (!container) return;
 
     if (!tests || tests.length === 0) {
-      container.innerHTML = '<p class="empty-msg">No laboratory tests found matching your symptoms or query.</p>';
+      container.innerHTML = '<p class="empty-msg">No laboratory tests found matching your query.</p>';
       return;
     }
 
-    // Removed jarring animate-fade so cards don't flash/blink
     container.innerHTML = tests.map(test => {
       const testCode = test.TestCode || 'TEST';
       const testId = test.TestID || testCode;
@@ -811,10 +810,15 @@ const TestsPage = {
     }).join('');
   },
 
+  /**
+   * 🏆 RELEVANCE-RANKED SEARCH ENGINE:
+   * Prioritizes Test Names & Test Codes first, followed by parameters, and lastly symptoms.
+   */
   filterTestsByQuery(query) {
     if (!query) return this.allTests;
     const cleanQuery = query.toLowerCase().trim();
 
+    // 1. Identify symptom triggers from natural language dictionary
     let symptomMatchedTargetTerms = [];
     Object.keys(this.symptomDictionary).forEach(symptomKey => {
       if (cleanQuery.includes(symptomKey)) {
@@ -827,35 +831,89 @@ const TestsPage = {
       .split(/\s+/)
       .filter(w => w.length > 2 && !this.stopWords.includes(w));
 
-    return this.allTests.filter(test => {
-      const name = String(test.TestName || '').toLowerCase();
-      const code = String(test.TestCode || '').toLowerCase();
-      const category = String(test.Category || '').toLowerCase();
-      const keywords = String(test.SearchKeywords || '').toLowerCase();
-      const desc = String(test.Description || test.WhyDone || '').toLowerCase();
-      const symptoms = String(test.Symptoms || '').toLowerCase();
-      const params = String(test.Parameters || '').toLowerCase();
-      const prep = String(test.Preparation || '').toLowerCase();
+    const scoredTests = [];
 
-      const combinedTestMeta = `${name} ${code} ${category} ${keywords} ${desc} ${symptoms} ${params} ${prep}`;
+    // 2. Score each test based on multi-tier relevance
+    for (const test of this.allTests) {
+      const name = String(test.TestName || '').toLowerCase().trim();
+      const code = String(test.TestCode || '').toLowerCase().trim();
+      const category = String(test.Category || '').toLowerCase().trim();
+      const keywords = String(test.SearchKeywords || '').toLowerCase().trim();
+      const desc = String(test.Description || test.WhyDone || '').toLowerCase().trim();
+      const symptoms = String(test.Symptoms || '').toLowerCase().trim();
+      const params = String(test.Parameters || '').toLowerCase().trim();
+      const sample = String(test.SampleType || '').toLowerCase().trim();
+      const prep = String(test.Preparation || '').toLowerCase().trim();
 
-      if (combinedTestMeta.includes(cleanQuery)) {
-        return true;
+      let score = 0;
+
+      // 🏆 PRIORITY 1: TEST NAME & CODE (Direct Typed Match - Highest Priority)
+      if (name.startsWith(cleanQuery)) {
+        score += 1500; // e.g. "Urine Complete Analysis", "Urine Routine"
+      } else if (new RegExp('\\b' + this.escapeRegExp(cleanQuery) + '\\b', 'i').test(name)) {
+        score += 1000; // e.g. "Complete Urine Examination"
+      } else if (name.includes(cleanQuery)) {
+        score += 650;  // e.g. "Microalbuminuria"
       }
 
+      if (code === cleanQuery) {
+        score += 1200;
+      } else if (code.includes(cleanQuery)) {
+        score += 450;
+      }
+
+      // 🥈 PRIORITY 2: Search Keywords & Parameters (Specific Tests)
+      if (keywords.includes(cleanQuery)) {
+        score += 250;
+      }
+      if (params.includes(cleanQuery)) {
+        score += 200;
+      }
+
+      // 🥉 PRIORITY 3: Sample Type
+      if (sample.includes(cleanQuery)) {
+        score += 150;
+      }
+
+      // 🎖️ PRIORITY 4: Category
+      if (category.includes(cleanQuery)) {
+        score += 100;
+      }
+
+      // 🔻 PRIORITY 5: Symptom Dictionary / Secondary Organs (Lowest Priority)
       if (symptomMatchedTargetTerms.length > 0) {
         const matchesSymptom = symptomMatchedTargetTerms.some(term => {
-          return code === term || name.includes(term) || keywords.includes(term) || desc.includes(term) || params.includes(term);
+          return code === term || name.includes(term) || keywords.includes(term) || params.includes(term);
         });
-        if (matchesSymptom) return true;
+        if (matchesSymptom) {
+          score += 40; // e.g. RFT, LFT matching through urine symptoms
+        }
       }
 
+      // 🔻 PRIORITY 6: General Description & WhyDone
+      if (desc.includes(cleanQuery) || symptoms.includes(cleanQuery) || prep.includes(cleanQuery)) {
+        score += 20;
+      }
+
+      // Fallback word token matching
       if (words.length > 0) {
-        return words.some(word => combinedTestMeta.includes(word));
+        const combinedMeta = `${name} ${code} ${category} ${keywords} ${desc} ${symptoms} ${params} ${prep}`;
+        const matchCount = words.filter(word => combinedMeta.includes(word)).length;
+        if (matchCount > 0) {
+          score += matchCount * 10;
+        }
       }
 
-      return false;
-    });
+      // Only include tests that actually matched
+      if (score > 0) {
+        scoredTests.push({ test, score });
+      }
+    }
+
+    // 🚀 3. Sort Descending by Relevance Score (Highest score comes first!)
+    scoredTests.sort((a, b) => b.score - a.score);
+
+    return scoredTests.map(item => item.test);
   },
 
   startVoiceSearch() {
