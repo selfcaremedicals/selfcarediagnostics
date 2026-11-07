@@ -1,10 +1,11 @@
 /* file: assets/js/utils.js */
 /**
- * Selfcare Diagnostics - Dynamic 2-Tier Sheet Inspection Engine v13.1.0
+ * Selfcare Diagnostics - Dynamic 2-Tier Sheet Inspection Engine v14.0.0
  * Verified against live database:
  * - VIP Membership Expiry Engine & Independent Per-Person Crown (👑) Validator
  * - Allows family member VIP status even if primary user is regular
  * - Individual Patient 10% Discount Resolver
+ * - Strict Exemption: GTT, OGTT & GCT have ZERO conflict with Urine Complete Analysis
  */
 
 const Utils = {
@@ -74,14 +75,13 @@ const Utils = {
   },
 
   // ==========================================================
-  // VIP MEMBERSHIP STRICT VALIDITY & EXPIRY CHECKER (Fixed)
+  // VIP MEMBERSHIP STRICT VALIDITY & EXPIRY CHECKER
   // ==========================================================
   isPatientVIP(patientIdOrObj) {
     try {
       const now = Date.now();
       const activeMobile = (typeof localStorage !== 'undefined' && localStorage.getItem('selfcare_active_user')) || '';
 
-      // Direct Object Checking if full member object passed
       if (typeof patientIdOrObj === 'object' && patientIdOrObj !== null) {
         if (patientIdOrObj.isVip === true) return true;
         if (patientIdOrObj.membership === 'Membership') {
@@ -101,7 +101,6 @@ const Utils = {
       const cleanId = String(targetId).trim().toUpperCase();
       const isPrimary = cleanId === 'SELF' || cleanId === 'PATIENT_SELF' || cleanId === '' || (activeMobile && (cleanId === activeMobile || cleanId === 'SCD_' + activeMobile));
 
-      // CASE A: PRIMARY ACCOUNT HOLDER
       if (isPrimary) {
         let isPrimaryVip = false;
         if (activeMobile) {
@@ -133,7 +132,6 @@ const Utils = {
         return isPrimaryVip || localStorage.getItem('selfcare_is_vip_member') === 'true';
       }
 
-      // CASE B: FAMILY MEMBER (Evaluates independently of primary status)
       let famList = [];
       try {
         const famRaw = localStorage.getItem(`selfcare_family_${activeMobile}`) || localStorage.getItem('selfcare_family_members');
@@ -149,7 +147,6 @@ const Utils = {
         }
       }
 
-      // Fallback check against coveredFamilyIds
       if (activeMobile) {
         const rawMem = localStorage.getItem(`selfcare_membership_${activeMobile}`);
         if (rawMem) {
@@ -269,9 +266,34 @@ const ConflictValidator = {
     return name.includes('RETICULOCYTE') || code.includes('RETIC') || code === 'T0015' || code === 'SCDT0015';
   },
 
+  // ==========================================================
+  // GTT / OGTT / GCT DETECTOR (Glucose Tolerance Tests)
+  // ==========================================================
+  isGlucoseToleranceTest(item) {
+    if (!item) return false;
+    const name = String(item.TestName || item.PackageName || item.name || '').toUpperCase();
+    const code = String(item.TestCode || item.code || item.TestID || item.id || '').toUpperCase().replace(/[\s\-_]/g, '');
+
+    return (
+      name.includes('OGTT') ||
+      name.includes('GTT') ||
+      name.includes('GCT') ||
+      name.includes('GLUCOSE TOLERANCE') ||
+      name.includes('GLUCOSE CHALLENGE') ||
+      code.includes('OGTT') ||
+      code.includes('GTT') ||
+      code.includes('GCT') ||
+      code === 'T0503' ||
+      code === 'SCDT0503'
+    );
+  },
+
   isUrineItem(item) {
     if (!item) return false;
     if (this.isPackage(item)) return false;
+    
+    // GTT / OGTT / GCT is a specialized blood tolerance test, NOT a routine urine analysis
+    if (this.isGlucoseToleranceTest(item)) return false;
 
     const sample = String(item.SampleType || item.sample || '').toUpperCase();
     const name = String(item.TestName || item.name || '').toUpperCase();
@@ -287,6 +309,7 @@ const ConflictValidator = {
     if (!item) return false;
     if (this.isPackage(item)) return false;
     if (this.isUrineItem(item)) return false;
+    if (this.isGlucoseToleranceTest(item)) return false; // Exclude GTT/GCT from simple sugar conflicts
 
     const name = String(item.TestName || item.name || '').toUpperCase();
     const code = String(item.TestCode || item.code || item.TestID || item.id || '').toUpperCase().replace(/[\s\-_]/g, '');
@@ -592,6 +615,8 @@ const ConflictValidator = {
       return { hasConflict: false, reason: '' };
     }
 
+    const isNewGtt = this.isGlucoseToleranceTest(newItem);
+
     const isNewRbs = this.isBloodSugarTest(newItem, 'rbs');
     const isNewFbs = this.isBloodSugarTest(newItem, 'fbs');
     const isNewPpbs = this.isBloodSugarTest(newItem, 'ppbs');
@@ -654,6 +679,16 @@ const ConflictValidator = {
       const isLocked = Boolean(cartItem.isExistingLocked || cartItem.isExistingBookingItem);
       const placeText = isLocked ? 'in your booked appointment' : 'in your cart';
 
+      const isCartGtt = this.isGlucoseToleranceTest(cartItem);
+      const isNewUrine = this.isUrineItem(newItem);
+      const isCartUrine = this.isUrineItem(cartItem);
+
+      // 🛡️ STRICT CLINICAL EXEMPTION:
+      // GTT / OGTT / GCT and Urine Complete Analysis / Routine have ZERO conflict. Allow simultaneous booking.
+      if ((isNewGtt && isCartUrine) || (isCartGtt && isNewUrine)) {
+        continue;
+      }
+
       if (cartIsPkg && newIsPkg) {
         if (newCode && cartCode && newCode === cartCode) {
           return {
@@ -700,6 +735,11 @@ const ConflictValidator = {
           const itemClean = this.cleanStr(constituent);
           const itemCode = constituent.toUpperCase().replace(/[\s\-_]/g, '');
 
+          // Skip urine constituents if newItem is GTT/OGTT/GCT
+          if (isNewGtt && (itemClean.includes('urine') || itemClean.includes('urinary') || itemCode === 'T0028' || itemCode === 'SCDT0028')) {
+            continue;
+          }
+
           if ((newCode && (newCode === itemCode || newCode === constituent.toUpperCase())) ||
               this.isSameOrganPanel(constituent, itemCode, newName, newCode) ||
               (itemClean && (itemClean === newNameClean || (itemClean.length > 3 && newNameClean === itemClean)))) {
@@ -713,8 +753,11 @@ const ConflictValidator = {
           const parentName = parentTest ? (parentTest.TestName || constituent) : constituent;
 
           const isConstituentUrine = this.isUrineItem(parentTest || { TestName: constituent });
-          const isNewUrine = this.isUrineItem(newItem);
           if (isConstituentUrine !== isNewUrine) continue;
+
+          if (isNewGtt && (this.cleanStr(parentName).includes('urine') || isConstituentUrine)) {
+            continue;
+          }
 
           if (parentTest && this.isSameOrganPanel(parentName, parentTest.TestCode, newName, newCode)) {
             return {
@@ -743,6 +786,10 @@ const ConflictValidator = {
           const itemClean = this.cleanStr(constituent);
           const itemCode = constituent.toUpperCase().replace(/[\s\-_]/g, '');
 
+          if (isCartGtt && (itemClean.includes('urine') || itemClean.includes('urinary') || itemCode === 'T0028' || itemCode === 'SCDT0028')) {
+            continue;
+          }
+
           if (this.isSameOrganPanel(constituent, itemCode, cartName, cartCode) || itemClean === cartNameClean) {
             return {
               hasConflict: true,
@@ -754,8 +801,11 @@ const ConflictValidator = {
           const parentName = parentTest ? (parentTest.TestName || constituent) : constituent;
 
           const isConstituentUrine = this.isUrineItem(parentTest || { TestName: constituent });
-          const isCartUrine = this.isUrineItem(cartItem);
           if (isConstituentUrine !== isCartUrine) continue;
+
+          if (isCartGtt && (this.cleanStr(parentName).includes('urine') || isConstituentUrine)) {
+            continue;
+          }
 
           for (const param of subParameters) {
             const paramClean = this.cleanStr(param);
@@ -785,8 +835,6 @@ const ConflictValidator = {
           };
         }
 
-        const isCartUrine = this.isUrineItem(cartItem);
-        const isNewUrine = this.isUrineItem(newItem);
         if (isCartUrine !== isNewUrine) continue;
 
         const cartDeep = this.getDeepParametersForSheetTest(cartName, allSheetTests);
