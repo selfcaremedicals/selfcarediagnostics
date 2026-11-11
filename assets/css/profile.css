@@ -1,11 +1,12 @@
 /* file: assets/css/profile.css */
 /**
- * Selfcare Diagnostics - My Account Page CSS v15.6.0
+ * Selfcare Diagnostics - My Account Page CSS v15.7.0
  * Features:
  * - 3D Tactile Bounce & Press Feedback on all buttons/cards (:active)
  * - Blood Connect & Refer And Earn Live Highlight Badges
  * - Branch Directions (Vettuvankeni & Velachery Upcoming)
  * - 5.0 Star Google Review & Future Growth Showcase Box
+ * - Cleaned obsolete General Info classes for direct Privacy Policy navigation
  */
 
 :root {
@@ -1153,23 +1154,4 @@ button:disabled,
 .channel-arrow {
   font-size: 20px;
   color: #9CA3AF;
-}
-
-.general-info-card {
-  padding: 10px 12px;
-  background: #F9FAFB;
-  border: 1px solid #E5E7EB;
-  border-radius: 10px;
-}
-
-.general-info-card h4 {
-  font-size: 12px;
-  color: var(--dark-green);
-  margin-bottom: 2px;
-}
-
-.general-info-card p {
-  font-size: 11px;
-  color: #4B5563;
-  line-height: 1.35;
 }
