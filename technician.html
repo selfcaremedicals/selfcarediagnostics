@@ -4,243 +4,303 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
-  <title>Technician Operations Portal - Selfcare Diagnostics</title>
+  <title>Lab Walk-in Desk & Operations - Selfcare Diagnostics</title>
   
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#078866">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <link rel="stylesheet" href="assets/css/global.css?v=6.4.0">
-  <link rel="stylesheet" href="assets/css/components.css?v=6.4.0">
-  <link rel="stylesheet" href="assets/css/responsive.css?v=6.4.0">
-  <link rel="stylesheet" href="assets/css/technician.css?v=1.0.0">
+  <!-- Core Versioned Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=6.5.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=6.5.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=6.5.0">
+  <link rel="stylesheet" href="assets/css/technician.css?v=3.8.0">
+
+  <!-- PDF Generation Engine (html2pdf) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body class="tech-body-bg">
 
-  <!-- Floating Glass App Header -->
+  <!-- Header -->
   <header class="tech-header glass-nav-3d">
     <div class="tech-header-left">
-      <div class="brand-wrap">
-        <h1 class="logo-text">SELFCARE <span class="logo-sub">TECH PORTAL</span></h1>
-        <p class="tagline" id="tech-zone-tagline">Diagnostics Staff Operations</p>
+      <div class="brand-wrap-flex" onclick="window.location.reload()" style="cursor: pointer;">
+        <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="lab-nav-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <div class="fallback-brand" style="display: none;">
+          <h1 class="logo-text">SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
+          <p class="tagline">Clinical Pathology Lab Desk</p>
+        </div>
       </div>
     </div>
     
-    <div class="tech-header-right" id="tech-user-badge-wrap" style="display: none;">
+    <div class="tech-header-right" id="tech-user-badge-wrap" style="display: flex;">
       <div class="tech-profile-pill">
-        <span class="tech-avatar-circle" id="tech-avatar-icon">🧑‍🔬</span>
+        <span class="tech-avatar-circle" id="tech-avatar-icon">🔬</span>
         <div class="tech-meta-text">
-          <strong id="tech-display-name">Technician</strong>
-          <span class="role-badge" id="tech-display-role">Lab</span>
+          <strong id="tech-display-name">Mohamed Adamkani</strong>
+          <span class="role-badge" id="tech-display-role">Desk Lead</span>
         </div>
       </div>
-      <button type="button" class="tech-logout-btn" onclick="TechnicianApp.logout()" title="Logout">
-        🚪
-      </button>
+      <button type="button" class="tech-logout-btn" onclick="TechnicianApp.logout()" title="Logout Desk">🚪</button>
     </div>
   </header>
 
-  <!-- Main Workstation Container -->
-  <main class="main-container tech-main-wrapper">
-
-    <!-- MODE SWITCH TABS (Shown if tech has multi-access or toggling) -->
-    <div class="mode-switch-card glass-panel-3d" id="tech-mode-switcher" style="display: none;">
-      <button type="button" class="mode-tab-btn active" id="btn-mode-lab" onclick="TechnicianApp.switchPortalMode('lab')">
-        🔬 Lab Walk-in Billing
-      </button>
-      <button type="button" class="mode-tab-btn" id="btn-mode-home" onclick="TechnicianApp.switchPortalMode('home')">
-        🏠 Home Collection Fleet
-      </button>
-    </div>
-
-    <!-- =========================================================
-         SECTION 1: LAB WALK-IN DESK (ID: Techlab...)
-         ========================================================= -->
-    <div id="lab-portal-view" class="portal-view-section active">
+  <!-- Main Workstation -->
+  <main class="main-container tech-main-wrapper" style="padding-top: 10px;">
+    
+    <!-- 1. Search Tests & Health Packages -->
+    <section class="glass-panel-3d search-catalogue-box animate-fade-in" style="margin-bottom: 14px;">
+      <div class="group-title-row">
+        <h4>🔍 Search Tests & Health Packages</h4>
+        <span class="sub-counter-badge" id="cat-items-counter" onclick="TechnicianApp.forceSyncCatalogue()" style="cursor: pointer;" title="Tap to refresh latest prices">
+          Unified Catalogue 🔄
+        </span>
+      </div>
       
-      <!-- Top Test & Package Search Input -->
-      <section class="glass-panel-3d group-card search-catalogue-box">
-        <div class="group-title-row">
-          <h4>🔍 Search Tests & Health Packages</h4>
-          <span class="sub-counter-badge" id="cat-items-counter">Instant Lookup</span>
-        </div>
-        
-        <div class="search-input-group">
-          <input type="text" id="catalogue-search-input" 
-                 placeholder="Type test name, code (e.g. CBC, Lipid, HbA1c, PKG001)..." 
-                 autocomplete="off" 
-                 oninput="TechnicianApp.handleSearchInput(this.value)">
-          <button type="button" class="clear-search-btn" id="clear-search-btn" onclick="TechnicianApp.clearSearch()">✕</button>
-        </div>
-
-        <!-- Live Dropdown Suggestions Box -->
-        <div id="search-results-dropdown" class="search-dropdown-menu" style="display: none;"></div>
-      </section>
-
-      <!-- Customer Lookup & Identification -->
-      <section class="glass-panel-3d group-card">
-        <div class="group-title-row">
-          <h4>👤 Customer / Patient Information</h4>
-          <button type="button" class="mini-btn-emerald" onclick="TechnicianApp.openNewCustomerModal()">
-            + New Customer
-          </button>
-        </div>
-
-        <div class="customer-search-grid">
-          <div class="form-field-unit">
-            <label>Customer Mobile Number</label>
-            <div class="mobile-autofill-wrap">
-              <span class="prefix-91">+91</span>
-              <input type="tel" id="cust-mobile-input" maxlength="10" placeholder="Enter 10-digit mobile"
-                     oninput="TechnicianApp.handleCustomerMobileLookup(this.value)">
-            </div>
-          </div>
-
-          <div class="form-field-unit">
-            <label>Patient Name</label>
-            <input type="text" id="cust-name-input" placeholder="Patient full name">
-          </div>
-        </div>
-
-        <div class="customer-extra-grid">
-          <div class="form-field-unit">
-            <label>Age</label>
-            <input type="number" id="cust-age-input" placeholder="Age" min="1" max="120">
-          </div>
-          <div class="form-field-unit">
-            <label>Gender</label>
-            <select id="cust-gender-select">
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div class="form-field-unit">
-            <label>Family Member Select</label>
-            <select id="cust-family-dropdown" onchange="TechnicianApp.handleFamilySelect(this.value)">
-              <option value="SELF">Self (Primary)</option>
-            </select>
-          </div>
-        </div>
-      </section>
-
-      <!-- Dedicated In-Page Walk-in Cart Table -->
-      <section class="glass-panel-3d group-card inpage-cart-card">
-        <div class="group-title-row">
-          <h4>🧪 Lab Billing Cart Items</h4>
-          <span class="cart-pill-counter" id="inpage-cart-count">0 Items</span>
-        </div>
-
-        <div id="inpage-cart-items-list" class="cart-items-table-list">
-          <div class="empty-inpage-cart">
-            <span>🛒</span>
-            <p>No tests or packages added yet. Search above to add items for lab counter checkout.</p>
-          </div>
-        </div>
-
-        <!-- Bill Summary Card (₹0 Doorstep Collection Fee strictly applied) -->
-        <div class="bill-summary-strip">
-          <div class="bill-summary-row">
-            <span>Total Tests MRP:</span>
-            <span class="strikethrough-val" id="lab-bill-mrp">₹0</span>
-          </div>
-          <div class="bill-summary-row">
-            <span>Diagnostic Offer Price:</span>
-            <span id="lab-bill-subtotal">₹0</span>
-          </div>
-          <div class="bill-summary-row">
-            <span>Doorstep Sample Collection:</span>
-            <span class="green-highlight">FREE (₹0 - Direct Lab Counter)</span>
-          </div>
-          <div class="bill-summary-divider"></div>
-          <div class="bill-summary-row final-row">
-            <strong>Grand Payable Amount:</strong>
-            <strong class="grand-payable-emerald" id="lab-bill-grand-total">₹0</strong>
-          </div>
-        </div>
-
-        <div class="cart-bottom-actions">
-          <button type="button" class="btn-clear-cart" onclick="TechnicianApp.clearInPageCart()">
-            Clear All
-          </button>
-          <button type="button" class="primary-glow-action-btn" id="btn-submit-lab-booking" onclick="TechnicianApp.executeLabCounterCheckout()">
-            ✓ Confirm Lab Bill & Print Receipt
-          </button>
-        </div>
-      </section>
-
-    </div>
-
-    <!-- =========================================================
-         SECTION 2: HOME COLLECTION FLEET (ID: Techhome...)
-         ========================================================= -->
-    <div id="home-portal-view" class="portal-view-section">
-      
-      <!-- Technician Wallet & Cash-in-Hand Dashboard -->
-      <section class="glass-panel-3d wallet-main-card">
-        <div class="wallet-top-header">
-          <div>
-            <span class="wallet-label-sub">Technician Earnings Wallet</span>
-            <h2 class="wallet-balance-num" id="wallet-balance-amount">₹0</h2>
-          </div>
-          <div class="cash-in-hand-wrap">
-            <span class="cash-label">Cash In Hand</span>
-            <strong class="cash-val" id="wallet-cash-in-hand">₹0</strong>
-          </div>
-        </div>
-
-        <div class="wallet-payout-grid">
-          <button type="button" class="payout-action-btn" onclick="TechnicianApp.requestWithdrawal('Same Day')">
-            ⚡ Same Day Payout
-          </button>
-          <button type="button" class="payout-action-btn" onclick="TechnicianApp.requestWithdrawal('Weekly')">
-            📅 Weekly Payout
-          </button>
-          <button type="button" class="payout-action-btn" onclick="TechnicianApp.requestWithdrawal('Monthly')">
-            🗓️ Monthly Payout
-          </button>
-        </div>
-      </section>
-
-      <!-- Quick Action Utilities -->
-      <div class="quick-utilities-row">
-        <button type="button" class="utility-chip-btn ild-call-btn" onclick="TechnicianApp.openIldDirectoryModal()">
-          📞 Call ILD Hubs
-        </button>
-        <button type="button" class="utility-chip-btn" onclick="TechnicianApp.refreshAssignedTrips()">
-          🔄 Refresh Trips
-        </button>
-        <button type="button" class="utility-chip-btn" onclick="TechnicianApp.detectCurrentGpsLocation()">
-          📍 Update GPS
-        </button>
+      <div class="search-input-group">
+        <span class="search-icon-decor">🔎</span>
+        <input type="text" id="catalogue-search-input" 
+               placeholder="Search test name (e.g. FBS, PPBS, RBS, BP, Vitals, HbA1c...)" 
+               autocomplete="off" 
+               oninput="TechnicianApp.handleSearchInput(this.value)">
+        <button type="button" class="clear-search-btn" id="clear-search-btn" onclick="TechnicianApp.clearSearch()">✕</button>
       </div>
 
-      <!-- Assigned Trips List (Accept / Reject Flow & 10KM Radius Filter) -->
-      <section class="glass-panel-3d group-card">
-        <div class="group-title-row">
-          <h4>📦 Assigned Home Collection Pickups</h4>
-          <span class="sub-counter-badge" id="assigned-jobs-count">0 Trips</span>
+      <div id="search-results-dropdown" class="search-dropdown-menu" style="display: none;"></div>
+    </section>
+
+    <!-- 2. Patient Registration Panel -->
+    <section class="glass-panel-3d patient-reg-card animate-fade-in" style="margin-bottom: 14px;">
+      <div class="group-title-row">
+        <h4>👤 Patient Registration & Identification</h4>
+        <span class="id-tag-pill" id="disp-patient-id-tag">ID: Auto-assigned</span>
+      </div>
+
+      <div class="customer-search-grid">
+        <div class="form-field-unit">
+          <label>Mobile Number (10 Digits) *</label>
+          <div class="mobile-autofill-wrap">
+            <span class="prefix-91">+91</span>
+            <input type="tel" id="cust-mobile-input" maxlength="10" placeholder="Enter customer mobile"
+                   oninput="TechnicianApp.handleCustomerMobileLookup(this.value)">
+          </div>
         </div>
 
-        <div id="assigned-jobs-container" class="jobs-vertical-list">
-          <!-- Populated dynamically via technician.js -->
+        <div class="form-field-unit">
+          <label>Patient Full Name *</label>
+          <div style="display: flex; gap: 6px;">
+            <select id="cust-salutation-select" style="width: 85px; flex-shrink: 0; padding: 9px 4px; border-radius: 10px; border: 1.5px solid #CBD5E1; font-weight: 700; background: #FFF;">
+              <option value="Mr.">Mr.</option>
+              <option value="Mrs.">Mrs.</option>
+              <option value="Ms.">Ms.</option>
+              <option value="Master">Master</option>
+              <option value="Dr.">Dr.</option>
+              <option value="Baby">Baby</option>
+            </select>
+            <input type="text" id="cust-name-input" placeholder="e.g. MOHAMED ADAMKANI A" style="flex: 1;">
+          </div>
         </div>
-      </section>
+      </div>
 
-      <!-- Active Accepted Queue (Trip In-Progress & Mark Completed) -->
-      <section class="glass-panel-3d group-card">
-        <div class="group-title-row">
-          <h4>🚀 Active Collections Queue</h4>
-          <span class="sub-counter-badge" id="active-queue-count">0 In-Progress</span>
+      <div class="customer-extra-grid" style="grid-template-columns: 1.2fr 1fr 1fr 1.2fr !important; margin-top: 10px;">
+        <div class="form-field-unit">
+          <label>Date of Birth (DOB)</label>
+          <input type="date" id="cust-dob-input" onchange="TechnicianApp.handleDobChange(this.value)">
         </div>
 
-        <div id="active-queue-container" class="jobs-vertical-list">
-          <!-- Populated dynamically via technician.js -->
+        <div class="form-field-unit">
+          <label>Age (Years) *</label>
+          <input type="number" id="cust-age-input" placeholder="Age" min="0" max="120" value="27">
         </div>
-      </section>
 
-    </div>
+        <div class="form-field-unit">
+          <label>Gender *</label>
+          <select id="cust-gender-select">
+            <option value="Male" selected>Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-field-unit">
+          <label>Email Address</label>
+          <input type="email" id="cust-email-input" placeholder="customer@mail.com">
+        </div>
+      </div>
+
+      <!-- Referring Doctor Input -->
+      <div class="form-field-unit doc-field-container" style="margin-top: 10px;">
+        <div class="label-with-action">
+          <label>Referring Doctor / Hospital</label>
+          <button type="button" class="btn-self-walkin" onclick="TechnicianApp.setSelfDoctor()">
+            + Self / Walk-In
+          </button>
+        </div>
+        <div class="doc-input-wrap">
+          <span class="doc-icon-decor">🩺</span>
+          <input type="text" id="cust-doctor-input" 
+                 placeholder="Search or Type Dr. Name..." 
+                 autocomplete="off" 
+                 onfocus="TechnicianApp.showDoctorDropdown()"
+                 oninput="TechnicianApp.filterDoctorDropdown(this.value)">
+        </div>
+        <div id="doctor-custom-dropdown" class="doctor-dropdown-menu" style="display: none;"></div>
+      </div>
+    </section>
+
+    <!-- 3. Billing Cart & Calculations -->
+    <section class="glass-panel-3d inpage-cart-card animate-fade-in" style="margin-bottom: 14px;">
+      <div class="group-title-row">
+        <h4>🧪 Selected Tests & Packages</h4>
+        <span class="cart-pill-counter" id="inpage-cart-count">0 Items</span>
+      </div>
+
+      <div id="cart-conflict-alert-box" class="conflict-alert-strip" style="display: none;"></div>
+      <div id="inpage-cart-items-list" class="cart-items-table-list"></div>
+
+      <!-- Coupon -->
+      <div class="coupon-apply-wrap">
+        <div class="coupon-input-group">
+          <span class="coupon-icon">🏷️</span>
+          <input type="text" id="lab-coupon-code-input" placeholder="Coupon or Referral Code">
+          <button type="button" class="btn-apply-coupon" onclick="TechnicianApp.applyCouponCode()">Apply</button>
+        </div>
+        <div id="coupon-status-msg" class="coupon-status-text" style="display: none;"></div>
+      </div>
+
+      <!-- Totals Strip -->
+      <div class="bill-summary-strip">
+        <div class="bill-summary-row">
+          <span>Subtotal (MRP):</span>
+          <span id="lab-bill-mrp">₹0</span>
+        </div>
+        <div class="bill-summary-row">
+          <span>Counter Discount:</span>
+          <span class="green-highlight" id="lab-bill-discount-line">- ₹0</span>
+        </div>
+        <div class="bill-summary-row" id="membership-discount-row" style="display: none;">
+          <span style="color: #B45309; font-weight: 800;">⭐ VIP Care Membership (10% Off):</span>
+          <span class="green-highlight" id="lab-bill-membership-line">- ₹0</span>
+        </div>
+        <div class="bill-summary-row" id="coupon-discount-row" style="display: none;">
+          <span>Coupon Savings:</span>
+          <span class="green-highlight" id="lab-bill-coupon-line">- ₹0</span>
+        </div>
+        <div class="bill-summary-row">
+          <span>Sample Collection:</span>
+          <span class="green-highlight">FREE (Lab Counter)</span>
+        </div>
+        <div class="bill-summary-divider"></div>
+        <div class="bill-summary-row final-row">
+          <strong>Grand Payable:</strong>
+          <strong class="grand-payable-emerald" id="lab-bill-grand-total">₹0</strong>
+        </div>
+      </div>
+
+      <!-- Payment Mode Options -->
+      <div class="payment-method-box">
+        <label class="pay-title-lbl">💳 Select Payment Mode:</label>
+        <div class="pay-modes-grid">
+          <label class="pay-mode-card active" id="pay-mode-lbl-cash">
+            <input type="radio" name="lab_payment_mode" value="CASH" checked onchange="TechnicianApp.handlePaymentModeChange('CASH')">
+            <span style="font-size: 18px;">💵</span>
+            <strong>Cash Counter</strong>
+          </label>
+          <label class="pay-mode-card" id="pay-mode-lbl-link">
+            <input type="radio" name="lab_payment_mode" value="LINK" onchange="TechnicianApp.handlePaymentModeChange('LINK')">
+            <span style="font-size: 18px;">🔗</span>
+            <strong>WhatsApp Link</strong>
+          </label>
+          <label class="pay-mode-card" id="pay-mode-lbl-upi">
+            <input type="radio" name="lab_payment_mode" value="UPI_QR" onchange="TechnicianApp.handlePaymentModeChange('UPI_QR')">
+            <span style="font-size: 18px;">⚡</span>
+            <strong>Counter UPI QR</strong>
+          </label>
+        </div>
+
+        <!-- Cash Calculator -->
+        <div id="cash-calculator-panel" class="cash-calc-panel">
+          <div class="cash-field-row">
+            <label><strong>Cash Tendered by Customer (₹) *</strong></label>
+            <input type="number" id="cash-tendered-input" placeholder="Enter cash received" 
+                   oninput="TechnicianApp.calculateCashChange(this.value)">
+          </div>
+          <div class="cash-change-result-row">
+            <span>Balance Given to Patient:</span>
+            <strong id="disp-change-return-amount">₹0</strong>
+          </div>
+        </div>
+
+        <!-- WhatsApp Link Wait Panel -->
+        <div id="link-payment-panel" class="cash-calc-panel" style="display: none; background: #F0FDF4; border: 1.5px dashed #078866; text-align: center; padding: 14px; border-radius: 12px;">
+          <div id="link-waiting-state">
+            <p style="margin: 0; font-size: 12px; color: #045D49; font-weight: 700;">
+              Click button below to create & send 5-minute GPay / PhonePe payment link to customer WhatsApp.
+            </p>
+          </div>
+          
+          <div id="link-polling-state" style="display: none;">
+            <div class="timer-countdown-badge">
+              <span>⏱️ Link Expires In:</span>
+              <span id="link-timer-display">05:00</span>
+            </div>
+            <p style="margin: 4px 0 0 0; font-size: 13px; font-weight: 800; color: #045D49;">
+              Payment Link Sent! Waiting for customer to pay online...
+            </p>
+            <p style="font-size: 11px; color: #64748B; margin: 4px 0 10px 0;">
+              Screen will automatically confirm once paid.
+            </p>
+            <button type="button" class="act-btn act-btn-download" style="margin: 0 auto;" onclick="TechnicianApp.manualCheckLinkPayment()">
+              🔄 Check Live Status Now
+            </button>
+          </div>
+
+          <div id="link-expired-state" class="timer-expired-alert" style="display: none;">
+            <p style="margin: 0 0 6px 0; font-size: 13px;">⚠️ <strong>Payment Link Expired (5 Minutes Over)!</strong></p>
+            <p style="margin: 0 0 10px 0; font-size: 11px;">The customer can no longer use this link. Click below to generate a new 5-minute link.</p>
+            <button type="button" class="act-btn act-btn-whatsapp" style="margin: 0 auto;" onclick="TechnicianApp.regeneratePaymentLink()">
+              🔄 Generate New Payment Link
+            </button>
+          </div>
+        </div>
+
+        <!-- Counter UPI QR Notice Panel -->
+        <div id="upi-counter-panel" class="cash-calc-panel" style="display: none; background: #F0FDF4; border: 1.5px solid #078866; text-align: center; padding: 12px; border-radius: 10px;">
+          <p style="margin: 0; font-size: 12px; color: #045D49; font-weight: 700;">
+            Show the Counter UPI QR Stand to customer. Once they scan & pay, click the button below to verify!
+          </p>
+        </div>
+      </div>
+
+      <div class="cart-bottom-actions">
+        <button type="button" class="btn-clear-cart" onclick="TechnicianApp.clearInPageCart()">Clear Bill</button>
+        <button type="button" class="primary-glow-action-btn" id="btn-submit-lab-booking" onclick="TechnicianApp.handleCheckoutClick()">
+          ✓ Generate Bill & Create Official PDF Invoice
+        </button>
+      </div>
+    </section>
+
+    <!-- 4. Previous Lab Bills (Date-to-Date Filter & Reports) -->
+    <section class="glass-panel-3d previous-bills-card animate-fade-in">
+      <div class="group-title-row" style="flex-wrap: wrap; gap: 10px;">
+        <h4>📑 Previous Lab Bills & Patient Reports</h4>
+        
+        <div class="date-filter-box">
+          <label style="font-size: 11px; font-weight: 700;">From:</label>
+          <input type="date" id="history-from-date" onchange="TechnicianApp.applyDateRangeFilter()">
+          <label style="font-size: 11px; font-weight: 700;">To:</label>
+          <input type="date" id="history-to-date" onchange="TechnicianApp.applyDateRangeFilter()">
+          
+          <button type="button" class="quick-filter-btn active" id="qf-today" onclick="TechnicianApp.setQuickDateFilter('today')">Today</button>
+          <button type="button" class="quick-filter-btn" id="qf-7days" onclick="TechnicianApp.setQuickDateFilter('7days')">7 Days</button>
+          <button type="button" class="quick-filter-btn" id="qf-month" onclick="TechnicianApp.setQuickDateFilter('month')">This Month</button>
+          <button type="button" class="quick-filter-btn" id="qf-all" onclick="TechnicianApp.setQuickDateFilter('all')">All</button>
+        </div>
+      </div>
+
+      <div id="previous-bills-container" class="previous-bills-list" style="margin-top: 12px;"></div>
+    </section>
 
   </main>
 
@@ -248,114 +308,449 @@
        MODALS
        ========================================================= -->
 
-  <!-- Modal 1: Technician Authentication (Techlab / Techhome) -->
-  <div id="tech-login-modal" class="sia-modal-overlay" style="display: none;">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header">
-        <div class="modal-title-wrap">
-          <span>🔒</span>
-          <h3>Technician Operations Login</h3>
+  <!-- Modal 1: Cash Collection Confirmation -->
+  <div id="cash-confirm-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop" style="text-align: center; padding: 24px;">
+      <div style="font-size: 40px; margin-bottom: 8px;">💵</div>
+      <h3 style="color: #045D49; margin: 0 0 10px 0;">Cash Collection Confirmation</h3>
+      <p style="font-size: 13px; color: #334155; margin: 0 0 16px 0; line-height: 1.5;">
+        Did you collect the cash <strong id="conf-cash-tendered" style="color: #045D49; font-size: 16px;">₹0</strong> from the patient?
+      </p>
+      <div style="background: #F8FAF9; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px; margin-bottom: 18px; font-size: 12px; text-align: left;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span>Bill Amount:</span><strong id="conf-grand-total">₹0</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span>Cash Tendered:</span><strong id="conf-cash-received">₹0</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; color: #047857; font-weight: 800;">
+          <span>Balance Given:</span><strong id="conf-change-return">₹0</strong>
         </div>
       </div>
-      <div class="sia-modal-body">
-        <p class="login-subtext">
-          Enter your admin-issued Staff ID (e.g. <code>TechlabRamesh</code> or <code>TechhomeSuresh</code>) and password[span_9](start_span)[span_9](end_span)[span_10](start_span)[span_10](end_span).
-        </p>
-
-        <form id="tech-login-form" onsubmit="TechnicianApp.handleLogin(event)">
-          <div class="form-field-unit">
-            <label>Technician ID</label>
-            <input type="text" id="tech-login-id" placeholder="Techlab... or Techhome..." required autocomplete="username">
-          </div>
-          <div class="form-field-unit">
-            <label>Password</label>
-            <input type="password" id="tech-login-pass" placeholder="Enter admin password" required autocomplete="current-password">
-          </div>
-
-          <button type="submit" class="primary-glow-action-btn" style="margin-top: 12px; width: 100%;">
-            Login to Operations Desk ➔
-          </button>
-        </form>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn-clear-cart" style="flex: 1;" onclick="TechnicianApp.closeModal('cash-confirm-modal')">Cancel</button>
+        <button type="button" class="primary-glow-action-btn" style="flex: 1.5;" onclick="TechnicianApp.confirmCashAndGenerateBill()">✓ Yes, Cash Collected</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal 2: Add New Customer -->
-  <div id="new-customer-modal" class="sia-modal-overlay" style="display: none;">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header">
-        <div class="modal-title-wrap">
-          <span>➕</span>
-          <h3>Register New Customer</h3>
-        </div>
-        <button type="button" class="sia-close-btn" onclick="TechnicianApp.closeModal('new-customer-modal')">✕</button>
+  <!-- Modal 2: Counter UPI QR Confirmation -->
+  <div id="upi-confirm-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop" style="text-align: center; padding: 24px;">
+      <div style="font-size: 40px; margin-bottom: 8px;">⚡</div>
+      <h3 style="color: #045D49; margin: 0 0 10px 0;">Counter UPI QR Confirmation</h3>
+      <p style="font-size: 13px; color: #334155; margin: 0 0 16px 0; line-height: 1.5;">
+        Did the customer pay <strong id="conf-upi-grand-total" style="color: #045D49; font-size: 16px;">₹0</strong> via Counter QR (GPay / PhonePe / Paytm)?
+      </p>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn-clear-cart" style="flex: 1;" onclick="TechnicianApp.closeModal('upi-confirm-modal')">Cancel</button>
+        <button type="button" class="primary-glow-action-btn" style="flex: 1.5;" onclick="TechnicianApp.confirmUpiAndGenerateBill()">✓ Yes, Paid Successfully</button>
       </div>
-      <div class="sia-modal-body">
-        <form id="new-customer-form" onsubmit="TechnicianApp.handleSaveNewCustomer(event)">
-          <div class="form-field-unit">
-            <label>Mobile Number (10 Digits)</label>
-            <input type="tel" id="new-cust-phone" maxlength="10" placeholder="10-digit mobile number" required>
-          </div>
-          <div class="form-field-unit">
-            <label>Customer Full Name</label>
-            <input type="text" id="new-cust-name" placeholder="Full name" required>
-          </div>
-          <div class="customer-extra-grid">
-            <div class="form-field-unit">
-              <label>Age</label>
-              <input type="number" id="new-cust-age" placeholder="Age" min="1" max="120" required>
+    </div>
+  </div>
+
+  <!-- Modal 3: Official Laboratory Invoice -->
+  <div id="bill-receipt-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content receipt-modal-wrap animate-3d-pop">
+      <div class="receipt-top-actions no-print">
+        <button type="button" class="act-btn act-btn-whatsapp" onclick="TechnicianApp.shareInvoicePDFOnWhatsApp()">
+          💬 Share PDF on WhatsApp
+        </button>
+        <button type="button" class="act-btn act-btn-download" onclick="TechnicianApp.downloadInvoicePDF()">
+          📥 Download PDF
+        </button>
+        <button type="button" class="act-btn act-btn-print" onclick="window.print()">
+          🖨️ Print (A4)
+        </button>
+        <button type="button" class="act-btn act-btn-close" onclick="TechnicianApp.closeModal('bill-receipt-modal')">✕</button>
+      </div>
+
+      <div class="invoice-sheet" id="printable-receipt-card">
+        <svg class="top-right-decor-curve" viewBox="0 0 180 75" fill="none">
+          <path d="M0 0H180V75C150 45 100 15 0 0Z" fill="#078866" fill-opacity="0.85"/>
+          <path d="M60 0H180V45C160 20 120 5 60 0Z" fill="#E4005A" fill-opacity="0.85"/>
+        </svg>
+
+        <div class="inv-header-row">
+          <div class="inv-brand-box">
+            <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="inv-main-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none;">
+              <h1 style="color: #045D49; font-size: 22px; font-weight: 900; margin: 0;">SELFCARE <span style="color:#E4005A;">DIAGNOSTICS</span></h1>
             </div>
-            <div class="form-field-unit">
-              <label>Gender</label>
-              <select id="new-cust-gender">
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
+          </div>
+          <div class="inv-branch-meta">
+            <div>📍 Masjid Street, 4th Main Road, Mahatma Gandhi Nagar,</div>
+            <div>Vettuvankeni, ECR, Chennai - 600115</div>
+            <div style="margin-top: 3px;">📞 <strong>+91 7010174890</strong> | <strong style="color: #078866;">✓ GSTIN: Verified</strong></div>
+          </div>
+        </div>
+
+        <div class="inv-title-banner">
+          <div class="inv-title-left">
+            <div class="flask-circle">🧪</div>
+            <div>
+              <h2>LABORATORY INVOICE</h2>
+              <p>Diagnostic Laboratory Services</p>
             </div>
           </div>
-          <div class="form-field-unit">
-            <label>Address / Area</label>
-            <input type="text" id="new-cust-address" placeholder="Door No, Street, Chennai Area">
+          <div class="inv-badge-pill">
+            <div class="badge-col">
+              <span>Invoice No.</span>
+              <strong id="rec-bill-id">SCDLAB000000</strong>
+            </div>
+            <div class="badge-col" style="border-left: 1px solid rgba(7, 136, 102, 0.2); padding-left: 14px;">
+              <span>Invoice Date & Time</span>
+              <strong id="rec-bill-datetime">Today</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="inv-info-grid">
+          <div class="inv-info-box">
+            <div class="box-header-strip"><span>👤</span> Patient Details</div>
+            <table class="box-details-table">
+              <tr><td>Name</td><td>:</td><td id="rec-patient-name">MOHAMED ADAMKANI A</td></tr>
+              <tr><td>Age / Gender</td><td>:</td><td id="rec-patient-age-gender">27 Years / Male</td></tr>
+              <tr><td>Mobile No.</td><td>:</td><td id="rec-patient-mobile">+91 7010174890</td></tr>
+              <tr><td>Ref. Doctor</td><td>:</td><td id="rec-referring-doctor">Self / Walk-In</td></tr>
+            </table>
           </div>
 
-          <button type="submit" class="primary-glow-action-btn" style="margin-top: 10px; width: 100%;">
-            Save Customer & Select ✓
-          </button>
-        </form>
+          <div class="inv-info-box">
+            <div class="box-header-strip"><span>🗓️</span> Visit Details</div>
+            <table class="box-details-table">
+              <tr><td>Visit Type</td><td>:</td><td id="rec-visit-type">Lab Counter</td></tr>
+              <tr><td>Sample ID</td><td>:</td><td id="rec-sample-id">SC261109001</td></tr>
+              <tr><td>Report TAT</td><td>:</td><td id="rec-report-tat">Within 6–12 Hours</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <table class="inv-items-table">
+          <thead>
+            <tr>
+              <th style="width: 32px; text-align: center;">#</th>
+              <th>Test / Package Description</th>
+              <th style="width: 100px; text-align: center;">Sample</th>
+              <th style="width: 110px; text-align: center;">Report Time</th>
+              <th style="width: 90px; text-align: right;">Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody id="rec-items-tbody"></tbody>
+        </table>
+
+        <div class="inv-bottom-section">
+          <div class="inv-note-box">
+            <div class="inv-note-title"><span>🧪</span> Note:</div>
+            <ul>
+              <li>Certified NABL accredited clinical pathology analyzers used.</li>
+              <li>Digital verified reports delivered to registered WhatsApp & App within 6–12 hours.</li>
+            </ul>
+          </div>
+
+          <div class="inv-totals-box">
+            <div class="inv-tot-row"><span>Subtotal (MRP)</span><span>:</span><strong id="rec-total-mrp">₹0</strong></div>
+            <div class="inv-tot-row" id="rec-discount-row"><span>Discount</span><span>:</span><strong style="color: #E11D48;" id="rec-total-discount">- ₹0</strong></div>
+            <div class="inv-tot-row"><span>Sample Collection</span><span>:</span><strong style="color: #047857;">₹0 (Lab Counter)</strong></div>
+            <div class="inv-grand-pill"><span>TOTAL AMOUNT PAID</span><span id="rec-grand-paid">₹0</span></div>
+          </div>
+        </div>
+
+        <div class="inv-pay-strip">
+          <div style="display: flex; align-items: center; gap: 8px;"><span>💳</span><strong>Payment Information</strong></div>
+          <div>Payment Mode : <strong id="rec-payment-mode-text">CASH</strong></div>
+          <div>Payment Status : <span class="pay-status-tag" id="rec-payment-status-badge">PAID</span></div>
+        </div>
+
+        <div class="inv-footer-msg">
+          <div class="inv-footer-line"></div>
+          <div class="inv-footer-pill"><span style="color: #E4005A;">❤️</span> Thank you for choosing Selfcare Diagnostics!</div>
+          <div class="inv-footer-line"></div>
+        </div>
+
+        <svg class="bottom-decor-curve" viewBox="0 0 800 24" fill="none">
+          <path d="M0 12C200 24 600 0 800 12V24H0V12Z" fill="#078866" fill-opacity="0.85"/>
+          <path d="M0 18C300 24 500 10 800 18V24H0V18Z" fill="#E4005A" fill-opacity="0.85"/>
+        </svg>
       </div>
     </div>
   </div>
 
-  <!-- Modal 3: Call ILD Hub Handover Directory -->
-  <div id="ild-directory-modal" class="sia-modal-overlay" style="display: none;">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header">
-        <div class="modal-title-wrap">
-          <span>📞</span>
-          <h3>Area-wise ILD Hub Handover Directory</h3>
+  <!-- Modal 4: UPDATE LAB REPORTS (Strict Billed Items Only) -->
+  <div id="update-report-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop" style="max-width: 520px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #E2E8F0; padding-bottom: 10px; margin-bottom: 14px;">
+        <div>
+          <h3 style="color: #045D49; margin: 0; font-size: 17px; display: flex; align-items: center; gap: 6px;">
+            <span>📝</span> Update Diagnostic Report
+          </h3>
+          <span id="rep-modal-patient-subtitle" style="font-size: 11px; color: #64748B;">Patient: Mohamed Adamkani • SCDLAB123456</span>
         </div>
-        <button type="button" class="sia-close-btn" onclick="TechnicianApp.closeModal('ild-directory-modal')">✕</button>
+        <button type="button" class="act-btn-close" onclick="TechnicianApp.closeModal('update-report-modal')">✕</button>
       </div>
-      <div class="sia-modal-body">
-        <p class="ild-desc">
-          Enquire and coordinate with the nearest Internal Logistics Delivery (ILD) coordinator to handover collected blood and urine vacutainers:
-        </p>
 
-        <div class="ild-contacts-stack" id="ild-contacts-list">
-          <!-- Populated dynamically via technician.js -->
+      <div id="rep-detected-banner" style="background: #F0FDF8; border: 1px solid #A7F3D0; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 11px; color: #045D49; font-weight: 700;">
+        ⚡ Billed Tests: <span id="rep-detected-list">Evaluating...</span>
+      </div>
+
+      <form id="lab-report-entry-form" onsubmit="event.preventDefault(); TechnicianApp.saveReportData();">
+        
+        <!-- FBS -->
+        <div id="field-group-fbs" class="report-input-card" style="display: none;">
+          <div class="rep-card-header">
+            <label>🩸 Fasting Blood Sugar (FBS)</label>
+            <span class="rep-ref-tag">Ref: 70 – 99 mg/dL</span>
+          </div>
+          <div class="rep-input-row">
+            <input type="number" step="0.1" id="rep-input-fbs" placeholder="e.g. 95">
+            <span class="rep-unit-label">mg/dL</span>
+          </div>
         </div>
+
+        <!-- PPBS -->
+        <div id="field-group-ppbs" class="report-input-card" style="display: none;">
+          <div class="rep-card-header">
+            <label>🍽️ Post Prandial Blood Sugar (PPBS)</label>
+            <span class="rep-ref-tag">Ref: &lt; 140 mg/dL</span>
+          </div>
+          <div class="rep-input-row">
+            <input type="number" step="0.1" id="rep-input-ppbs" placeholder="e.g. 130">
+            <span class="rep-unit-label">mg/dL</span>
+          </div>
+        </div>
+
+        <!-- RBS -->
+        <div id="field-group-rbs" class="report-input-card" style="display: none;">
+          <div class="rep-card-header">
+            <label>⏱️ Random Blood Sugar (RBS)</label>
+            <span class="rep-ref-tag">Ref: 70 – 140 mg/dL</span>
+          </div>
+          <div class="rep-input-row">
+            <input type="number" step="0.1" id="rep-input-rbs" placeholder="e.g. 110">
+            <span class="rep-unit-label">mg/dL</span>
+          </div>
+        </div>
+
+        <!-- BP -->
+        <div id="field-group-bp" class="report-input-card" style="display: none;">
+          <div class="rep-card-header">
+            <label>❤️ Blood Pressure (BP)</label>
+            <span class="rep-ref-tag">Ref: 120 / 80 mmHg</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="rep-input-row">
+              <input type="number" id="rep-input-bp-sys" placeholder="Systolic (120)">
+              <span class="rep-unit-label">mmHg</span>
+            </div>
+            <div class="rep-input-row">
+              <input type="number" id="rep-input-bp-dia" placeholder="Diastolic (80)">
+              <span class="rep-unit-label">mmHg</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Height / Weight / Auto BMI -->
+        <div id="field-group-vitals" class="report-input-card" style="display: none;">
+          <div class="rep-card-header">
+            <label>⚖️ Body Vitals & BMI</label>
+            <span class="rep-ref-tag">BMI Ref: 18.5 – 24.9 kg/m²</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+            <div class="rep-input-row">
+              <input type="number" step="0.1" id="rep-input-height" placeholder="Height" oninput="TechnicianApp.calculateBmiRealtime()">
+              <span class="rep-unit-label">cm</span>
+            </div>
+            <div class="rep-input-row">
+              <input type="number" step="0.1" id="rep-input-weight" placeholder="Weight" oninput="TechnicianApp.calculateBmiRealtime()">
+              <span class="rep-unit-label">kg</span>
+            </div>
+          </div>
+          
+          <div class="bmi-live-strip">
+            <span>Auto-Calculated BMI:</span>
+            <div>
+              <strong id="disp-calc-bmi">--</strong>
+              <span id="disp-calc-bmi-status" class="bmi-badge-normal">Enter H & W</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 16px;">
+          <button type="button" class="btn-clear-cart" style="flex: 1;" onclick="TechnicianApp.closeModal('update-report-modal')">Cancel</button>
+          <button type="submit" class="primary-glow-action-btn" style="flex: 2;">💾 Save & Verify Report</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 5: POST-SAVE ACTIONS (Download PDF or Send WhatsApp) -->
+  <div id="report-post-save-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop" style="max-width: 420px; text-align: center; padding: 24px;">
+      <div style="width: 58px; height: 58px; background: #E2F3ED; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; font-size: 28px;">
+        ✅
+      </div>
+      <h3 style="color: #045D49; margin: 0 0 6px 0; font-size: 19px;">Report Saved & Verified!</h3>
+      <p style="font-size: 12px; color: #475569; margin: 0 0 16px 0;">
+        Results have been stored to database. Choose an action below:
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" class="act-btn act-btn-whatsapp" style="justify-content: center; padding: 12px;" onclick="TechnicianApp.shareReportViaPostSaveWhatsapp()">
+          💬 Send Report to Customer WhatsApp
+        </button>
+        <button type="button" class="act-btn act-btn-download" style="justify-content: center; padding: 12px;" onclick="TechnicianApp.downloadCurrentReportPDF()">
+          📥 Download Official Lab Report PDF
+        </button>
+        <button type="button" class="btn-view-receipt-mini" style="padding: 10px;" onclick="TechnicianApp.previewSavedReport()">
+          👁️ Preview Full Report
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- Core JavaScript Architecture -->
+  <!-- Modal 6: OFFICIAL LAB REPORT SHEET (Invoice Exact Model + Corner QR) -->
+  <div id="report-view-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content receipt-modal-wrap animate-3d-pop" style="max-width: 860px;">
+      <div class="receipt-top-actions no-print">
+        <button type="button" class="act-btn act-btn-whatsapp" onclick="TechnicianApp.shareCurrentReportWhatsApp()">
+          💬 Share Report on WhatsApp
+        </button>
+        <button type="button" class="act-btn act-btn-download" onclick="TechnicianApp.downloadCurrentReportPDF()">
+          📥 Download Report PDF
+        </button>
+        <button type="button" class="act-btn act-btn-print" onclick="window.print()">
+          🖨️ Print Report (A4)
+        </button>
+        <button type="button" class="act-btn act-btn-close" onclick="TechnicianApp.closeModal('report-view-modal')">✕</button>
+      </div>
+
+      <div class="invoice-sheet" id="printable-report-sheet">
+        <svg class="top-right-decor-curve" viewBox="0 0 180 75" fill="none">
+          <path d="M0 0H180V75C150 45 100 15 0 0Z" fill="#078866" fill-opacity="0.85"/>
+          <path d="M60 0H180V45C160 20 120 5 60 0Z" fill="#E4005A" fill-opacity="0.85"/>
+        </svg>
+
+        <div class="inv-header-row">
+          <div class="inv-brand-box">
+            <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="inv-main-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none;">
+              <h1 style="color: #045D49; font-size: 22px; font-weight: 900; margin: 0;">SELFCARE <span style="color:#E4005A;">DIAGNOSTICS</span></h1>
+            </div>
+            <span style="font-size: 10px; color: #047857; font-weight: 800; letter-spacing: 0.4px; margin-top: 2px;">
+              CLINICAL PATHOLOGY LABORATORY • NABL QUALITY PROTOCOL
+            </span>
+          </div>
+          <div class="inv-branch-meta">
+            <div>📍 Masjid Street, 4th Main Road, Mahatma Gandhi Nagar,</div>
+            <div>Vettuvankeni, ECR, Chennai - 600115</div>
+            <div style="margin-top: 3px;">📞 <strong>+91 7010174890</strong> | <strong style="color: #078866;">✓ Certified Lab Desk</strong></div>
+          </div>
+        </div>
+
+        <div class="inv-title-banner" style="position: relative;">
+          <div class="inv-title-left">
+            <div class="flask-circle" style="background: #045D49;">🔬</div>
+            <div>
+              <h2>CLINICAL PATHOLOGY TEST REPORT</h2>
+              <p>Verified Diagnostic Examination Record</p>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <!-- Corner Direct Download QR Code -->
+            <div class="report-qr-corner-box" title="Scan to Download Report & Invoice Directly">
+              <img id="rep-corner-qr-img" src="" alt="Direct Download QR" style="width: 64px; height: 64px; border-radius: 4px; display: block;">
+              <span>Scan to Download</span>
+            </div>
+
+            <div class="inv-badge-pill">
+              <div class="badge-col">
+                <span>Report / Bill ID</span>
+                <strong id="rep-sheet-bill-id">SCDLAB000000</strong>
+              </div>
+              <div class="badge-col" style="border-left: 1px solid rgba(7, 136, 102, 0.2); padding-left: 12px;">
+                <span>Reported Date</span>
+                <strong id="rep-sheet-datetime">Today</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="inv-info-grid">
+          <div class="inv-info-box">
+            <div class="box-header-strip"><span>👤</span> Patient Details</div>
+            <table class="box-details-table">
+              <tr><td>Name</td><td>:</td><td id="rep-patient-name">MOHAMED ADAMKANI A</td></tr>
+              <tr><td>Age / Gender</td><td>:</td><td id="rep-patient-age-gender">27 Years / Male</td></tr>
+              <tr><td>Mobile No.</td><td>:</td><td id="rep-patient-mobile">+91 7010174890</td></tr>
+              <tr><td>Ref. Doctor</td><td>:</td><td id="rep-referring-doctor">Self / Walk-In</td></tr>
+            </table>
+          </div>
+
+          <div class="inv-info-box">
+            <div class="box-header-strip"><span>🗓️</span> Sample & Clinical Info</div>
+            <table class="box-details-table">
+              <tr><td>Sample ID</td><td>:</td><td id="rep-sample-id">SC261109001</td></tr>
+              <tr><td>Collection Date</td><td>:</td><td id="rep-collection-date">Today</td></tr>
+              <tr><td>Sample Type</td><td>:</td><td>Venous Blood / Physical</td></tr>
+              <tr><td>Report Status</td><td>:</td><td><strong style="color: #047857;">VERIFIED & CERTIFIED</strong></td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- Clinical Findings Table -->
+        <table class="inv-items-table" style="margin-bottom: 16px;">
+          <thead>
+            <tr>
+              <th style="width: 32px; text-align: center;">#</th>
+              <th>Investigation / Parameter</th>
+              <th style="width: 110px; text-align: center;">Observed Value</th>
+              <th style="width: 90px; text-align: center;">Units</th>
+              <th style="width: 140px; text-align: center;">Biological Ref. Interval</th>
+              <th style="width: 100px; text-align: center;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="rep-findings-tbody"></tbody>
+        </table>
+
+        <div class="inv-bottom-section" style="margin-top: 10px;">
+          <div class="inv-note-box">
+            <div class="inv-note-title"><span>💡</span> Clinical Interpretation & Guidance:</div>
+            <ul style="font-size: 10px; line-height: 1.5; color: #334155; margin: 0; padding-left: 16px;">
+              <li>Test performed on calibrated, NABL quality standard clinical analyzers.</li>
+              <li>Direct digital verification link embedded in top corner QR code.</li>
+              <li>Correlate findings clinically with your consulting medical practitioner.</li>
+            </ul>
+          </div>
+
+          <div style="background: #F8FAF9; border: 1px solid #CBD5E1; border-radius: 10px; padding: 10px 14px; text-align: right; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;">
+            <div style="font-family: 'Brush Script MT', cursive; font-size: 18px; color: #045D49; margin-bottom: 2px;">Dr. Kathar M.D.</div>
+            <strong style="font-size: 11px; color: #0F172A;">CONSULTANT PATHOLOGIST</strong>
+            <span style="font-size: 9.5px; color: #64748B;">Selfcare Diagnostics Lab Network</span>
+          </div>
+        </div>
+
+        <div class="inv-footer-msg" style="margin-top: 16px;">
+          <div class="inv-footer-line"></div>
+          <div class="inv-footer-pill"><span style="color: #E4005A;">❤️</span> Official Verified Laboratory Report • Selfcare Diagnostics</div>
+          <div class="inv-footer-line"></div>
+        </div>
+
+        <svg class="bottom-decor-curve" viewBox="0 0 800 24" fill="none">
+          <path d="M0 12C200 24 600 0 800 12V24H0V12Z" fill="#078866" fill-opacity="0.85"/>
+          <path d="M0 18C300 24 500 10 800 18V24H0V18Z" fill="#E4005A" fill-opacity="0.85"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core Scripts -->
   <script src="assets/js/config.js?v=8.2.0"></script>
   <script src="assets/js/utils.js?v=12.0.0"></script>
-  <script src="assets/js/api.js?v=5.1.0"></script>
+  <script src="assets/js/api.js?v=6.6.0"></script>
   <script src="assets/js/offline-db.js?v=5.0.0"></script>
   <script src="assets/js/offline-sync.js?v=5.0.0"></script>
-  <script src="assets/js/auth.js?v=3.4.0"></script>
-  <script src="assets/js/technician.js?v=1.0.0"></script>
+  <script src="assets/js/auth.js?v=3.7.0"></script>
+  <script src="assets/js/technician.js?v=3.8.0"></script>
 </body>
 </html>
