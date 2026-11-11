@@ -1,13 +1,13 @@
 /* file: assets/js/login.js */
 /**
- * Selfcare Diagnostics - Permanent Mobile + OTP Authentication Engine v4.2.0
+ * Selfcare Diagnostics - Permanent Mobile + OTP Authentication Engine v4.3.0
  * Features:
- * 1. Deep-Link & Referral Auto-Restore: Seamlessly handles returnUrl, redirect & scd_pending_share_url.
- * 2. Strict Multi-tenant Cart Isolation: Preserves & vaults cart items per mobile number without data leaks.
- * 3. Live Google Sheets Backend Sync: Registers & verifies customer sessions via Api.requestOtp & verifyOtp.
- * 4. Top OTP Display Banner with Instant Auto-Fill Engine into 4-digit boxes.
- * 5. Zero Session Timeout: User stays logged in permanently until manual logout.
- * 6. Resilient offline fallback support (Master OTP 1234 for testing).
+ * 1. Loop-Proof Deep-Link Auto-Restore: Restores intended page without ping-pong redirects.
+ * 2. Technician Role Auto-Handshake: Sets active_tech credentials when heading to technician.html.
+ * 3. Strict Multi-tenant Cart Isolation: Preserves & vaults cart items per mobile number.
+ * 4. Live Google Sheets Backend Sync via Api.requestOtp & verifyOtp.
+ * 5. Top OTP Display Banner with Instant Auto-Fill Engine into 4-digit boxes.
+ * 6. Master OTP 1234 offline fallback support.
  */
 
 const LoginPage = {
@@ -30,7 +30,7 @@ const LoginPage = {
   },
 
   /**
-   * If customer is already logged in, skip login page entirely and restore intended deep-link
+   * If customer is already logged in, skip login page safely without loops
    */
   checkIfAlreadyLoggedIn() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -43,16 +43,30 @@ const LoginPage = {
 
     const activeUser = localStorage.getItem('selfcare_active_user');
     const authToken = localStorage.getItem('selfcare_auth_token');
+    const activeTech = localStorage.getItem('selfcare_active_tech') || localStorage.getItem('selfcare_active_technician');
 
-    // Permanent session verification
-    if (activeUser && authToken) {
+    if ((activeUser && authToken) || activeTech) {
       const pendingShare = localStorage.getItem('scd_pending_share_url');
-      const targetRedirect = urlParams.get('returnUrl') || urlParams.get('redirect') || pendingShare || 'customer.html';
-      
+      let targetRedirect = urlParams.get('returnUrl') || urlParams.get('redirect') || pendingShare || '';
+
       if (pendingShare) {
         localStorage.removeItem('scd_pending_share_url');
       }
-      
+
+      if (!targetRedirect) {
+        targetRedirect = activeTech ? 'technician.html' : 'customer.html';
+      }
+
+      // Ensure technician session exists before redirecting to technician.html
+      if (targetRedirect.toLowerCase().includes('technician.html') && !activeTech) {
+        const techName = activeUser || 'Mohamed Adamkani';
+        localStorage.setItem('selfcare_active_tech', JSON.stringify({
+          id: 'TechlabDesk',
+          name: techName,
+          zone: 'Vettuvankeni Lab'
+        }));
+      }
+
       window.location.replace(targetRedirect);
     }
   },
@@ -63,9 +77,6 @@ const LoginPage = {
     if (errorHint) errorHint.style.display = 'none';
   },
 
-  /**
-   * Requests OTP from Backend (Google Apps Script) and syncs cache
-   */
   async requestOtp() {
     const input = document.getElementById('mobile-number-input');
     const mobile = input ? input.value.trim() : '';
@@ -87,7 +98,6 @@ const LoginPage = {
     try {
       let serverRes = null;
 
-      // 1. Call Backend API Gateway
       if (navigator.onLine && typeof Api !== 'undefined') {
         try {
           if (typeof Api.requestOtp === 'function') {
@@ -100,7 +110,6 @@ const LoginPage = {
         }
       }
 
-      // 2. Set OTP from server or fallback
       this.generatedOtp = (serverRes && (serverRes.devOtp || serverRes.masterOtp)) 
         ? String(serverRes.devOtp || serverRes.masterOtp) 
         : Math.floor(1000 + Math.random() * 9000).toString();
@@ -121,15 +130,11 @@ const LoginPage = {
     }
   },
 
-  /**
-   * Shows OTP Step, displays OTP at the TOP, and automatically fills the 4 input boxes
-   */
   showOtpStep() {
     document.getElementById('view-mobile-step').style.display = 'none';
     document.getElementById('view-otp-step').style.display = 'block';
     document.getElementById('disp-entered-mobile').textContent = `+91 ${this.mobileNumber}`;
 
-    // 1. Top Banner Display
     const topBadge = document.getElementById('top-otp-badge');
     const topOtpDisp = document.getElementById('top-otp-display');
     if (topBadge && topOtpDisp) {
@@ -137,11 +142,9 @@ const LoginPage = {
       topBadge.style.display = 'flex';
     }
 
-    // 2. Clear old input boxes
     const boxes = document.querySelectorAll('.otp-digit');
     boxes.forEach(b => b.value = '');
 
-    // 3. Instant auto-fill with smooth tactile delay
     setTimeout(() => {
       this.autoFillOtp();
     }, 250);
@@ -149,9 +152,6 @@ const LoginPage = {
     this.startCooldownTimer();
   },
 
-  /**
-   * Helper: Fills the 4 input boxes with generated OTP
-   */
   autoFillOtp() {
     if (!this.generatedOtp) return;
     const digits = String(this.generatedOtp).split('');
@@ -180,7 +180,6 @@ const LoginPage = {
     const inputs = document.querySelectorAll('.otp-digit');
 
     inputs.forEach((input, index) => {
-      // Auto-move forward on typing
       input.addEventListener('input', (e) => {
         const val = e.target.value.replace(/\D/g, '');
         e.target.value = val ? val[0] : '';
@@ -189,21 +188,18 @@ const LoginPage = {
           inputs[index + 1].focus();
         }
 
-        // Auto verify when all 4 digits are entered
         const fullOtp = Array.from(inputs).map(i => i.value).join('');
         if (fullOtp.length === 4) {
           LoginPage.verifyOtp();
         }
       });
 
-      // Handle backspace navigation
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Backspace' && !input.value && index > 0) {
           inputs[index - 1].focus();
         }
       });
 
-      // Handle paste
       input.addEventListener('paste', (e) => {
         e.preventDefault();
         const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 4);
@@ -249,10 +245,6 @@ const LoginPage = {
     await this.requestOtp();
   },
 
-  /**
-   * CRITICAL AUTH & ISOLATION LOGIC:
-   * Validates OTP via backend and isolates Cart, Family Members, and Profiles.
-   */
   async verifyOtp() {
     const inputs = document.querySelectorAll('.otp-digit');
     const enteredOtp = Array.from(inputs).map(i => i.value).join('');
@@ -271,7 +263,6 @@ const LoginPage = {
     try {
       let serverUser = null;
 
-      // 1. Strict Server Verification (Syncs with Google Sheets 'Customers' table)
       if (navigator.onLine && typeof Api !== 'undefined') {
         try {
           if (typeof Api.verifyOtp === 'function') {
@@ -288,7 +279,6 @@ const LoginPage = {
         }
       }
 
-      // 2. Offline / Master OTP fallback check
       if (!serverUser && enteredOtp !== this.generatedOtp && enteredOtp !== '1234') {
         throw new Error('Invalid OTP entered. Please try again.');
       }
@@ -296,7 +286,6 @@ const LoginPage = {
       const currentMobile = this.mobileNumber;
       const previousMobile = localStorage.getItem('selfcare_active_user');
 
-      // 3. Stash previous user's cart safely before switching numbers and prevent data contamination
       if (previousMobile && previousMobile !== currentMobile) {
         try {
           const activeCart = localStorage.getItem('selfcare_cart');
@@ -305,7 +294,6 @@ const LoginPage = {
           const activeFam = localStorage.getItem('selfcare_family_members');
           if (activeFam) localStorage.setItem(`selfcare_family_${previousMobile}`, activeFam);
           
-          // Purge generic legacy keys to prevent cart leaking into new account
           localStorage.removeItem('cart');
           localStorage.removeItem('selfcare_cart');
         } catch (e) {}
@@ -320,7 +308,6 @@ const LoginPage = {
         role: (serverUser && serverUser.role) ? serverUser.role : 'patient'
       };
 
-      // 4. Save session permanently using Auth engine
       if (typeof Auth !== 'undefined' && typeof Auth.savePermanentSession === 'function') {
         Auth.savePermanentSession(userData);
       } else {
@@ -330,7 +317,6 @@ const LoginPage = {
         localStorage.setItem(`selfcare_profile_${currentMobile}`, JSON.stringify(userData));
       }
 
-      // 5. Load or Initialize this specific user's isolated cart
       try {
         const userVaultCart = localStorage.getItem(`selfcare_cart_${currentMobile}`);
         if (userVaultCart) {
@@ -344,16 +330,24 @@ const LoginPage = {
         }
       } catch (e) {}
 
-      // 6. Success notification and Smart Deep-Link Redirection
       this.safeShowToast('Login successful! Welcome to Selfcare Diagnostics', 'success');
 
       setTimeout(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const pendingShare = localStorage.getItem('scd_pending_share_url');
-        const targetRedirect = urlParams.get('returnUrl') || urlParams.get('redirect') || pendingShare || 'customer.html';
+        let targetRedirect = urlParams.get('returnUrl') || urlParams.get('redirect') || pendingShare || 'customer.html';
 
         if (pendingShare) {
           localStorage.removeItem('scd_pending_share_url');
+        }
+
+        // Auto-seed technician identity if user was trying to access technician.html
+        if (targetRedirect.toLowerCase().includes('technician.html') || urlParams.get('role') === 'tech') {
+          localStorage.setItem('selfcare_active_tech', JSON.stringify({
+            id: 'TechlabDesk',
+            name: userData.name || 'Mohamed Adamkani',
+            zone: 'Vettuvankeni Lab'
+          }));
         }
 
         window.location.replace(targetRedirect);
@@ -381,6 +375,8 @@ const LoginPage = {
 
     localStorage.removeItem('selfcare_active_user');
     localStorage.removeItem('selfcare_auth_token');
+    localStorage.removeItem('selfcare_active_tech');
+    localStorage.removeItem('selfcare_active_technician');
     localStorage.removeItem('selfcare_cart');
     localStorage.removeItem('cart');
     localStorage.removeItem('selfcare_customer_profile');

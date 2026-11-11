@@ -1,6 +1,6 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v15.6.0
+ * Selfcare Diagnostics - My Account Controller v15.7.0
  * Features:
  * - Dynamic VIP Crown Engine
  * - Cloud Sync for Profile & Family Vault
@@ -713,11 +713,6 @@ const ProfilePage = {
   openReviewModal() {
     this.triggerHaptic();
     this.openModal('modal-review');
-  },
-
-  openGeneralInfoModal() {
-    this.triggerHaptic();
-    this.openModal('modal-general-info');
   },
 
   handleLogout() {

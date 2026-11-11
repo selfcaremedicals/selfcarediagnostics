@@ -1,13 +1,11 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - API Gateway v6.5.1 (Referral & Emergency Blood Cloud Edition)
+ * Selfcare Diagnostics - API Gateway v6.6.0 (Clinical Report & Verification Edition)
  * Updates:
- * - High-speed In-Memory TTL Response Caching for Instant UI updates (Zero GAS delay)
- * - Automatic cache invalidation on write/update mutations (VIP, Bookings, Referrals & Blood SOS)
- * - Fixed Cold-Start Timeout: Referral verification increased to 35s (Prevents 'Failed to fetch' error)
- * - Dedicated endpoints for Referral & Reward Engine (validateReferralCode, getReferralData, claimReferralReward)
- * - Dedicated endpoints for Emergency Blood Connect (getBloodData, saveBloodRequest, updateBloodRequest, registerBloodDonor)
- * - Concurrent In-Flight request deduplication
+ * - Added updateReport endpoint for diagnostic laboratory findings & vitals
+ * - Added getBookingReport endpoint for retrieving verified reports
+ * - High-speed In-Memory TTL Response Caching for Instant UI updates
+ * - Dedicated endpoints for Referral, VIP, Blood SOS, and Razorpay
  */
 
 const Api = {
@@ -42,6 +40,7 @@ const Api = {
       'getAdminPackages',
       'getAllBookings',
       'getPaymentStatus',
+      'getBookingReport',
       'aiSearch'
     ];
 
@@ -49,7 +48,6 @@ const Api = {
       return 8500;
     }
 
-    // Extended 35-second threshold to allow Google Apps Script cold start without throwing 'Failed to fetch'
     if (action === 'validateReferralCode' || action === 'claimReferralReward' || action === 'getReferralData') {
       return 35000;
     }
@@ -58,7 +56,7 @@ const Api = {
       return 90000;
     }
 
-    if (action === 'createRazorpayOrder' || action === 'verifyRazorpayPayment' || action === 'saveMembership') {
+    if (action === 'createRazorpayOrder' || action === 'verifyRazorpayPayment' || action === 'saveMembership' || action === 'updateReport') {
       return 30000;
     }
 
@@ -167,9 +165,22 @@ const Api = {
   },
 
   // ==========================================================
+  // CLINICAL LAB REPORTS ENGINE
+  // ==========================================================
+  async updateReport(payload) {
+    this.invalidateCache('getBookingsByPatient');
+    this.invalidateCache('getBookingDetails');
+    this.invalidateCache('getBookingReport');
+    return this.request('updateReport', payload, false);
+  },
+
+  async getBookingReport(bookingId, patientPhone) {
+    return this.request('getBookingReport', { bookingId, patientPhone }, false);
+  },
+
+  // ==========================================================
   // REFERRAL & REWARD ENGINE APIS
   // ==========================================================
-
   async validateReferralCode(code, mobile, amount) {
     return this.request('validateReferralCode', { code, mobile, amount }, false);
   },
@@ -186,7 +197,6 @@ const Api = {
   // ==========================================================
   // EMERGENCY BLOOD CONNECT CLOUD APIS
   // ==========================================================
-
   async getBloodData() {
     return this.request('getBloodData', {}, true);
   },
@@ -209,7 +219,6 @@ const Api = {
   // ==========================================================
   // AUTHENTICATION & PROFILE APIS
   // ==========================================================
-
   async requestOtp(mobile) {
     return this.request('requestOtp', { mobile }, false);
   },
@@ -234,7 +243,6 @@ const Api = {
   // ==========================================================
   // VIP MEMBERSHIP GATEWAY APIS
   // ==========================================================
-
   async saveMembership(membershipPayload) {
     this.invalidateCache('getProfile');
     this.invalidateCache('getFamilyMembers');
@@ -249,7 +257,6 @@ const Api = {
   // ==========================================================
   // FAMILY VAULT DIRECTORY APIS
   // ==========================================================
-
   async getFamilyMembers(primaryMobile) {
     return this.request('getFamilyMembers', {
       mobile: primaryMobile,
@@ -272,7 +279,6 @@ const Api = {
   // ==========================================================
   // CATALOGUE APIS
   // ==========================================================
-
   async getTests() {
     return this.request('getTests', {}, true);
   },
@@ -304,7 +310,6 @@ const Api = {
   // ==========================================================
   // PRESCRIPTION & OCR APIS
   // ==========================================================
-
   async uploadPrescription(payload) {
     return this.request('uploadPrescription', payload, false);
   },
@@ -328,7 +333,6 @@ const Api = {
   // ==========================================================
   // BOOKINGS & LIVE TRACKING APIS
   // ==========================================================
-
   async createBooking(bookingData) {
     this.invalidateCache('getBookingsByPatient');
     this.invalidateCache('getReferralData');
@@ -346,7 +350,6 @@ const Api = {
   // ==========================================================
   // PAYMENT STATUS CHECK
   // ==========================================================
-
   async getPaymentStatus(bookingId, paymentReference) {
     return this.request('getPaymentStatus', { bookingId, paymentReference }, false);
   },
@@ -354,7 +357,6 @@ const Api = {
   // ==========================================================
   // RAZORPAY ONLINE PAYMENT GATEWAY APIS
   // ==========================================================
-
   async createRazorpayOrder(orderPayload) {
     return this.request('createRazorpayOrder', orderPayload, false);
   },

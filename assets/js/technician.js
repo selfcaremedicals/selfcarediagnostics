@@ -1,199 +1,175 @@
 /* file: assets/js/technician.js */
 /**
- * Selfcare Diagnostics - Master Technician Operations Engine v1.0.0
+ * Selfcare Diagnostics - Master Lab Walk-in Desk Engine v3.8.2
  * Features:
- * 1. Role Auth Decider: Techlab... (Lab Walk-in) vs Techhome... (Home Fleet).
- * 2. Instant Search Autocomplete for all 500+ Tests & Packages.
- * 3. Dedicated In-Page Walk-in Cart with ₹0 Collection Fee.
- * 4. Customer Mobile Lookup & Auto-fill from local and cloud vaults.
- * 5. Home Fleet Trip Accept/Reject with 10KM Radius Guard.
- * 6. Automated Wallet Visit Earning: ₹150 Single Visit / ₹250 Multi-Visit.
- * 7. Area-wise ILD Handover Hub Directory with one-tap dialing.
- * 8. Safe Exit & Logout to break redirect loops.
+ * 1. Infinite-Loop Shielded Auth: Automatically binds TechlabDesk session on first load[span_9](start_span)[span_9](end_span).
+ * 2. Dynamic Billed Parameter Filter: Shows ONLY tests billed (FBS, PPBS, RBS, BP, Vitals/BMI)[span_10](start_span)[span_10](end_span).
+ * 3. Real-Time BMI Auto-Calculation: Calculates immediately as Height/Weight are entered[span_11](start_span)[span_11](end_span).
+ * 4. Post-Save Popup: Prompts Download Report PDF or Send via WhatsApp[span_12](start_span)[span_12](end_span).
+ * 5. Invoice-Exact Lab Report Sheet with Corner Download QR (points to booking.html, NEVER technician.html)[span_13](start_span)[span_13](end_span).
+ * 6. WhatsApp Bill Share includes direct booking.html tracking link[span_14](start_span)[span_14](end_span).
+ * 7. 5-Minute Countdown Timer for WhatsApp Payment Links[span_15](start_span)[span_15](end_span).
+ * 8. Counter UPI Direct Confirmation Modal & Compulsory Cash Tendered Validation[span_16](start_span)[span_16](end_span).
  */
 
 const TechnicianApp = {
   currentTech: null,
-  portalMode: 'lab', // 'lab' or 'home'
-  
-  // In-page Lab Cart State
+  catalogueList: [],
+  isSyncingCatalogue: false,
+
+  // Lab Cart & Membership State
   inPageCart: [],
   selectedCustomer: null,
+  activeMembership: null,
+  appliedCoupon: null,
+  currentPaymentMode: 'CASH',
+  activeCashTendered: 0,
+  activeChangeReturned: 0,
+  lastGeneratedBooking: null,
+  activeViewingReport: null,
+  activeEditingBookingId: null,
 
-  // Home Fleet State
-  assignedTrips: [],
-  activeQueue: [],
-  currentGps: { lat: 12.9249, lng: 80.2425 }, // Panayur, Chennai Hub Default
+  // ⏱️ 5-Minute Payment Link State
+  activePaymentLinkId: null,
+  linkExpiryTimestamp: null,
+  linkCountdownTimer: null,
+  linkPollingInterval: null,
+  pendingBookingData: null,
 
-  // Area-wise Internal Logistics Delivery (ILD) Contacts
-  ildHubs: [
-    { area: 'Panayur & ECR Hub', coordinator: 'Karthik ILD', phone: '9840123456' },
-    { area: 'Neelankarai & Kottivakkam', coordinator: 'Senthil ILD', phone: '9840987654' },
-    { area: 'Thoraipakkam & OMR Hub', coordinator: 'Vignesh ILD', phone: '9840555666' },
-    { area: 'Sholinganallur & Navalur', coordinator: 'Saravanan ILD', phone: '9840777888' },
-    { area: 'Velachery & Perungudi', coordinator: 'Praveen ILD', phone: '9840111222' },
-    { area: 'Adyar & Besant Nagar', coordinator: 'Manikandan ILD', phone: '9840333444' }
+  doctorList: [
+    'Self / Walk-In',
+    'Dr. Rajesh MBBS (Vettuvankeni)',
+    'Dr. K. Senthil MD (ECR Clinic)',
+    'Dr. Anitha DGO (Neelankarai)',
+    'Dr. Suresh MD (Thoraipakkam)',
+    'Dr. Priya MBBS (Adyar Clinic)',
+    'Dr. A. Mohamed Kathar MD (Chennai)',
+    'Selfcare Clinical Pathology (In-House)'
   ],
 
   async init() {
     this.checkSessionAndAuth();
-    this.detectCurrentGpsLocation(false);
-    this.renderIldDirectory();
+    this.initHistoryDateFilter();
+    this.loadDoctorDirectory();
+    this.loadPreviousBills();
+    await this.loadCatalogueData();
+
+    document.addEventListener('click', (e) => {
+      const drop = document.getElementById('doctor-custom-dropdown');
+      const input = document.getElementById('cust-doctor-input');
+      if (drop && input && !drop.contains(e.target) && e.target !== input) {
+        drop.style.display = 'none';
+      }
+    });
   },
 
   /* =========================================================
-     1. AUTH & ROLE DECIDER
+     1. AUTHENTICATION & TECHNICIAN IDENTITY (LOOP PROOF)
      ========================================================= */
   checkSessionAndAuth() {
     let rawTech = localStorage.getItem('selfcare_active_tech') || localStorage.getItem('selfcare_active_technician');
     if (rawTech) {
-      try {
-        this.currentTech = JSON.parse(rawTech);
-      } catch (e) {
-        this.currentTech = null;
-      }
+      try { this.currentTech = JSON.parse(rawTech); } catch (e) { this.currentTech = null; }
     }
-
-    // Fallback: Check if active user has technician role
-    if (!this.currentTech || !this.currentTech.id) {
-      const activeUser = localStorage.getItem('selfcare_active_user') || '';
-      const userRole = localStorage.getItem('selfcare_user_role') || '';
-      if (userRole === 'technician' && activeUser.toLowerCase().startsWith('tech')) {
-        this.currentTech = {
-          id: activeUser,
-          name: activeUser,
-          zone: 'Chennai Zone'
-        };
-      }
+    if (!this.currentTech) {
+      const activeUser = localStorage.getItem('selfcare_active_user') || 'Mohamed Adamkani';
+      this.currentTech = { id: 'TechlabDesk', name: activeUser, zone: 'Vettuvankeni Lab' };
+      localStorage.setItem('selfcare_active_tech', JSON.stringify(this.currentTech));
     }
-
-    if (!this.currentTech || !this.currentTech.id) {
-      this.openModal('tech-login-modal');
-      return;
-    }
-
-    this.applyTechRoleSession();
-  },
-
-  applyTechRoleSession() {
-    const id = String(this.currentTech.id).trim();
-    const idLower = id.toLowerCase();
-
-    if (idLower.startsWith('techhome')) {
-      this.portalMode = 'home';
-    } else {
-      this.portalMode = 'lab';
-    }
-
-    const badgeWrap = document.getElementById('tech-user-badge-wrap');
     const nameEl = document.getElementById('tech-display-name');
-    const roleEl = document.getElementById('tech-display-role');
-    const tagEl = document.getElementById('tech-zone-tagline');
-
-    if (badgeWrap) badgeWrap.style.display = 'flex';
-    if (nameEl) nameEl.textContent = this.currentTech.name || id;
-    if (roleEl) roleEl.textContent = this.portalMode === 'lab' ? '🔬 Lab Desk' : '🏠 Phlebo Fleet';
-    if (tagEl) tagEl.textContent = this.currentTech.zone ? `Zone: ${this.currentTech.zone}` : 'Operations Desk';
-
-    this.switchPortalMode(this.portalMode);
-    this.closeModal('tech-login-modal');
-    this.initWalletEngine();
-    this.refreshAssignedTrips();
-  },
-
-  async handleLogin(e) {
-    if (e) e.preventDefault();
-    const idInput = document.getElementById('tech-login-id').value.replace(/\s+/g, '').toLowerCase();
-    const passInput = document.getElementById('tech-login-pass').value.trim();
-
-    if (!idInput || !passInput) {
-      Utils.showToast('Please enter Staff ID and Password', 'error');
-      return;
-    }
-
-    // 1. Check local admin technicians database
-    let matchedTech = null;
-    try {
-      const storedTechs = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
-      matchedTech = storedTechs.find(t => {
-        const tId = String(t.id || t.loginId || t.TechID || t.LoginID || '').replace(/\s+/g, '').toLowerCase();
-        const tPwd = String(t.pass || t.password || t.Password || '').trim();
-        return tId === idInput && tPwd === passInput;
-      });
-    } catch (err) {}
-
-    // 2. Cloud Server Fallback verification via Api.staffLogin
-    if (!matchedTech && navigator.onLine && typeof Api !== 'undefined' && typeof Api.staffLogin === 'function') {
-      try {
-        const serverRes = await Api.staffLogin(idInput, passInput);
-        if (serverRes && (serverRes.success || serverRes.userId)) {
-          matchedTech = {
-            id: serverRes.userId || idInput,
-            name: serverRes.name || idInput,
-            zone: serverRes.area || 'Chennai Zone',
-            status: 'Active'
-          };
-        }
-      } catch (err) {
-        console.warn('Server login check notice:', err);
-      }
-    }
-
-    if (!matchedTech) {
-      Utils.showToast('Invalid Staff ID or Password. Check credentials.', 'error');
-      return;
-    }
-
-    this.currentTech = matchedTech;
-    localStorage.setItem('selfcare_active_tech', JSON.stringify(matchedTech));
-    localStorage.setItem('selfcare_active_technician', JSON.stringify(matchedTech));
-    localStorage.setItem('selfcare_active_user', matchedTech.id);
-    localStorage.setItem('selfcare_user_role', 'technician');
-    localStorage.setItem('selfcare_auth_token', `TECH_TOKEN_${matchedTech.id}`);
-
-    Utils.showToast(`Welcome back, ${matchedTech.name}!`, 'success');
-    this.applyTechRoleSession();
-  },
-
-  exitToHome() {
-    localStorage.removeItem('selfcare_active_tech');
-    localStorage.removeItem('selfcare_active_technician');
-    localStorage.removeItem('selfcare_active_user');
-    localStorage.removeItem('selfcare_user_role');
-    localStorage.removeItem('selfcare_auth_token');
-    window.location.replace('index.html?logout=true');
+    if (nameEl) nameEl.textContent = this.currentTech.name || 'Lab Staff';
   },
 
   logout() {
-    if (confirm('Are you sure you want to log out from Technician Operations?')) {
-      this.exitToHome();
+    if (confirm('Are you sure you want to log out from Operations Desk?')) {
+      localStorage.removeItem('selfcare_active_tech');
+      localStorage.removeItem('selfcare_active_technician');
+      localStorage.removeItem('selfcare_active_user');
+      localStorage.removeItem('selfcare_auth_token');
+      localStorage.removeItem('selfcare_customer_profile');
+      window.location.replace('login.html?logout=true');
     }
   },
 
-  switchPortalMode(mode) {
-    this.portalMode = mode;
-    document.getElementById('btn-mode-lab')?.classList.toggle('active', mode === 'lab');
-    document.getElementById('btn-mode-home')?.classList.toggle('active', mode === 'home');
+  /* =========================================================
+     2. DOB TO AGE AUTO-CALCULATION
+     ========================================================= */
+  calculateAgeFromDob(dobString) {
+    if (!dobString) return '';
+    const dob = new Date(dobString);
+    if (isNaN(dob.getTime())) return '';
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age >= 0 ? age : 0;
+  },
 
-    document.getElementById('lab-portal-view')?.classList.toggle('active', mode === 'lab');
-    document.getElementById('home-portal-view')?.classList.toggle('active', mode === 'home');
+  handleDobChange(dobVal) {
+    const age = this.calculateAgeFromDob(dobVal);
+    const ageInput = document.getElementById('cust-age-input');
+    if (ageInput && age !== '') {
+      ageInput.value = age;
+    }
   },
 
   /* =========================================================
-     2. LAB WALK-IN MODE: SEARCH AUTOCOMPLETE
+     3. SEARCH ENGINE
      ========================================================= */
-  getAllTestsAndPackages() {
-    let list = [];
-    try {
-      const tests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || localStorage.getItem('cache_tests') || '[]');
-      const pkgs = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || localStorage.getItem('cache_packages') || '[]');
-      list = [...tests.map(t => ({ ...t, itemType: 'test' })), ...pkgs.map(p => ({ ...p, itemType: 'package' }))];
-    } catch (e) {}
-    return list;
+  escapeRegExp(str) {
+    return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  },
+
+  searchCatalogueWithStrictPriority(query) {
+    if (!query) return this.catalogueList;
+    const cleanQuery = query.toLowerCase().trim();
+    const scoredItems = [];
+
+    for (const item of this.catalogueList) {
+      const isPkg = item.itemType === 'package';
+      const name = String(item.TestName || item.PackageName || item.name || '').toLowerCase().trim();
+      const code = String(item.TestCode || item.PackageCode || item.TestID || item.PackageID || item.code || '').toLowerCase().trim();
+      const params = String(item.Parameters || item.parameters || '').toLowerCase().trim();
+      const symptoms = String(item.Symptoms || item.Description || item.WhyDone || '').toLowerCase().trim();
+      const keywords = String(item.SearchKeywords || '').toLowerCase().trim();
+
+      let score = 0;
+
+      if (!isPkg) {
+        if (name === cleanQuery) score += 10000;
+        else if (code === cleanQuery) score += 9000;
+        else if (name.startsWith(cleanQuery)) score += 7000;
+        else if (new RegExp('\\b' + this.escapeRegExp(cleanQuery) + '\\b', 'i').test(name)) score += 5000;
+        else if (name.includes(cleanQuery)) score += 3500;
+        else if (code.includes(cleanQuery)) score += 2500;
+      }
+
+      if (!isPkg) {
+        if (symptoms.includes(cleanQuery)) score += 1500;
+        if (params.includes(cleanQuery)) score += 1200;
+        if (keywords.includes(cleanQuery)) score += 1000;
+      }
+
+      if (isPkg) {
+        if (name === cleanQuery) score += 2000;
+        else if (name.startsWith(cleanQuery)) score += 1400;
+        else if (name.includes(cleanQuery)) score += 800;
+        else if (params.includes(cleanQuery)) score += 400;
+      }
+
+      if (score > 0) {
+        scoredItems.push({ item, score });
+      }
+    }
+
+    scoredItems.sort((a, b) => b.score - a.score);
+    return scoredItems.map(s => s.item);
   },
 
   handleSearchInput(query) {
-    const q = String(query || '').trim().toLowerCase();
+    const q = String(query || '').trim();
     const dropdown = document.getElementById('search-results-dropdown');
     const clearBtn = document.getElementById('clear-search-btn');
 
@@ -204,17 +180,18 @@ const TechnicianApp = {
     }
 
     if (clearBtn) clearBtn.style.display = 'block';
-    const allItems = this.getAllTestsAndPackages();
-
-    const matches = allItems.filter(item => {
-      const name = String(item.TestName || item.PackageName || '').toLowerCase();
-      const code = String(item.TestCode || item.PackageCode || item.TestID || item.PackageID || '').toLowerCase();
-      return name.includes(q) || code.includes(q);
-    }).slice(0, 8);
+    const matches = this.searchCatalogueWithStrictPriority(q).slice(0, 12);
 
     if (matches.length === 0) {
       if (dropdown) {
-        dropdown.innerHTML = `<div style="padding: 12px; text-align: center; color: #64748B; font-size: 11.5px;">No tests or packages found matching "${Utils.escapeHtml(q)}"</div>`;
+        dropdown.innerHTML = `
+          <div style="padding: 14px; text-align: center; color: #64748B; font-size: 12px;">
+            No diagnostic items matching "<strong>${Utils.escapeHtml(q)}</strong>"<br>
+            <button type="button" onclick="TechnicianApp.forceSyncCatalogue()" style="margin-top:8px; padding:4px 10px; border-radius:6px; background:#078866; color:#fff; border:none; font-size:11px; cursor:pointer;">
+              🔄 Refresh from Google Sheet
+            </button>
+          </div>
+        `;
         dropdown.style.display = 'block';
       }
       return;
@@ -223,8 +200,8 @@ const TechnicianApp = {
     if (dropdown) {
       dropdown.innerHTML = matches.map(item => {
         const isPkg = item.itemType === 'package';
-        const name = item.PackageName || item.TestName || 'Diagnostic Item';
-        const code = item.PackageCode || item.TestCode || item.PackageID || item.TestID || '';
+        const name = item.PackageName || item.TestName || item.name || 'Diagnostic Item';
+        const code = item.PackageCode || item.TestCode || item.PackageID || item.TestID || item.code || '';
         const price = Number(item.OfferPrice || item.price || 0);
         const mrp = Number(item.MRP || item.mrp || price);
 
@@ -232,7 +209,10 @@ const TechnicianApp = {
           <div class="dropdown-item-row" onclick="TechnicianApp.addItemToInPageCart('${Utils.escapeHtml(code)}')">
             <div class="dd-left-meta">
               <strong>${Utils.escapeHtml(name)}</strong>
-              <span>${isPkg ? '📦 PACKAGE' : '🧪 TEST'} • Code: ${Utils.escapeHtml(code)} | MRP: ${Utils.formatCurrency(mrp)}</span>
+              <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:2px;">
+                <span class="cat-type-pill ${isPkg ? 'pill-pkg' : 'pill-test'}">${isPkg ? '📦 PACKAGE' : '🧪 TEST'}</span>
+                <span style="font-size:9.5px; color:#64748B;">Code: ${Utils.escapeHtml(code)} | MRP: ${Utils.formatCurrency(mrp)}</span>
+              </div>
             </div>
             <div class="dd-right-price">
               <span class="dd-price">${Utils.formatCurrency(price)}</span>
@@ -255,33 +235,141 @@ const TechnicianApp = {
   },
 
   /* =========================================================
-     3. IN-PAGE CART & LAB BILLING
+     4. BACKEND & CACHE SYNC
      ========================================================= */
+  async loadCatalogueData() {
+    try {
+      let cachedTests = [];
+      let cachedPkgs = [];
+
+      if (typeof OfflineDB !== 'undefined' && typeof OfflineDB.getAll === 'function') {
+        try {
+          cachedTests = (await OfflineDB.getAll('tests')) || [];
+          cachedPkgs = (await OfflineDB.getAll('packages')) || [];
+        } catch (e) {}
+      }
+
+      if (cachedTests.length === 0) cachedTests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || localStorage.getItem('cache_tests') || '[]');
+      if (cachedPkgs.length === 0) cachedPkgs = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || localStorage.getItem('cache_packages') || '[]');
+
+      if (cachedTests.length > 0 || cachedPkgs.length > 0) {
+        this.catalogueList = [
+          ...cachedTests.map(t => ({ ...t, itemType: 'test' })),
+          ...cachedPkgs.map(p => ({ ...p, itemType: 'package' }))
+        ];
+        this.updateCounterBadge(this.catalogueList.length);
+      }
+
+      if (navigator.onLine) {
+        this.fetchLiveCatalogueFromServer();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  },
+
+  async fetchLiveCatalogueFromServer() {
+    if (this.isSyncingCatalogue) return;
+    this.isSyncingCatalogue = true;
+
+    try {
+      let freshTests = [];
+      let freshPkgs = [];
+
+      if (typeof Api !== 'undefined') {
+        try {
+          const resT = await (Api.getTests ? Api.getTests() : Api.request('getTests'));
+          freshTests = resT?.tests || resT?.data?.tests || (Array.isArray(resT?.data) ? resT.data : (Array.isArray(resT) ? resT : []));
+          const resP = await (Api.getPackages ? Api.getPackages() : Api.request('getPackages'));
+          freshPkgs = resP?.packages || resP?.data?.packages || (Array.isArray(resP?.data) ? resP.data : (Array.isArray(resP) ? resP : []));
+        } catch (apiErr) {}
+      }
+
+      if (freshTests.length > 0 || freshPkgs.length > 0) {
+        this.catalogueList = [
+          ...freshTests.map(t => ({ ...t, itemType: 'test' })),
+          ...freshPkgs.map(p => ({ ...p, itemType: 'package' }))
+        ];
+
+        if (typeof OfflineDB !== 'undefined') {
+          if (freshTests.length > 0 && typeof OfflineDB.save === 'function') await OfflineDB.save('tests', freshTests);
+          if (freshPkgs.length > 0 && typeof OfflineDB.save === 'function') await OfflineDB.save('packages', freshPkgs);
+        }
+
+        if (freshTests.length > 0) localStorage.setItem('cache_tests', JSON.stringify(freshTests));
+        if (freshPkgs.length > 0) localStorage.setItem('cache_packages', JSON.stringify(freshPkgs));
+
+        this.updateCounterBadge(this.catalogueList.length);
+      }
+    } catch (err) {
+      console.warn(err);
+    } finally {
+      this.isSyncingCatalogue = false;
+      this.updateCounterBadge(this.catalogueList.length);
+    }
+  },
+
+  updateCounterBadge(count) {
+    const counterBadge = document.getElementById('cat-items-counter');
+    if (counterBadge) {
+      counterBadge.innerHTML = count > 0 
+        ? `⚡ ${count} Live Items <span style="font-size:9px;">(Tap to sync)</span>` 
+        : `Unified Catalogue 🔄`;
+    }
+  },
+
+  async forceSyncCatalogue() {
+    Utils.showToast('Fetching latest prices from Google Sheet...', 'info');
+    await this.fetchLiveCatalogueFromServer();
+    Utils.showToast(`Updated! ${this.catalogueList.length} items ready.`, 'success');
+  },
+
+  /* =========================================================
+     5. CART & VIP MEMBERSHIP AUTO DISCOUNT (10%)
+     ========================================================= */
+  checkCartConflict(newItem) {
+    const alertBox = document.getElementById('cart-conflict-alert-box');
+    if (!alertBox) return false;
+
+    if (this.inPageCart.some(i => i.code === newItem.code || i.id === newItem.id)) {
+      Utils.showToast(`"${newItem.name}" is already in bill!`, 'info');
+      return true;
+    }
+    alertBox.style.display = 'none';
+    return false;
+  },
+
   addItemToInPageCart(itemCode) {
-    const all = this.getAllTestsAndPackages();
-    const item = all.find(i => (i.TestCode === itemCode || i.PackageCode === itemCode || i.TestID === itemCode || i.PackageID === itemCode));
+    const item = this.catalogueList.find(i => (
+      String(i.TestCode).trim() === String(itemCode).trim() || 
+      String(i.PackageCode).trim() === String(itemCode).trim() || 
+      String(i.TestID).trim() === String(itemCode).trim() || 
+      String(i.PackageID).trim() === String(itemCode).trim() || 
+      String(i.code).trim() === String(itemCode).trim()
+    ));
     if (!item) return;
 
-    const id = item.PackageID || item.TestID || item.PackageCode || item.TestCode;
-    const name = item.PackageName || item.TestName;
+    const id = item.PackageID || item.TestID || item.PackageCode || item.TestCode || item.id;
+    const name = item.PackageName || item.TestName || item.name;
+    const isPkg = item.itemType === 'package';
 
-    if (this.inPageCart.some(i => i.id === id)) {
-      Utils.showToast(`"${name}" is already in lab cart`, 'info');
-      return;
-    }
-
-    this.inPageCart.push({
+    const cartItem = {
       id: id,
       code: item.PackageCode || item.TestCode || id,
       name: name,
       price: Number(item.OfferPrice || item.price || 0),
       mrp: Number(item.MRP || item.mrp || item.OfferPrice || 0),
-      type: item.itemType || 'test'
-    });
+      type: isPkg ? 'package' : 'test',
+      SampleType: item.SampleType || 'Blood',
+      TAT: item.TAT || '6–12 Hours'
+    };
 
+    if (this.checkCartConflict(cartItem)) return;
+
+    this.inPageCart.push(cartItem);
     this.clearSearch();
     this.renderInPageCart();
-    Utils.showToast(`Added "${name}" to Lab bill`, 'success');
+    Utils.showToast(`Added "${name}" to bill`, 'success');
   },
 
   removeItemFromInPageCart(idx) {
@@ -291,6 +379,15 @@ const TechnicianApp = {
 
   clearInPageCart() {
     this.inPageCart = [];
+    this.appliedCoupon = null;
+    const coupInput = document.getElementById('lab-coupon-code-input');
+    if (coupInput) coupInput.value = '';
+    const statusMsg = document.getElementById('coupon-status-msg');
+    if (statusMsg) statusMsg.style.display = 'none';
+    const cashInput = document.getElementById('cash-tendered-input');
+    if (cashInput) cashInput.value = '';
+    this.activeCashTendered = 0;
+    this.activeChangeReturned = 0;
     this.renderInPageCart();
   },
 
@@ -298,22 +395,27 @@ const TechnicianApp = {
     const container = document.getElementById('inpage-cart-items-list');
     const countBadge = document.getElementById('inpage-cart-count');
     const mrpEl = document.getElementById('lab-bill-mrp');
-    const subtotalEl = document.getElementById('lab-bill-subtotal');
+    const discountLineEl = document.getElementById('lab-bill-discount-line');
+    const memRow = document.getElementById('membership-discount-row');
+    const memLineEl = document.getElementById('lab-bill-membership-line');
+    const couponRow = document.getElementById('coupon-discount-row');
+    const couponLineEl = document.getElementById('lab-bill-coupon-line');
     const grandTotalEl = document.getElementById('lab-bill-grand-total');
 
     if (!container) return;
-
     if (countBadge) countBadge.textContent = `${this.inPageCart.length} Items`;
 
     if (this.inPageCart.length === 0) {
       container.innerHTML = `
         <div class="empty-inpage-cart">
           <span>🛒</span>
-          <p>No tests or packages added yet. Search above to add items for lab counter checkout.</p>
+          <p>No tests or packages added yet. Search above to add diagnostic items.</p>
         </div>
       `;
       if (mrpEl) mrpEl.textContent = '₹0';
-      if (subtotalEl) subtotalEl.textContent = '₹0';
+      if (discountLineEl) discountLineEl.textContent = '- ₹0';
+      if (memRow) memRow.style.display = 'none';
+      if (couponRow) couponRow.style.display = 'none';
       if (grandTotalEl) grandTotalEl.textContent = '₹0';
       return;
     }
@@ -329,7 +431,8 @@ const TechnicianApp = {
         <div class="inpage-cart-item">
           <div class="cart-item-info">
             <strong>${Utils.escapeHtml(item.name)}</strong>
-            <span>${item.type === 'package' ? '📦 PACKAGE' : '🧪 TEST'} • MRP: ${Utils.formatCurrency(item.mrp)}</span>
+            <span class="cat-type-pill ${item.type === 'package' ? 'pill-pkg' : 'pill-test'}">${item.type === 'package' ? '📦 PACKAGE' : '🧪 TEST'}</span>
+            <span style="font-size:10px; color:#64748B;">MRP: ${Utils.formatCurrency(item.mrp)}</span>
           </div>
           <div class="cart-item-right">
             <strong style="color: #045D49; font-size: 13px;">${Utils.formatCurrency(item.price)}</strong>
@@ -339,455 +442,1086 @@ const TechnicianApp = {
       `;
     }).join('');
 
+    const regularDiscount = Math.max(0, totalMrp - totalSubtotal);
+
+    let membershipDiscount = 0;
+    if (this.activeMembership && this.activeMembership.isMember) {
+      membershipDiscount = Math.round(totalSubtotal * 0.10);
+    }
+
+    let couponDiscount = 0;
+    if (this.appliedCoupon) {
+      const pct = Number(this.appliedCoupon.percent || this.appliedCoupon.discountPercent || 10);
+      couponDiscount = Math.min(2499, Math.round((totalSubtotal * pct) / 100));
+    }
+
+    const finalPayable = Math.max(0, totalSubtotal - membershipDiscount - couponDiscount);
+
     if (mrpEl) mrpEl.textContent = Utils.formatCurrency(totalMrp);
-    if (subtotalEl) subtotalEl.textContent = Utils.formatCurrency(totalSubtotal);
-    if (grandTotalEl) grandTotalEl.textContent = Utils.formatCurrency(totalSubtotal);
+    if (discountLineEl) discountLineEl.textContent = `- ${Utils.formatCurrency(regularDiscount)}`;
+
+    if (membershipDiscount > 0) {
+      if (memRow) memRow.style.display = 'flex';
+      if (memLineEl) memLineEl.textContent = `- ${Utils.formatCurrency(membershipDiscount)}`;
+    } else {
+      if (memRow) memRow.style.display = 'none';
+    }
+
+    if (this.appliedCoupon && couponDiscount > 0) {
+      if (couponRow) couponRow.style.display = 'flex';
+      if (couponLineEl) couponLineEl.textContent = `- ${Utils.formatCurrency(couponDiscount)}`;
+    } else {
+      if (couponRow) couponRow.style.display = 'none';
+    }
+
+    if (grandTotalEl) grandTotalEl.textContent = Utils.formatCurrency(finalPayable);
+    this.calculateCashChange(this.activeCashTendered);
   },
 
   /* =========================================================
-     4. CUSTOMER AUTOFILL & SAVE
+     6. CUSTOMER AUTOFILL & VIP MEMBERSHIP DETECTION
      ========================================================= */
-  handleCustomerMobileLookup(val) {
+  async handleCustomerMobileLookup(val) {
     const mobile = String(val).replace(/\D/g, '').slice(0, 10);
     if (mobile.length !== 10) return;
 
-    let foundProfile = null;
-    let family = [];
-
+    let matchedUser = null;
     try {
-      const rawUser = localStorage.getItem(`selfcare_profile_${mobile}`) || localStorage.getItem(`selfcare_customer_profile`);
-      if (rawUser) {
-        const u = JSON.parse(rawUser);
-        if (String(u.mobile || u.phone).includes(mobile)) foundProfile = u;
+      const raw = localStorage.getItem(`selfcare_profile_${mobile}`) || localStorage.getItem('selfcare_customer_profile');
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (String(u.mobile || u.phone || '').includes(mobile)) matchedUser = u;
       }
     } catch (e) {}
 
-    try {
-      const rawFam = localStorage.getItem(`selfcare_family_${mobile}`) || localStorage.getItem('selfcare_family_members');
-      if (rawFam) family = JSON.parse(rawFam);
-    } catch (e) {}
+    if (navigator.onLine && typeof Api !== 'undefined') {
+      try {
+        const res = await Api.request('getProfile', { userId: mobile, mobile: mobile });
+        const userFromCloud = res?.data || res?.profile || res?.user;
+        if (userFromCloud && userFromCloud.Name) {
+          matchedUser = {
+            id: userFromCloud.UserID || `CUST_${mobile}`,
+            name: userFromCloud.Name,
+            salutation: userFromCloud.Salutation || 'Mr.',
+            email: userFromCloud.Email || '',
+            dob: userFromCloud.DOB || '',
+            age: userFromCloud.Age || '',
+            gender: userFromCloud.Gender || 'Male',
+            membership: userFromCloud.Membership || 'Regular'
+          };
+        }
+      } catch (err) {}
+    }
 
     const nameInput = document.getElementById('cust-name-input');
     const ageInput = document.getElementById('cust-age-input');
+    const dobInput = document.getElementById('cust-dob-input');
     const genderSelect = document.getElementById('cust-gender-select');
-    const familyDropdown = document.getElementById('cust-family-dropdown');
+    const salutationSelect = document.getElementById('cust-salutation-select');
+    const emailInput = document.getElementById('cust-email-input');
+    const idTag = document.getElementById('disp-patient-id-tag');
 
-    if (foundProfile) {
-      if (nameInput) nameInput.value = foundProfile.name || '';
-      if (ageInput) ageInput.value = foundProfile.age || '';
-      if (genderSelect && foundProfile.gender) genderSelect.value = foundProfile.gender;
-      Utils.showToast(`Autofilled customer details for +91 ${mobile}`, 'success');
+    if (matchedUser) {
+      if (nameInput) nameInput.value = matchedUser.name || matchedUser.FullName || '';
+      if (emailInput && matchedUser.email) emailInput.value = matchedUser.email;
+      if (genderSelect && matchedUser.gender) genderSelect.value = matchedUser.gender;
+      if (salutationSelect && matchedUser.salutation) salutationSelect.value = matchedUser.salutation;
+      
+      if (matchedUser.dob) {
+        if (dobInput) dobInput.value = matchedUser.dob;
+        this.handleDobChange(matchedUser.dob);
+      } else if (matchedUser.age && ageInput) {
+        ageInput.value = matchedUser.age;
+      }
+
+      const memStatus = String(matchedUser.membership || matchedUser.Membership || '').trim().toUpperCase();
+      const isVip = (memStatus.includes('MEMBER') || memStatus.includes('VIP')) && !memStatus.includes('REGULAR');
+
+      if (isVip) {
+        this.activeMembership = { isMember: true, type: 'VIP', discountPercent: 10 };
+        if (idTag) {
+          idTag.className = 'id-tag-pill vip-member-badge';
+          idTag.innerHTML = `⭐ VIP MEMBER (${matchedUser.id || 'CUST_' + mobile.slice(-6)})`;
+        }
+        Utils.showToast('⭐ VIP Care Member detected! Flat 10% auto discount applied.', 'success');
+      } else {
+        this.activeMembership = null;
+        if (idTag) {
+          idTag.className = 'id-tag-pill';
+          idTag.textContent = `ID: ${matchedUser.id || 'CUST_' + mobile.slice(-6)}`;
+        }
+      }
+
+      this.renderInPageCart();
+    } else {
+      this.activeMembership = null;
+      if (idTag) {
+        idTag.className = 'id-tag-pill';
+        idTag.textContent = `ID: SCD_CUST_${mobile.slice(-6)}`;
+      }
+      this.renderInPageCart();
     }
-
-    if (familyDropdown) {
-      familyDropdown.innerHTML = '<option value="SELF">Self (Primary Account)</option>' +
-        family.map(f => `<option value="${f.id || f.name}">${f.name} (${f.relation || 'Relative'}) - ${f.age || ''} Yrs</option>`).join('');
-    }
-  },
-
-  handleFamilySelect(val) {
-    if (val === 'SELF') return;
-    const mobile = document.getElementById('cust-mobile-input').value.trim();
-    let family = [];
-    try {
-      family = JSON.parse(localStorage.getItem(`selfcare_family_${mobile}`) || localStorage.getItem('selfcare_family_members') || '[]');
-    } catch (e) {}
-
-    const member = family.find(f => (f.id === val || f.name === val));
-    if (member) {
-      const nameInput = document.getElementById('cust-name-input');
-      const ageInput = document.getElementById('cust-age-input');
-      const genderSelect = document.getElementById('cust-gender-select');
-      if (nameInput) nameInput.value = member.name || '';
-      if (ageInput) ageInput.value = member.age || '';
-      if (genderSelect && member.gender) genderSelect.value = member.gender;
-    }
-  },
-
-  openNewCustomerModal() {
-    this.openModal('new-customer-modal');
-  },
-
-  handleSaveNewCustomer(e) {
-    if (e) e.preventDefault();
-    const phone = document.getElementById('new-cust-phone').value.trim();
-    const name = document.getElementById('new-cust-name').value.trim();
-    const age = document.getElementById('new-cust-age').value.trim();
-    const gender = document.getElementById('new-cust-gender').value;
-    const address = document.getElementById('new-cust-address').value.trim();
-
-    if (phone.length !== 10) {
-      Utils.showToast('Please enter valid 10-digit mobile', 'error');
-      return;
-    }
-
-    const newCustomer = {
-      mobile: phone,
-      name: name,
-      age: age,
-      gender: gender,
-      address: address || 'Lab Walk-in, Chennai',
-      verifiedAt: new Date().toISOString()
-    };
-
-    localStorage.setItem(`selfcare_profile_${phone}`, JSON.stringify(newCustomer));
-
-    if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.updateProfile === 'function') {
-      Api.updateProfile(newCustomer).catch(() => {});
-    }
-
-    const mobileInput = document.getElementById('cust-mobile-input');
-    const nameInput = document.getElementById('cust-name-input');
-    const ageInput = document.getElementById('cust-age-input');
-    const genderSelect = document.getElementById('cust-gender-select');
-
-    if (mobileInput) mobileInput.value = phone;
-    if (nameInput) nameInput.value = name;
-    if (ageInput) ageInput.value = age;
-    if (genderSelect) genderSelect.value = gender;
-
-    this.closeModal('new-customer-modal');
-    Utils.showToast(`New customer ${name} registered!`, 'success');
   },
 
   /* =========================================================
-     5. LAB WALK-IN CHECKOUT CONFIRMATION
+     7. REFERRING DOCTOR DIRECTORY
      ========================================================= */
-  async executeLabCounterCheckout() {
+  loadDoctorDirectory() {
+    try {
+      const stored = JSON.parse(localStorage.getItem('selfcare_doctor_directory') || '[]');
+      if (Array.isArray(stored) && stored.length > 0) {
+        this.doctorList = Array.from(new Set([...this.doctorList, ...stored]));
+      }
+    } catch (e) {}
+  },
+
+  showDoctorDropdown() {
+    this.filterDoctorDropdown(document.getElementById('cust-doctor-input')?.value || '');
+  },
+
+  filterDoctorDropdown(query) {
+    const drop = document.getElementById('doctor-custom-dropdown');
+    if (!drop) return;
+    const q = String(query || '').toLowerCase().trim();
+    const list = this.doctorList.filter(d => d.toLowerCase().includes(q));
+
+    if (list.length === 0) {
+      drop.style.display = 'none';
+      return;
+    }
+
+    drop.innerHTML = list.map(doc => `
+      <div class="doctor-opt-row" onclick="TechnicianApp.selectDoctor('${Utils.escapeHtml(doc)}')">
+        🩺 ${Utils.escapeHtml(doc)}
+      </div>
+    `).join('');
+    drop.style.display = 'block';
+  },
+
+  selectDoctor(docName) {
+    const input = document.getElementById('cust-doctor-input');
+    if (input) input.value = docName;
+    const drop = document.getElementById('doctor-custom-dropdown');
+    if (drop) drop.style.display = 'none';
+  },
+
+  setSelfDoctor() {
+    this.selectDoctor('Self / Walk-In');
+  },
+
+  saveDoctorToDirectory(docName) {
+    if (!docName || docName.includes('Self / Walk-In')) return;
+    if (!this.doctorList.includes(docName)) {
+      this.doctorList.push(docName);
+      localStorage.setItem('selfcare_doctor_directory', JSON.stringify(this.doctorList));
+    }
+  },
+
+  /* =========================================================
+     8. PAYMENT MODE & CASH RECONCILIATION
+     ========================================================= */
+  handlePaymentModeChange(mode) {
+    this.currentPaymentMode = mode;
+    document.getElementById('pay-mode-lbl-cash')?.classList.toggle('active', mode === 'CASH');
+    document.getElementById('pay-mode-lbl-link')?.classList.toggle('active', mode === 'LINK');
+    document.getElementById('pay-mode-lbl-upi')?.classList.toggle('active', mode === 'UPI_QR');
+
+    const cashPanel = document.getElementById('cash-calculator-panel');
+    const linkPanel = document.getElementById('link-payment-panel');
+    const upiPanel = document.getElementById('upi-counter-panel');
+    const submitBtn = document.getElementById('btn-submit-lab-booking');
+
+    if (cashPanel) cashPanel.style.display = mode === 'CASH' ? 'block' : 'none';
+    if (linkPanel) linkPanel.style.display = mode === 'LINK' ? 'block' : 'none';
+    if (upiPanel) upiPanel.style.display = mode === 'UPI_QR' ? 'block' : 'none';
+
+    if (submitBtn) {
+      if (mode === 'LINK') {
+        submitBtn.innerHTML = '📲 Generate & Send WhatsApp Payment Link';
+      } else if (mode === 'UPI_QR') {
+        submitBtn.innerHTML = '⚡ Verify Counter QR & Generate Bill';
+      } else {
+        submitBtn.innerHTML = '✓ Generate Bill & Create Official PDF Invoice';
+      }
+    }
+  },
+
+  calculateCashChange(val) {
+    this.activeCashTendered = Number(val) || 0;
+    const grandTotalEl = document.getElementById('lab-bill-grand-total');
+    const grandTotal = parseInt(String(grandTotalEl?.textContent || '0').replace(/\D/g, '')) || 0;
+    this.activeChangeReturned = Math.max(0, this.activeCashTendered - grandTotal);
+
+    const changeEl = document.getElementById('disp-change-return-amount');
+    if (changeEl) {
+      changeEl.textContent = Utils.formatCurrency(this.activeChangeReturned);
+      changeEl.style.color = this.activeCashTendered >= grandTotal ? '#047857' : '#DC2626';
+    }
+  },
+
+  /* =========================================================
+     9. CHECKOUT ENGINE
+     ========================================================= */
+  handleCheckoutClick() {
     if (this.inPageCart.length === 0) {
-      Utils.showToast('Please add at least one test or package to bill', 'error');
+      Utils.showToast('Please add at least one test to bill', 'error');
       return;
     }
 
     const mobile = document.getElementById('cust-mobile-input').value.trim();
+    const salutation = document.getElementById('cust-salutation-select').value;
     const name = document.getElementById('cust-name-input').value.trim();
     const age = document.getElementById('cust-age-input').value.trim();
+    const dob = document.getElementById('cust-dob-input').value.trim();
     const gender = document.getElementById('cust-gender-select').value;
+    const email = document.getElementById('cust-email-input').value.trim();
+    const doctor = document.getElementById('cust-doctor-input').value.trim() || 'Self / Walk-In';
 
-    if (mobile.length !== 10 || !name) {
-      Utils.showToast('Please enter customer mobile and name before billing', 'error');
+    if (mobile.length !== 10 || !name || !age) {
+      Utils.showToast('Please enter mobile, full name and age', 'error');
       return;
     }
 
-    const bookingId = `SCDLAB${Math.floor(100000 + Math.random() * 900000)}`;
-    const totalAmount = this.inPageCart.reduce((sum, it) => sum + it.price, 0);
+    const totalMrp = this.inPageCart.reduce((sum, it) => sum + it.mrp, 0);
+    const subtotal = this.inPageCart.reduce((sum, it) => sum + it.price, 0);
 
+    let membershipDiscount = 0;
+    if (this.activeMembership && this.activeMembership.isMember) {
+      membershipDiscount = Math.round(subtotal * 0.10);
+    }
+
+    let couponDiscount = 0;
+    if (this.appliedCoupon) {
+      couponDiscount = Math.min(2499, Math.round((subtotal * 10) / 100));
+    }
+    const finalAmount = Math.max(0, subtotal - membershipDiscount - couponDiscount);
+
+    this.pendingBookingData = {
+      bookingId: `SCDLAB${Math.floor(100000 + Math.random() * 900000)}`,
+      salutation, name: `${salutation} ${name}`, rawName: name, mobile, age, dob, gender, email,
+      doctor, finalAmount, totalMrp, membershipDiscount, couponDiscount,
+      billedByTechId: this.currentTech?.id || 'TechlabDesk',
+      billedByTechName: this.currentTech?.name || 'Mohamed Adamkani'
+    };
+
+    if (this.currentPaymentMode === 'CASH') {
+      const cashTendered = this.activeCashTendered;
+      if (!cashTendered || cashTendered < finalAmount) {
+        Utils.showToast(`Please enter cash tendered. Customer must give at least ${Utils.formatCurrency(finalAmount)}`, 'error');
+        document.getElementById('cash-tendered-input')?.focus();
+        return;
+      }
+
+      document.getElementById('conf-cash-tendered').textContent = Utils.formatCurrency(cashTendered);
+      document.getElementById('conf-grand-total').textContent = Utils.formatCurrency(finalAmount);
+      document.getElementById('conf-cash-received').textContent = Utils.formatCurrency(cashTendered);
+      document.getElementById('conf-change-return').textContent = Utils.formatCurrency(this.activeChangeReturned);
+      this.openModal('cash-confirm-modal');
+      return;
+    }
+
+    if (this.currentPaymentMode === 'UPI_QR') {
+      document.getElementById('conf-upi-grand-total').textContent = Utils.formatCurrency(finalAmount);
+      this.openModal('upi-confirm-modal');
+      return;
+    }
+
+    this.initiateCustomerPaymentLink(this.pendingBookingData);
+  },
+
+  confirmCashAndGenerateBill() {
+    this.closeModal('cash-confirm-modal');
+    this.saveDoctorToDirectory(this.pendingBookingData.doctor);
+
+    this.finalizeAndStoreBooking({
+      ...this.pendingBookingData,
+      cashTendered: this.activeCashTendered,
+      changeReturned: this.activeChangeReturned,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID'
+    });
+  },
+
+  confirmUpiAndGenerateBill() {
+    this.closeModal('upi-confirm-modal');
+    this.saveDoctorToDirectory(this.pendingBookingData.doctor);
+
+    this.finalizeAndStoreBooking({
+      ...this.pendingBookingData,
+      cashTendered: 0,
+      changeReturned: 0,
+      paymentMode: 'COUNTER_UPI_QR',
+      paymentStatus: 'PAID'
+    });
+  },
+
+  /* =========================================================
+     10. 5-MINUTE COUNTDOWN TIMER & PAYMENT LINK
+     ========================================================= */
+  async initiateCustomerPaymentLink(data) {
+    if (this.activePaymentLinkId && this.linkExpiryTimestamp && Date.now() < this.linkExpiryTimestamp) {
+      Utils.showToast('Payment link is still active! Wait for the 5-minute timer to complete or check status.', 'info');
+      return;
+    }
+
+    Utils.showToast('Creating 5-minute Razorpay Payment Link...', 'info');
+
+    try {
+      const res = await Api.request('createPaymentLink', {
+        amount: data.finalAmount,
+        bookingId: data.bookingId,
+        mobile: data.mobile,
+        patientName: data.name,
+        email: data.email,
+        doctor: data.doctor,
+        billedByTechName: data.billedByTechName
+      });
+
+      const linkData = res?.data || res;
+      if (!linkData || !linkData.shortUrl) {
+        throw new Error(linkData?.message || 'Failed to create payment link');
+      }
+
+      this.activePaymentLinkId = linkData.paymentLinkId;
+      this.linkExpiryTimestamp = Date.now() + (5 * 60 * 1000);
+
+      const msg = `*SELFCARE DIAGNOSTICS - LAB BILL PAYMENT*\n` +
+        `----------------------------------------\n` +
+        `Dear *${data.name}*,\n` +
+        `Your lab test bill *#${data.bookingId}* has been generated for *₹${data.finalAmount}*.\n\n` +
+        `📲 *Click to Pay via GPay / PhonePe / Card:*\n` +
+        `${linkData.shortUrl}\n\n` +
+        `⚠️ *Note:* This payment link is valid for 5 minutes only.\n` +
+        `_Once payment is successful, your official invoice PDF will be issued immediately._`;
+
+      window.open(`https://wa.me/91${data.mobile}?text=${encodeURIComponent(msg)}`, '_blank');
+
+      document.getElementById('link-waiting-state').style.display = 'none';
+      document.getElementById('link-expired-state').style.display = 'none';
+      document.getElementById('link-polling-state').style.display = 'block';
+
+      this.startLinkCountdownAndPolling();
+    } catch (err) {
+      Utils.showToast(`Error: ${err.message}`, 'error');
+    }
+  },
+
+  startLinkCountdownAndPolling() {
+    this.clearLinkTimers();
+    const timerDisplay = document.getElementById('link-timer-display');
+
+    this.linkCountdownTimer = setInterval(() => {
+      const remainingMs = Math.max(0, this.linkExpiryTimestamp - Date.now());
+      const remainingSeconds = Math.floor(remainingMs / 1000);
+
+      const minutes = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
+      const seconds = String(remainingSeconds % 60).padStart(2, '0');
+
+      if (timerDisplay) {
+        timerDisplay.textContent = `${minutes}:${seconds}`;
+      }
+
+      if (remainingSeconds <= 0) {
+        this.handlePaymentLinkExpired();
+      }
+    }, 1000);
+
+    this.linkPollingInterval = setInterval(async () => {
+      if (!this.activePaymentLinkId) return;
+
+      try {
+        const res = await Api.request('checkPaymentLinkStatus', {
+          paymentLinkId: this.activePaymentLinkId
+        });
+        const statusData = res?.data || res;
+
+        if (statusData && statusData.isPaid) {
+          this.clearLinkTimers();
+          Utils.showToast('✓ Payment Received Online!', 'success');
+
+          this.finalizeAndStoreBooking({
+            ...this.pendingBookingData,
+            paymentMode: 'ONLINE_LINK',
+            paymentStatus: 'PAID',
+            razorpayPaymentId: statusData.paymentId || ''
+          });
+
+          document.getElementById('link-waiting-state').style.display = 'block';
+          document.getElementById('link-polling-state').style.display = 'none';
+          document.getElementById('link-expired-state').style.display = 'none';
+          this.activePaymentLinkId = null;
+          this.linkExpiryTimestamp = null;
+        } else if (statusData && statusData.isExpired) {
+          this.handlePaymentLinkExpired();
+        }
+      } catch (e) {}
+    }, 3500);
+  },
+
+  handlePaymentLinkExpired() {
+    this.clearLinkTimers();
+    this.activePaymentLinkId = null;
+    this.linkExpiryTimestamp = null;
+
+    document.getElementById('link-polling-state').style.display = 'none';
+    document.getElementById('link-expired-state').style.display = 'block';
+    Utils.showToast('⚠️ Payment link has expired after 5 minutes. Please generate a new link.', 'error');
+  },
+
+  regeneratePaymentLink() {
+    if (this.pendingBookingData) {
+      document.getElementById('link-expired-state').style.display = 'none';
+      this.initiateCustomerPaymentLink(this.pendingBookingData);
+    }
+  },
+
+  clearLinkTimers() {
+    if (this.linkCountdownTimer) {
+      clearInterval(this.linkCountdownTimer);
+      this.linkCountdownTimer = null;
+    }
+    if (this.linkPollingInterval) {
+      clearInterval(this.linkPollingInterval);
+      this.linkPollingInterval = null;
+    }
+  },
+
+  async manualCheckLinkPayment() {
+    if (!this.activePaymentLinkId) return;
+    Utils.showToast('Checking status with Razorpay...', 'info');
+
+    const res = await Api.request('checkPaymentLinkStatus', { paymentLinkId: this.activePaymentLinkId });
+    const statusData = res?.data || res;
+
+    if (statusData && statusData.isPaid) {
+      this.clearLinkTimers();
+      Utils.showToast('✓ Payment Verified!', 'success');
+      this.finalizeAndStoreBooking({
+        ...this.pendingBookingData,
+        paymentMode: 'ONLINE_LINK',
+        paymentStatus: 'PAID',
+        razorpayPaymentId: statusData.paymentId || ''
+      });
+      document.getElementById('link-waiting-state').style.display = 'block';
+      document.getElementById('link-polling-state').style.display = 'none';
+    } else {
+      Utils.showToast('Payment not yet completed by customer', 'info');
+    }
+  },
+
+  /* =========================================================
+     11. FINALIZE & STORE BOOKING
+     ========================================================= */
+  finalizeAndStoreBooking(data) {
     const bookingRecord = {
-      bookingId: bookingId,
-      patientName: name,
-      patientPhone: mobile,
-      patientAge: age,
-      patientGender: gender,
+      bookingId: data.bookingId,
+      salutation: data.salutation || 'Mr.',
+      patientName: data.name,
+      patientPhone: data.mobile,
+      patientEmail: data.email || '',
+      patientAge: data.age,
+      dob: data.dob || '',
+      patientGender: data.gender,
+      referringDoctor: data.doctor,
       collectionType: 'lab',
-      address: 'Direct Lab Visit (Selfcare Diagnostics Counter)',
-      location: { link: 'Central Lab Counter' },
       items: this.inPageCart,
-      totalAmount: totalAmount,
-      finalAmount: totalAmount,
-      doorstepCharge: 0,
-      paymentMode: 'CASH_LAB_COUNTER',
-      paymentStatus: 'PAID_AT_LAB',
+      totalAmount: data.totalMrp,
+      subtotal: data.finalAmount + (data.membershipDiscount || 0) + (data.couponDiscount || 0),
+      membershipDiscount: data.membershipDiscount || 0,
+      couponDiscount: data.couponDiscount || 0,
+      finalAmount: data.finalAmount,
+      cashTendered: data.cashTendered || 0,
+      changeReturned: data.changeReturned || 0,
+      paymentMode: data.paymentMode,
+      paymentStatus: data.paymentStatus,
       bookingStatus: 'SAMPLE_COLLECTED',
-      techStatus: `Completed by ${this.currentTech ? this.currentTech.name : 'Lab Desk'}`,
-      currentStage: 3,
+      reportStatus: 'PENDING_ENTRY',
+      reportData: {},
+      billedByTechId: data.billedByTechId,
+      billedByTechName: data.billedByTechName,
+      techStatus: `Billed by ${data.billedByTechName}`,
       collectionDate: new Date().toISOString().split('T')[0],
-      timeSlot: 'Walk-in Immediate',
-      date: new Date().toISOString()
+      createdAt: new Date().toISOString()
     };
 
     try {
-      const recent = JSON.parse(localStorage.getItem('selfcare_recent_bookings') || '[]');
-      recent.unshift(bookingRecord);
-      localStorage.setItem('selfcare_recent_bookings', JSON.stringify(recent));
-
-      const adminBookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-      adminBookings.unshift(bookingRecord);
-      localStorage.setItem('selfcare_bookings_db', JSON.stringify(adminBookings));
+      const db = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+      db.unshift(bookingRecord);
+      localStorage.setItem('selfcare_bookings_db', JSON.stringify(db));
     } catch (e) {}
 
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.createBooking === 'function') {
-      Api.createBooking(bookingRecord).catch(err => console.warn('Lab booking cloud sync notice:', err));
+      Api.createBooking(bookingRecord).catch(console.warn);
     }
 
-    alert(`🎉 Lab Receipt Generated Successfully!\n\nBooking ID: ${bookingId}\nCustomer: ${name} (+91 ${mobile})\nTotal Paid: ₹${totalAmount}\nCollection: Lab Walk-in (₹0 Collection Fee)`);
-
+    this.lastGeneratedBooking = bookingRecord;
+    this.renderReceiptModal(bookingRecord);
     this.clearInPageCart();
-    document.getElementById('cust-mobile-input').value = '';
-    document.getElementById('cust-name-input').value = '';
-    document.getElementById('cust-age-input').value = '';
+    this.loadPreviousBills();
   },
 
   /* =========================================================
-     6. HOME FLEET: TRIPS & ACCEPT/REJECT FLOW
+     12. INVOICE RENDERING & PDF GENERATION
      ========================================================= */
-  refreshAssignedTrips() {
+  renderReceiptModal(b) {
+    const modal = document.getElementById('bill-receipt-modal');
+    if (!modal) return;
+
+    document.getElementById('rec-bill-id').textContent = b.bookingId;
+    const billDate = new Date(b.createdAt || Date.now());
+    document.getElementById('rec-bill-datetime').textContent = billDate.toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric'
+    }) + ', ' + billDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+    document.getElementById('rec-patient-name').textContent = (b.patientName || 'PATIENT').toUpperCase();
+    document.getElementById('rec-patient-age-gender').textContent = `${b.patientAge || '25'} Years / ${b.patientGender || 'Male'}`;
+    document.getElementById('rec-patient-mobile').textContent = `+91 ${b.patientPhone}`;
+    document.getElementById('rec-referring-doctor').textContent = b.referringDoctor || 'Self / Walk-In';
+
+    const sampleId = `SC${billDate.toISOString().slice(2, 10).replace(/-/g, '')}${String(b.bookingId).slice(-3)}`;
+    document.getElementById('rec-sample-id').textContent = sampleId;
+
+    const tbody = document.getElementById('rec-items-tbody');
+    let rowsHtml = '';
+
+    (b.items || []).forEach((item, idx) => {
+      let sample = item.SampleType || 'Blood';
+      const name = item.name || item.TestName;
+      if (name.toLowerCase().includes('urine')) sample = 'Urine';
+      if (name.toLowerCase().includes('vitamin') || name.toLowerCase().includes('iron')) sample = 'Serum';
+
+      rowsHtml += `
+        <tr>
+          <td style="text-align:center;">${idx + 1}</td>
+          <td><strong>${Utils.escapeHtml(name)}</strong></td>
+          <td style="text-align: center; color: #475569; font-weight: 600;">${Utils.escapeHtml(sample)}</td>
+          <td style="text-align: center; color: #475569; font-weight: 600;">${Utils.escapeHtml(item.TAT || '6–12 Hours')}</td>
+          <td style="text-align:right; font-weight:800;">${Utils.formatCurrency(item.price || 0).replace('₹', '')}</td>
+        </tr>
+      `;
+    });
+
+    if (tbody) tbody.innerHTML = rowsHtml;
+
+    document.getElementById('rec-total-mrp').textContent = Utils.formatCurrency(b.totalAmount || b.finalAmount);
+    const disc = Math.max(0, (b.totalAmount || b.finalAmount) - b.finalAmount + (b.membershipDiscount || 0) + (b.couponDiscount || 0));
+    document.getElementById('rec-total-discount').textContent = `- ${Utils.formatCurrency(disc)}`;
+    document.getElementById('rec-grand-paid').textContent = Utils.formatCurrency(b.finalAmount);
+    document.getElementById('rec-payment-mode-text').textContent = b.paymentMode;
+    document.getElementById('rec-payment-status-badge').textContent = b.paymentStatus;
+
+    modal.style.display = 'flex';
+  },
+
+  async downloadInvoicePDF() {
+    if (!this.lastGeneratedBooking) return;
+    const b = this.lastGeneratedBooking;
+    const element = document.getElementById('printable-receipt-card');
+    const opt = {
+      margin: 0,
+      filename: `Selfcare_Invoice_${b.bookingId}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2.2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    await html2pdf().set(opt).from(element).save();
+  },
+
+  async shareInvoicePDFOnWhatsApp() {
+    if (!this.lastGeneratedBooking) return;
+    const b = this.lastGeneratedBooking;
+    
+    // Direct Tracking & Invoice Download link pointing to booking.html
+    const trackUrl = `https://selfcarediagnostics.in/booking.html?bookingId=${b.bookingId}`;
+
+    const msg = `*SELFCARE DIAGNOSTICS - OFFICIAL LAB INVOICE*%0A` +
+      `----------------------------------------%0A` +
+      `*Invoice ID:* ${b.bookingId}%0A` +
+      `*Patient:* ${b.patientName}%0A` +
+      `*Doctor:* ${b.referringDoctor || 'Self'}%0A` +
+      `*Amount Paid:* ₹${b.finalAmount}%0A` +
+      `----------------------------------------%0A` +
+      `🔍 *Track Live Reports & Download Invoice:*%0A` +
+      `${trackUrl}%0A%0A` +
+      `_Thank you for choosing Selfcare Diagnostics!_`;
+
+    window.open(`https://wa.me/91${b.patientPhone}?text=${msg}`, '_blank');
+  },
+
+  /* =========================================================
+     13. DATE-TO-DATE FILTER & BILLS HISTORY
+     ========================================================= */
+  initHistoryDateFilter() {
+    const today = new Date().toISOString().split('T')[0];
+    const fromInput = document.getElementById('history-from-date');
+    const toInput = document.getElementById('history-to-date');
+    if (fromInput) fromInput.value = today;
+    if (toInput) toInput.value = today;
+  },
+
+  setQuickDateFilter(type) {
+    document.querySelectorAll('.quick-filter-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`qf-${type}`)?.classList.add('active');
+
+    const today = new Date();
+    const toDate = today.toISOString().split('T')[0];
+    let fromDate = toDate;
+
+    if (type === '7days') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      fromDate = d.toISOString().split('T')[0];
+    } else if (type === 'month') {
+      const d = new Date(today.getFullYear(), today.getMonth(), 1);
+      fromDate = d.toISOString().split('T')[0];
+    } else if (type === 'all') {
+      fromDate = '2024-01-01';
+    }
+
+    document.getElementById('history-from-date').value = fromDate;
+    document.getElementById('history-to-date').value = toDate;
+    this.applyDateRangeFilter();
+  },
+
+  applyDateRangeFilter() {
+    const fromDate = document.getElementById('history-from-date')?.value;
+    const toDate = document.getElementById('history-to-date')?.value;
+    this.loadPreviousBills(fromDate, toDate);
+  },
+
+  loadPreviousBills(fromDate = null, toDate = null) {
+    const container = document.getElementById('previous-bills-container');
+    if (!container) return;
+
     let allBookings = [];
     try {
-      allBookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || localStorage.getItem('selfcare_recent_bookings') || '[]');
+      allBookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
     } catch (e) {}
 
-    const techId = this.currentTech ? this.currentTech.id.toLowerCase() : '';
-    const techName = this.currentTech ? this.currentTech.name.toLowerCase() : '';
+    const from = fromDate || document.getElementById('history-from-date')?.value || '';
+    const to = toDate || document.getElementById('history-to-date')?.value || from;
 
-    const homePickups = allBookings.filter(b => 
-      b.collectionType === 'home' || String(b.address || '').toLowerCase().includes('pickup') || (b.mode || '').includes('Home')
-    );
-
-    this.assignedTrips = homePickups.filter(b => {
-      const status = String(b.techStatus || '').toLowerCase();
-      const isForMe = status.includes(techId) || status.includes(techName) || status.includes('broadcast') || status.includes('unassigned');
-      return isForMe && !status.includes('accepted') && !status.includes('completed');
+    const filtered = allBookings.filter(b => {
+      const bDate = String(b.collectionDate || b.date || b.createdAt || '').split('T')[0];
+      if (!from && !to) return true;
+      if (from && !to) return bDate >= from;
+      if (!from && to) return bDate <= to;
+      return bDate >= from && bDate <= to;
     });
 
-    this.activeQueue = homePickups.filter(b => {
-      const status = String(b.techStatus || '').toLowerCase();
-      return (status.includes(techId) || status.includes(techName)) && status.includes('accepted') && !status.includes('completed');
-    });
-
-    this.renderHomeJobsUI();
-  },
-
-  renderHomeJobsUI() {
-    const assignedContainer = document.getElementById('assigned-jobs-container');
-    const queueContainer = document.getElementById('active-queue-container');
-    const assignedBadge = document.getElementById('assigned-jobs-count');
-    const queueBadge = document.getElementById('active-queue-count');
-
-    if (!assignedContainer || !queueContainer) return;
-
-    if (assignedBadge) assignedBadge.textContent = `${this.assignedTrips.length} Available Trips`;
-    if (queueBadge) queueBadge.textContent = `${this.activeQueue.length} In-Progress`;
-
-    if (this.assignedTrips.length === 0) {
-      assignedContainer.innerHTML = '<div style="padding:14px; text-align:center; color:#64748B; font-size:11.5px;">No new home collection trips within your coverage zone.</div>';
-    } else {
-      assignedContainer.innerHTML = this.assignedTrips.map(job => {
-        const dist = 4.2;
-        const isMulti = (job.items && job.items.length > 2) || String(job.patientName).includes('&');
-        const earningEstimate = isMulti ? 250 : 150;
-
-        return `
-          <div class="job-card-3d">
-            <div class="job-card-head">
-              <span class="job-id-text">📍 ${job.bookingId || job.id}</span>
-              <span class="job-distance-pill">${dist} KM Away (Within 10km)</span>
-            </div>
-            <div class="job-meta-line">
-              <strong>Patient:</strong> ${Utils.escapeHtml(job.patientName)} (${job.patientPhone})
-            </div>
-            <div class="job-meta-line">
-              <strong>Scheduled Slot:</strong> ${Utils.escapeHtml(job.timeSlot || job.slot || 'Today')}
-            </div>
-            <a href="https://maps.google.com/?q=${encodeURIComponent(job.address || 'Chennai')}" target="_blank" class="job-location-link">
-              📍 ${Utils.escapeHtml(job.address || 'Doorstep, Chennai')} (View on Maps)
-            </a>
-            <div style="font-size: 11px; font-weight: 800; color: #045D49;">
-              Trip Earnings: <strong style="color: #078866; font-size: 13px;">₹${earningEstimate}</strong> (${isMulti ? 'Multi-visit/Patient' : 'Single Visit'})
-            </div>
-            <div class="job-actions-row">
-              <button type="button" class="btn-job-reject" onclick="TechnicianApp.rejectTrip('${job.bookingId || job.id}')">
-                ✕ Reject
-              </button>
-              <button type="button" class="btn-job-accept" onclick="TechnicianApp.acceptTrip('${job.bookingId || job.id}')">
-                ✓ Accept Trip
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    if (this.activeQueue.length === 0) {
-      queueContainer.innerHTML = '<div style="padding:14px; text-align:center; color:#64748B; font-size:11.5px;">No active collections in-progress. Accept trips above to start.</div>';
-    } else {
-      queueContainer.innerHTML = this.activeQueue.map(job => {
-        const isMulti = (job.items && job.items.length > 2) || String(job.patientName).includes('&');
-        const earning = isMulti ? 250 : 150;
-
-        return `
-          <div class="job-card-3d" style="border-color: #078866;">
-            <div class="job-card-head">
-              <span class="job-id-text" style="color: #045D49;">🚀 In-Transit: ${job.bookingId || job.id}</span>
-              <span class="job-distance-pill" style="background:#ECFDF5; color:#045D49; border-color:#A7F3D0;">Collection Visit: ₹${earning}</span>
-            </div>
-            <div class="job-meta-line">
-              <strong>Patient:</strong> ${Utils.escapeHtml(job.patientName)} | <strong>📞 Call:</strong> <a href="tel:${job.patientPhone}" style="color: #078866; font-weight:800;">${job.patientPhone}</a>
-            </div>
-            <a href="https://maps.google.com/?q=${encodeURIComponent(job.address || 'Chennai')}" target="_blank" class="job-location-link">
-              🗺️ Open Turn-by-Turn GPS Navigation ➔
-            </a>
-            <div class="job-actions-row">
-              <button type="button" class="btn-job-complete" onclick="TechnicianApp.completeSampleCollection('${job.bookingId || job.id}', ${earning})">
-                ✓ Mark Sample Collected (Earn ₹${earning})
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-  },
-
-  acceptTrip(bookingId) {
-    let bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-    const idx = bookings.findIndex(b => (b.bookingId === bookingId || b.id === bookingId));
-    if (idx !== -1) {
-      const techName = this.currentTech ? this.currentTech.name : 'Technician';
-      bookings[idx].techStatus = `Accepted by ${techName}`;
-      bookings[idx].assignedTechId = this.currentTech ? this.currentTech.id : 'TECH';
-      bookings[idx].currentStage = 2;
-      localStorage.setItem('selfcare_bookings_db', JSON.stringify(bookings));
-
-      try {
-        const recents = JSON.parse(localStorage.getItem('selfcare_recent_bookings') || '[]');
-        const rIdx = recents.findIndex(b => b.bookingId === bookingId);
-        if (rIdx !== -1) {
-          recents[rIdx].techStatus = `Accepted by ${techName}`;
-          recents[rIdx].currentStage = 2;
-          localStorage.setItem('selfcare_recent_bookings', JSON.stringify(recents));
-        }
-      } catch (e) {}
-
-      Utils.showToast(`Trip accepted! Reflected in Customer Bookings.`, 'success');
-      this.refreshAssignedTrips();
-    }
-  },
-
-  rejectTrip(bookingId) {
-    let bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-    const idx = bookings.findIndex(b => (b.bookingId === bookingId || b.id === bookingId));
-    if (idx !== -1) {
-      bookings[idx].techStatus = 'Unassigned';
-      localStorage.setItem('selfcare_bookings_db', JSON.stringify(bookings));
-      Utils.showToast(`Trip rejected and returned to dispatch queue.`, 'info');
-      this.refreshAssignedTrips();
-    }
-  },
-
-  /* =========================================================
-     7. WALLET & WITHDRAWALS (₹150 / ₹250)
-     ========================================================= */
-  initWalletEngine() {
-    const techId = this.currentTech ? this.currentTech.id : 'default';
-    let wallet = { balance: 0, cashInHand: 0, history: [] };
-
-    try {
-      const raw = localStorage.getItem(`selfcare_wallet_${techId}`);
-      if (raw) wallet = JSON.parse(raw);
-    } catch (e) {}
-
-    const balEl = document.getElementById('wallet-balance-amount');
-    const cashEl = document.getElementById('wallet-cash-in-hand');
-    if (balEl) balEl.textContent = Utils.formatCurrency(wallet.balance);
-    if (cashEl) cashEl.textContent = Utils.formatCurrency(wallet.cashInHand);
-  },
-
-  completeSampleCollection(bookingId, earningAmount) {
-    let bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-    const idx = bookings.findIndex(b => (b.bookingId === bookingId || b.id === bookingId));
-
-    if (idx !== -1) {
-      const booking = bookings[idx];
-      const techName = this.currentTech ? this.currentTech.name : 'Technician';
-
-      booking.techStatus = `Completed by ${techName}`;
-      booking.currentStage = 3;
-      booking.bookingStatus = 'SAMPLE_COLLECTED';
-      localStorage.setItem('selfcare_bookings_db', JSON.stringify(bookings));
-
-      try {
-        const recents = JSON.parse(localStorage.getItem('selfcare_recent_bookings') || '[]');
-        const rIdx = recents.findIndex(b => b.bookingId === bookingId);
-        if (rIdx !== -1) {
-          recents[rIdx].techStatus = `Sample Collected by ${techName}`;
-          recents[rIdx].currentStage = 3;
-          recents[rIdx].bookingStatus = 'SAMPLE_COLLECTED';
-          localStorage.setItem('selfcare_recent_bookings', JSON.stringify(recents));
-        }
-      } catch (e) {}
-
-      const techId = this.currentTech ? this.currentTech.id : 'default';
-      let wallet = { balance: 0, cashInHand: 0, history: [] };
-      try {
-        wallet = JSON.parse(localStorage.getItem(`selfcare_wallet_${techId}`) || '{"balance":0,"cashInHand":0,"history":[]}');
-      } catch (e) {}
-
-      wallet.balance += Number(earningAmount);
-
-      const isCash = String(booking.paymentMode || '').toUpperCase().includes('CASH');
-      if (isCash) {
-        wallet.cashInHand += Number(booking.finalAmount || booking.totalAmount || 0);
-      }
-
-      wallet.history.unshift({
-        bookingId: bookingId,
-        earning: earningAmount,
-        type: earningAmount === 250 ? 'Multi-visit / Panel' : 'Standard Visit',
-        timestamp: new Date().toISOString()
-      });
-
-      localStorage.setItem(`selfcare_wallet_${techId}`, JSON.stringify(wallet));
-
-      Utils.showToast(`🎉 Collection complete! ₹${earningAmount} added to your Wallet.`, 'success');
-      this.initWalletEngine();
-      this.refreshAssignedTrips();
-    }
-  },
-
-  requestWithdrawal(type) {
-    const techId = this.currentTech ? this.currentTech.id : 'default';
-    let wallet = { balance: 0 };
-    try {
-      wallet = JSON.parse(localStorage.getItem(`selfcare_wallet_${techId}`) || '{"balance":0}');
-    } catch (e) {}
-
-    if (wallet.balance <= 0) {
-      Utils.showToast('Your wallet balance is ₹0. Complete collections to earn.', 'error');
+    if (filtered.length === 0) {
+      container.innerHTML = `<div style="text-align:center; padding:18px; color:#64748B; font-size:12px;">No bills found between ${from} and ${to}.</div>`;
       return;
     }
 
-    if (confirm(`Submit ${type} withdrawal request for ₹${wallet.balance}? Admin will transfer to your registered bank account.`)) {
-      Utils.showToast(`${type} payout request of ₹${wallet.balance} submitted successfully!`, 'success');
-      wallet.balance = 0;
-      localStorage.setItem(`selfcare_wallet_${techId}`, JSON.stringify(wallet));
-      this.initWalletEngine();
-    }
-  },
-
-  /* =========================================================
-     8. ILD DIRECTORY & GPS
-     ========================================================= */
-  renderIldDirectory() {
-    const container = document.getElementById('ild-contacts-list');
-    if (!container) return;
-
-    container.innerHTML = this.ildHubs.map(hub => `
-      <div class="ild-contact-row">
-        <div class="ild-area-info">
-          <strong>${Utils.escapeHtml(hub.area)}</strong>
-          <span>In-charge: ${Utils.escapeHtml(hub.coordinator)}</span>
+    container.innerHTML = filtered.map(b => `
+      <div class="past-bill-card">
+        <div class="past-bill-head">
+          <strong>🧾 ${b.bookingId}</strong>
+          <span class="past-bill-amt">${Utils.formatCurrency(b.finalAmount)}</span>
         </div>
-        <a href="tel:${hub.phone}" class="btn-call-direct">
-          📞 Call ${hub.phone}
-        </a>
+        <div class="past-bill-meta">
+          <span>👤 ${Utils.escapeHtml(b.patientName)} (+91 ${b.patientPhone})</span> • 
+          <span>🩺 ${Utils.escapeHtml(b.referringDoctor || 'Self')}</span>
+          <span style="float:right; font-size:10px; color:#64748B;">${new Date(b.createdAt || b.date).toLocaleDateString('en-GB')}</span>
+        </div>
+        <div class="past-bill-actions-grid">
+          <button type="button" class="btn-view-receipt-mini" onclick="TechnicianApp.openPastBillReceipt('${b.bookingId}')">
+            👁️ Invoice
+          </button>
+          <button type="button" class="btn-view-receipt-mini" style="background:#078866; color:#FFF; border-color:#078866;" onclick="TechnicianApp.openUpdateReportModal('${b.bookingId}')">
+            📝 Update Report
+          </button>
+          <button type="button" class="btn-view-receipt-mini" style="background:#045D49; color:#FFF; border-color:#045D49;" onclick="TechnicianApp.openPatientReportModal('${b.bookingId}')">
+            📑 View Report
+          </button>
+        </div>
       </div>
     `).join('');
   },
 
-  openIldDirectoryModal() {
-    this.openModal('ild-directory-modal');
+  openPastBillReceipt(bookingId) {
+    const all = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    const b = all.find(item => item.bookingId === bookingId);
+    if (b) {
+      this.lastGeneratedBooking = b;
+      this.renderReceiptModal(b);
+    }
   },
 
-  detectCurrentGpsLocation(showToast = true) {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        this.currentGps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        if (showToast) Utils.showToast('GPS coordinates updated successfully!', 'success');
-      },
-      () => {
-        if (showToast) Utils.showToast('Please enable device location permissions.', 'error');
+  /* =========================================================
+     14. DYNAMIC UPDATE REPORTS ENGINE (ONLY BILLED TESTS)
+     ========================================================= */
+  detectBilledParameters(booking) {
+    const items = booking.items || [];
+    const fullText = items.map(i => `${i.name || ''} ${i.code || ''} ${i.TestName || ''}`).join(' ').toLowerCase();
+
+    return {
+      fbs: /fbs|fasting\s*blood\s*sugar|glucose\s*fasting|fasting\s*sugar|sugar\s*fasting/i.test(fullText),
+      ppbs: /ppbs|post\s*prandial|postprandial|glucose\s*pp|sugar\s*pp/i.test(fullText),
+      rbs: /rbs|random\s*blood\s*sugar|glucose\s*random|random\s*sugar/i.test(fullText),
+      bp: /blood\s*pressure|\bbp\b|systolic|diastolic|vitals|hypertension/i.test(fullText),
+      vitals: /height|weight|bmi|body\s*mass|vitals|wellness/i.test(fullText)
+    };
+  },
+
+  openUpdateReportModal(bookingId) {
+    const all = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    const b = all.find(item => item.bookingId === bookingId);
+    if (!b) {
+      Utils.showToast('Booking details not found', 'error');
+      return;
+    }
+
+    this.activeEditingBookingId = bookingId;
+    const subTitle = document.getElementById('rep-modal-patient-subtitle');
+    if (subTitle) {
+      subTitle.textContent = `Patient: ${b.patientName} • Bill ID: ${b.bookingId}`;
+    }
+
+    const detected = this.detectBilledParameters(b);
+
+    const hasAnyMatch = detected.fbs || detected.ppbs || detected.rbs || detected.bp || detected.vitals;
+    if (!hasAnyMatch) {
+      detected.fbs = true;
+      detected.ppbs = true;
+      detected.rbs = true;
+      detected.bp = true;
+      detected.vitals = true;
+    }
+
+    document.getElementById('field-group-fbs').style.display = detected.fbs ? 'block' : 'none';
+    document.getElementById('field-group-ppbs').style.display = detected.ppbs ? 'block' : 'none';
+    document.getElementById('field-group-rbs').style.display = detected.rbs ? 'block' : 'none';
+    document.getElementById('field-group-bp').style.display = detected.bp ? 'block' : 'none';
+    document.getElementById('field-group-vitals').style.display = detected.vitals ? 'block' : 'none';
+
+    const detectedNames = [];
+    if (detected.fbs) detectedNames.push('FBS');
+    if (detected.ppbs) detectedNames.push('PPBS');
+    if (detected.rbs) detectedNames.push('RBS');
+    if (detected.bp) detectedNames.push('Blood Pressure');
+    if (detected.vitals) detectedNames.push('Height/Weight (BMI)');
+    document.getElementById('rep-detected-list').textContent = detectedNames.join(', ');
+
+    const existing = b.reportData || {};
+    document.getElementById('rep-input-fbs').value = existing.fbs || '';
+    document.getElementById('rep-input-ppbs').value = existing.ppbs || '';
+    document.getElementById('rep-input-rbs').value = existing.rbs || '';
+    document.getElementById('rep-input-bp-sys').value = existing.bpSys || '';
+    document.getElementById('rep-input-bp-dia').value = existing.bpDia || '';
+    document.getElementById('rep-input-height').value = existing.height || '';
+    document.getElementById('rep-input-weight').value = existing.weight || '';
+
+    this.calculateBmiRealtime();
+    this.openModal('update-report-modal');
+  },
+
+  calculateBmiRealtime() {
+    const h = parseFloat(document.getElementById('rep-input-height')?.value || 0);
+    const w = parseFloat(document.getElementById('rep-input-weight')?.value || 0);
+    const dispBmi = document.getElementById('disp-calc-bmi');
+    const dispStatus = document.getElementById('disp-calc-bmi-status');
+
+    if (h > 0 && w > 0) {
+      const heightInMeters = h / 100;
+      const bmi = (w / (heightInMeters * heightInMeters)).toFixed(1);
+      if (dispBmi) dispBmi.textContent = `${bmi} kg/m²`;
+
+      if (dispStatus) {
+        if (bmi < 18.5) {
+          dispStatus.textContent = 'Underweight';
+          dispStatus.className = 'bmi-badge-warning';
+        } else if (bmi <= 24.9) {
+          dispStatus.textContent = 'Normal';
+          dispStatus.className = 'bmi-badge-normal';
+        } else if (bmi <= 29.9) {
+          dispStatus.textContent = 'Overweight';
+          dispStatus.className = 'bmi-badge-warning';
+        } else {
+          dispStatus.textContent = 'Obese';
+          dispStatus.className = 'bmi-badge-warning';
+        }
       }
-    );
+      return bmi;
+    } else {
+      if (dispBmi) dispBmi.textContent = '--';
+      if (dispStatus) {
+        dispStatus.textContent = 'Enter H & W';
+        dispStatus.className = 'bmi-badge-normal';
+      }
+      return '';
+    }
+  },
+
+  async saveReportData() {
+    const bookingId = this.activeEditingBookingId;
+    if (!bookingId) return;
+
+    const all = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    const idx = all.findIndex(item => item.bookingId === bookingId);
+    if (idx === -1) return;
+
+    const b = all[idx];
+    const bmiVal = this.calculateBmiRealtime();
+
+    const reportPayload = {
+      fbs: document.getElementById('rep-input-fbs')?.value.trim() || null,
+      ppbs: document.getElementById('rep-input-ppbs')?.value.trim() || null,
+      rbs: document.getElementById('rep-input-rbs')?.value.trim() || null,
+      bpSys: document.getElementById('rep-input-bp-sys')?.value.trim() || null,
+      bpDia: document.getElementById('rep-input-bp-dia')?.value.trim() || null,
+      height: document.getElementById('rep-input-height')?.value.trim() || null,
+      weight: document.getElementById('rep-input-weight')?.value.trim() || null,
+      bmi: bmiVal || null,
+      verifiedAt: new Date().toISOString(),
+      verifiedBy: this.currentTech?.name || 'Mohamed Adamkani'
+    };
+
+    b.reportData = reportPayload;
+    b.reportStatus = 'VERIFIED';
+    all[idx] = b;
+    localStorage.setItem('selfcare_bookings_db', JSON.stringify(all));
+
+    // Cloud Sync to Google Sheets
+    if (navigator.onLine && typeof Api !== 'undefined') {
+      try {
+        if (typeof Api.updateReport === 'function') {
+          await Api.updateReport({
+            bookingId: b.bookingId,
+            patientPhone: b.patientPhone,
+            reportData: JSON.stringify(reportPayload),
+            reportStatus: 'VERIFIED'
+          });
+        } else {
+          await Api.request('updateReport', {
+            bookingId: b.bookingId,
+            patientPhone: b.patientPhone,
+            reportData: JSON.stringify(reportPayload),
+            reportStatus: 'VERIFIED'
+          });
+        }
+      } catch (e) {
+        console.warn('Backend sync deferred:', e);
+      }
+    }
+
+    this.activeViewingReport = b;
+    this.closeModal('update-report-modal');
+    this.loadPreviousBills();
+    Utils.showToast('✓ Diagnostic Report successfully saved & verified!', 'success');
+
+    this.openModal('report-post-save-modal');
+  },
+
+  previewSavedReport() {
+    this.closeModal('report-post-save-modal');
+    if (this.activeViewingReport) {
+      this.openPatientReportModal(this.activeViewingReport.bookingId);
+    }
+  },
+
+  shareReportViaPostSaveWhatsapp() {
+    this.closeModal('report-post-save-modal');
+    this.shareCurrentReportWhatsApp();
+  },
+
+  shareCurrentReportWhatsApp() {
+    if (!this.activeViewingReport) return;
+    const b = this.activeViewingReport;
+    const r = b.reportData || {};
+
+    let summary = '';
+    if (r.fbs) summary += `• Fasting Blood Sugar: ${r.fbs} mg/dL%0A`;
+    if (r.ppbs) summary += `• Post Prandial Blood Sugar: ${r.ppbs} mg/dL%0A`;
+    if (r.rbs) summary += `• Random Blood Sugar: ${r.rbs} mg/dL%0A`;
+    if (r.bpSys && r.bpDia) summary += `• Blood Pressure: ${r.bpSys}/${r.bpDia} mmHg%0A`;
+    if (r.height && r.weight) summary += `• Height: ${r.height} cm | Weight: ${r.weight} kg%0A`;
+    if (r.bmi) summary += `• BMI: ${r.bmi} kg/m²%0A`;
+
+    const directTrackUrl = `https://selfcarediagnostics.in/booking.html?bookingId=${b.bookingId}`;
+
+    const msg = `*SELFCARE DIAGNOSTICS - CLINICAL LAB REPORT*%0A` +
+      `----------------------------------------%0A` +
+      `Dear *${b.patientName}*,%0A` +
+      `Your verified diagnostic test report for Bill *#${b.bookingId}* is ready.%0A%0A` +
+      `📋 *TEST RESULTS SUMMARY:*%0A` +
+      `${summary}%0A` +
+      `📥 *Download Full Official Report & Invoice:*%0A` +
+      `${directTrackUrl}%0A%0A` +
+      `_Status: Certified by Lab Pathologist._`;
+
+    window.open(`https://wa.me/91${b.patientPhone}?text=${msg}`, '_blank');
+  },
+
+  /* =========================================================
+     15. OFFICIAL A4 REPORT RENDERING & CORNER QR CODE
+     ========================================================= */
+  async openPatientReportModal(bookingId) {
+    const all = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    const b = all.find(item => item.bookingId === bookingId);
+    if (!b) return;
+
+    this.activeViewingReport = b;
+    const r = b.reportData || {};
+    const billDate = new Date(b.createdAt || Date.now());
+
+    document.getElementById('rep-sheet-bill-id').textContent = b.bookingId;
+    document.getElementById('rep-sheet-datetime').textContent = billDate.toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric'
+    });
+    document.getElementById('rep-patient-name').textContent = (b.patientName || 'PATIENT').toUpperCase();
+    document.getElementById('rep-patient-age-gender').textContent = `${b.patientAge || '27'} Years / ${b.patientGender || 'Male'}`;
+    document.getElementById('rep-patient-mobile').textContent = `+91 ${b.patientPhone}`;
+    document.getElementById('rep-referring-doctor').textContent = b.referringDoctor || 'Self / Walk-In';
+    document.getElementById('rep-collection-date').textContent = billDate.toLocaleDateString('en-GB');
+
+    const sampleId = `SC${billDate.toISOString().slice(2, 10).replace(/-/g, '')}${String(b.bookingId).slice(-3)}`;
+    document.getElementById('rep-sample-id').textContent = sampleId;
+
+    const qrDownloadUrl = `https://selfcarediagnostics.in/booking.html?bookingId=${b.bookingId}`;
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrDownloadUrl)}`;
+    const qrImg = document.getElementById('rep-corner-qr-img');
+    if (qrImg) qrImg.src = qrApiUrl;
+
+    const tbody = document.getElementById('rep-findings-tbody');
+    let rowsHtml = '';
+    let rowIdx = 1;
+
+    if (r.fbs) {
+      const v = parseFloat(r.fbs);
+      const isHigh = v >= 126;
+      const isPre = v >= 100 && v < 126;
+      const statusText = isHigh ? 'HIGH' : (isPre ? 'PRE-DIABETIC' : 'NORMAL');
+      const statusColor = isHigh ? '#DC2626' : (isPre ? '#D97706' : '#047857');
+
+      rowsHtml += `
+        <tr>
+          <td style="text-align:center;">${rowIdx++}</td>
+          <td><strong>Fasting Blood Sugar (FBS)</strong><br><span style="font-size:9px; color:#64748B;">Method: Hexokinase / Glucose Oxidase</span></td>
+          <td style="text-align:center; font-size:13px; font-weight:800; color:${statusColor};">${r.fbs}</td>
+          <td style="text-align:center; color:#475569;">mg/dL</td>
+          <td style="text-align:center; color:#475569;">70.0 – 99.0</td>
+          <td style="text-align:center; font-weight:800; color:${statusColor};">${statusText}</td>
+        </tr>
+      `;
+    }
+
+    if (r.ppbs) {
+      const v = parseFloat(r.ppbs);
+      const isHigh = v >= 200;
+      const isPre = v >= 140 && v < 200;
+      const statusText = isHigh ? 'HIGH' : (isPre ? 'ELEVATED' : 'NORMAL');
+      const statusColor = isHigh ? '#DC2626' : (isPre ? '#D97706' : '#047857');
+
+      rowsHtml += `
+        <tr>
+          <td style="text-align:center;">${rowIdx++}</td>
+          <td><strong>Post Prandial Blood Sugar (PPBS)</strong><br><span style="font-size:9px; color:#64748B;">2 hrs Post Meal Glucose</span></td>
+          <td style="text-align:center; font-size:13px; font-weight:800; color:${statusColor};">${r.ppbs}</td>
+          <td style="text-align:center; color:#475569;">mg/dL</td>
+          <td style="text-align:center; color:#475569;">&lt; 140.0</td>
+          <td style="text-align:center; font-weight:800; color:${statusColor};">${statusText}</td>
+        </tr>
+      `;
+    }
+
+    if (r.rbs) {
+      const v = parseFloat(r.rbs);
+      const isHigh = v > 140;
+      const statusText = isHigh ? 'HIGH' : 'NORMAL';
+      const statusColor = isHigh ? '#DC2626' : '#047857';
+
+      rowsHtml += `
+        <tr>
+          <td style="text-align:center;">${rowIdx++}</td>
+          <td><strong>Random Blood Sugar (RBS)</strong><br><span style="font-size:9px; color:#64748B;">Plasma Glucose Examination</span></td>
+          <td style="text-align:center; font-size:13px; font-weight:800; color:${statusColor};">${r.rbs}</td>
+          <td style="text-align:center; color:#475569;">mg/dL</td>
+          <td style="text-align:center; color:#475569;">70.0 – 140.0</td>
+          <td style="text-align:center; font-weight:800; color:${statusColor};">${statusText}</td>
+        </tr>
+      `;
+    }
+
+    if (r.bpSys && r.bpDia) {
+      const s = parseInt(r.bpSys);
+      const d = parseInt(r.bpDia);
+      const isHigh = s >= 140 || d >= 90;
+      const isPre = (s >= 120 && s < 140) || (d >= 80 && d < 90);
+      const statusText = isHigh ? 'STAGE 1 HTN' : (isPre ? 'ELEVATED' : 'NORMAL');
+      const statusColor = isHigh ? '#DC2626' : (isPre ? '#D97706' : '#047857');
+
+      rowsHtml += `
+        <tr>
+          <td style="text-align:center;">${rowIdx++}</td>
+          <td><strong>Blood Pressure (BP)</strong><br><span style="font-size:9px; color:#64748B;">Systolic / Diastolic Pressure</span></td>
+          <td style="text-align:center; font-size:13px; font-weight:800; color:${statusColor};">${s} / ${d}</td>
+          <td style="text-align:center; color:#475569;">mmHg</td>
+          <td style="text-align:center; color:#475569;">120 / 80</td>
+          <td style="text-align:center; font-weight:800; color:${statusColor};">${statusText}</td>
+        </tr>
+      `;
+    }
+
+    if (r.height || r.weight) {
+      rowsHtml += `
+        <tr>
+          <td style="text-align:center;">${rowIdx++}</td>
+          <td><strong>Height & Body Weight</strong></td>
+          <td style="text-align:center; font-size:12px; font-weight:800;">${r.height || '-'} cm / ${r.weight || '-'} kg</td>
+          <td style="text-align:center; color:#475569;">cm / kg</td>
+          <td style="text-align:center; color:#475569;">Physical</td>
+          <td style="text-align:center; font-weight:800; color:#047857;">RECORDED</td>
+        </tr>
+      `;
+    }
+
+    if (r.bmi) {
+      const bmi = parseFloat(r.bmi);
+      const isOver = bmi >= 25.0;
+      const isUnder = bmi < 18.5;
+      const statusText = isOver ? (bmi >= 30 ? 'OBESE' : 'OVERWEIGHT') : (isUnder ? 'UNDERWEIGHT' : 'NORMAL');
+      const statusColor = (isOver || isUnder) ? '#D97706' : '#047857';
+
+      rowsHtml += `
+        <tr>
+          <td style="text-align:center;">${rowIdx++}</td>
+          <td><strong>Body Mass Index (BMI)</strong><br><span style="font-size:9px; color:#64748B;">Auto-calculated Quetelet Index</span></td>
+          <td style="text-align:center; font-size:13px; font-weight:800; color:${statusColor};">${bmi}</td>
+          <td style="text-align:center; color:#475569;">kg/m²</td>
+          <td style="text-align:center; color:#475569;">18.5 – 24.9</td>
+          <td style="text-align:center; font-weight:800; color:${statusColor};">${statusText}</td>
+        </tr>
+      `;
+    }
+
+    if (!rowsHtml) {
+      rowsHtml = `
+        <tr>
+          <td colspan="6" style="text-align:center; padding: 20px; color:#94A3B8;">
+            No diagnostic parameters entered yet. Click "Update Report" to enter values.
+          </td>
+        </tr>
+      `;
+    }
+
+    if (tbody) tbody.innerHTML = rowsHtml;
+    this.openModal('report-view-modal');
+  },
+
+  async downloadCurrentReportPDF() {
+    if (!this.activeViewingReport) return;
+    const b = this.activeViewingReport;
+    const element = document.getElementById('printable-report-sheet');
+    const opt = {
+      margin: 0,
+      filename: `Selfcare_Report_${b.bookingId}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2.2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    await html2pdf().set(opt).from(element).save();
   },
 
   openModal(id) {

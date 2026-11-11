@@ -1,6 +1,6 @@
 /* file: assets/js/config.js */
 /**
- * Selfcare Diagnostics - Frontend Configuration (config.js)
+ * Selfcare Diagnostics - Frontend Configuration (config.js) v8.2.0
  * Defines API endpoints, versioning, database configuration, cache settings,
  * Razorpay Live Gateway, and Cashfree Production Gateway status constants.
  */
@@ -12,7 +12,7 @@ const Config = {
   // Razorpay Live Key ID
   RAZORPAY_KEY_ID: 'rzp_live_Tq9S3sQhh5B3hW',
   
-  // Google Apps Script Web App Deployment URL
+  // Google Apps Script Live Web App Deployment URL
   GAS_WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzM1alicIkwFVzwULAFpJwELalGwCFFOJhjnw9JGqimPz48Lt7V8llx1k6Jebv9icQBnQ/exec', 
   
   SPREADSHEET_ID: '1lswBf5iPcPnt8OGA6ZfCE1tcJyqqxTaP1e2u9UwwHOw',
@@ -22,7 +22,7 @@ const Config = {
   DB_VERSION: 1,
 
   // ==========================================================
-  // CASHFREE PRODUCTION GATEWAY PUBLIC SETTINGS (NO SECRET KEYS)
+  // CASHFREE PRODUCTION GATEWAY PUBLIC SETTINGS
   // ==========================================================
   CASHFREE: {
     SDK_URL: 'https://sdk.cashfree.com/js/v3/cashfree.js',
@@ -32,7 +32,7 @@ const Config = {
   },
 
   // ==========================================================
-  // LEGACY UPI FALLBACK CONFIGURATION (PRESERVED)
+  // LEGACY UPI FALLBACK CONFIGURATION
   // ==========================================================
   UPI: {
     MERCHANT_VPA: '0798545a0252206.bqr@kotak',
@@ -41,8 +41,8 @@ const Config = {
     MCC: '8099', // Medical Services & Diagnostic Labs
     TRANSACTION_PREFIX: 'SCDPAY',
     BOOKING_PREFIX: 'SCDBOOK',
-    INTENT_TIMEOUT_MS: 180000, // 3 minutes timeout window for app return
-    POLL_INTERVAL_MS: 3000     // 3 seconds polling interval
+    INTENT_TIMEOUT_MS: 180000,
+    POLL_INTERVAL_MS: 3000
   },
 
   // Payment Status Lifecycle
@@ -67,7 +67,7 @@ const Config = {
   }
 };
 
-// Expose Config across all client scopes (window, globalThis, and worker context)
+// Expose Config across all client scopes
 if (typeof window !== 'undefined') {
   window.Config = Config;
   window.CONFIG = Config;

@@ -1,11 +1,14 @@
 /* file: assets/js/auth.js */
 /**
- * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.6.0
+ * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.7.1
  * Features:
- * - Full VIP Membership & Expiry mapping during OTP verification
- * - Preserves VIP status and Crown across logins and reloads
- * - Purges family directory cache & VIP state on logout safely
- * - 0ms Synchronous local-first session verification
+ * - Loop-Proof Universal Route Guard: Prevents infinite redirect bouncing.
+ * - Deep-Link Preservation: Preserves target redirect (?bookingId=...) and returns post-login.
+ * - Auto-resolves Technician Desk credentials seamlessly without kickback.
+ * - Full VIP Membership & Expiry mapping during OTP verification.
+ * - Preserves VIP status and Crown across logins and reloads.
+ * - Purges family directory cache & VIP state on logout safely.
+ * - 0ms Synchronous local-first session verification.
  */
 
 const Auth = {
@@ -13,6 +16,46 @@ const Auth = {
   PROFILE_KEY: 'selfcare_customer_profile',
   TOKEN_KEY: 'selfcare_auth_token',
   ROLE_KEY: 'selfcare_user_role',
+
+  /**
+   * Universal Route Guard (Runs immediately on file load)
+   */
+  checkRouteGuard() {
+    try {
+      if (typeof window === 'undefined') return;
+
+      const currentPath = window.location.pathname.toLowerCase();
+      const currentUrl = window.location.href;
+
+      // 1. Login page-la iruntha entha redirect-um seiya koodathu (Loop Prevention)
+      if (currentPath.endsWith('login.html') || currentPath.includes('/login')) {
+        return;
+      }
+
+      const activeUser = localStorage.getItem(this.ACTIVE_USER_KEY);
+      const activeTech = localStorage.getItem('selfcare_active_tech') || localStorage.getItem('selfcare_active_technician');
+      const token = localStorage.getItem(this.TOKEN_KEY);
+
+      // Session verification
+      const isLogged = Boolean(activeUser && token) || Boolean(activeTech) || this.isLoggedIn();
+
+      // 2. Yaarume login pannala na mattum thaan login page-ku anuppanum
+      if (!isLogged) {
+        const target = encodeURIComponent(currentUrl);
+        window.location.replace(`login.html?redirect=${target}`);
+        return;
+      }
+
+      // 3. Technician.html-la login irunthu active_tech illana auto-seed seithu loop-ai thadukkum
+      if (currentPath.includes('technician.html') && !activeTech) {
+        const techName = activeUser || 'Mohamed Adamkani';
+        const defaultTech = { id: 'TechlabDesk', name: techName, zone: 'Vettuvankeni Lab' };
+        localStorage.setItem('selfcare_active_tech', JSON.stringify(defaultTech));
+      }
+    } catch (e) {
+      console.warn('[Auth] Route guard check notice:', e);
+    }
+  },
 
   isLoggedIn() {
     try {
@@ -122,7 +165,6 @@ const Auth = {
       localStorage.setItem('selfcare_permanent_user', serialized);
       localStorage.setItem('selfcare_user_session', serialized);
 
-      // VIP Status Sync
       if (isVipValid) {
         localStorage.setItem('selfcare_is_vip_member', 'true');
         const memObj = {
@@ -193,7 +235,6 @@ const Auth = {
         return { success: false, message: 'Invalid OTP entered. Please try again.' };
       }
 
-      // Backend profile fields with Membership & Expiry mapping
       const userData = {
         userId: (serverUser && (serverUser.userId || serverUser.UserID)) ? (serverUser.userId || serverUser.UserID) : `SCD_${cleanMobile}`,
         mobile: cleanMobile,
@@ -225,9 +266,10 @@ const Auth = {
     return this.savePermanentSession(merged);
   },
 
-  requireAuth(redirectUrl = 'index.html') {
+  requireAuth(redirectUrl = 'login.html') {
     if (!this.isLoggedIn()) {
-      window.location.href = redirectUrl;
+      const target = encodeURIComponent(window.location.href);
+      window.location.replace(`${redirectUrl}?redirect=${target}`);
       return false;
     }
     return true;
@@ -247,6 +289,8 @@ const Auth = {
       localStorage.removeItem(this.PROFILE_KEY);
       localStorage.removeItem(this.TOKEN_KEY);
       localStorage.removeItem(this.ROLE_KEY);
+      localStorage.removeItem('selfcare_active_tech');
+      localStorage.removeItem('selfcare_active_technician');
       localStorage.removeItem('selfcare_is_vip_member');
       localStorage.removeItem('selfcare_permanent_user');
       localStorage.removeItem('selfcare_user_session');
@@ -258,13 +302,16 @@ const Auth = {
         Utils.showToast('Logged out successfully', 'info');
       }
       setTimeout(() => {
-        window.location.replace('index.html');
+        window.location.replace('login.html?logout=true');
       }, 350);
     } catch (e) {
       console.error('Logout error:', e);
     }
   }
 };
+
+// Immediate Safe Route Guard
+Auth.checkRouteGuard();
 
 if (typeof window !== 'undefined') window.Auth = Auth;
 if (typeof module !== 'undefined' && module.exports) module.exports = Auth;
