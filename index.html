@@ -47,9 +47,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Versioned Global Stylesheets -->
-  <link rel="stylesheet" href="assets/css/global.css?v=5.8.0">
-  <link rel="stylesheet" href="assets/css/components.css?v=5.8.0">
-  <link rel="stylesheet" href="assets/css/responsive.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/global.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=6.0.0">
 
   <style>
     :root {
@@ -222,7 +222,7 @@
       background: #EAF6F2;
       padding: 4px;
       border-radius: 12px;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
     .role-tab-btn {
@@ -248,6 +248,35 @@
       box-shadow: 0 4px 12px rgba(7, 136, 102, 0.12);
     }
 
+    /* PATIENT MODE SUB-TABS (Login vs Sign Up) */
+    .patient-mode-switch {
+      display: flex;
+      gap: 6px;
+      background: #F1F5F9;
+      padding: 3px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      border: 1px solid #E2E8F0;
+    }
+
+    .mode-pill-btn {
+      flex: 1;
+      padding: 7px 10px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 800;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .mode-pill-btn.active {
+      background: var(--primary-green);
+      color: #ffffff;
+    }
+
     /* LOGIN CARD */
     .login-card {
       padding: 22px 20px;
@@ -265,11 +294,11 @@
       font-size: 11.5px;
       color: var(--text-muted);
       line-height: 1.4;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .form-group {
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .form-group label {
@@ -302,16 +331,28 @@
       color: var(--dark-green);
       background: #F0FDF9;
       border-right: 1px solid rgba(7, 136, 102, 0.2);
+      white-space: nowrap;
     }
 
     .phone-input-wrap input, .staff-input-wrap input {
       flex: 1;
+      width: 100%;
       border: none;
       outline: none;
       padding: 11px 14px;
       font-size: 14px;
       font-weight: 700;
       color: var(--text-main);
+      background: transparent;
+    }
+
+    .pwd-eye-btn {
+      background: transparent;
+      border: none;
+      padding: 0 12px;
+      font-size: 15px;
+      cursor: pointer;
+      opacity: 0.75;
     }
 
     .error-hint {
@@ -319,7 +360,49 @@
       font-size: 10.5px;
       color: #DC2626;
       margin-top: 5px;
+      font-weight: 700;
+    }
+
+    .pwd-match-status {
+      display: none;
+      font-size: 11px;
+      font-weight: 800;
+      margin-top: 6px;
+      padding: 5px 10px;
+      border-radius: 8px;
+    }
+
+    .pwd-match-status.match-ok {
+      display: block;
+      background: #ECFDF5;
+      color: #047857;
+      border: 1px solid #A7F3D0;
+    }
+
+    .pwd-match-status.match-err {
+      display: block;
+      background: #FEF2F2;
+      color: #DC2626;
+      border: 1px solid #FECACA;
+    }
+
+    .switch-auth-footer {
+      text-align: center;
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--text-muted);
       font-weight: 600;
+    }
+
+    .switch-auth-footer button {
+      background: none;
+      border: none;
+      color: var(--primary-green);
+      font-weight: 800;
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 4px;
     }
 
     .btn-3d-action {
@@ -341,95 +424,9 @@
       transform: scale(0.97);
     }
 
-    /* TOP OTP BANNER */
-    .otp-top-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
-      border: 1.5px solid #078866;
-      border-radius: 12px;
-      padding: 10px 14px;
-      margin-bottom: 16px;
-      cursor: pointer;
-      box-shadow: 0 4px 15px rgba(7, 136, 102, 0.12);
-      animation: slideDown 0.3s ease-out;
-    }
-
-    .otp-badge-content {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12.5px;
-      font-weight: 700;
-      color: #045D49;
-    }
-
-    .otp-badge-content strong {
-      font-size: 16px;
-      color: #078866;
-      letter-spacing: 2px;
-      background: #ffffff;
-      padding: 2px 8px;
-      border-radius: 6px;
-      border: 1px dashed #078866;
-    }
-
-    .autofill-tag {
-      font-size: 10.5px;
-      font-weight: 800;
-      color: #045D49;
-      background: #A7F3D0;
-      padding: 3px 8px;
-      border-radius: 20px;
-    }
-
-    @keyframes slideDown {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* OTP Boxes */
-    .otp-boxes-grid {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      margin: 10px 0;
-    }
-
-    .otp-digit {
-      width: 52px;
-      height: 54px;
-      text-align: center;
-      font-size: 22px;
-      font-weight: 800;
-      border: 1.5px solid rgba(7, 136, 102, 0.3);
-      border-radius: 12px;
-      background: #ffffff;
-      color: var(--dark-green);
-      outline: none;
-    }
-
-    .otp-digit:focus {
-      border-color: var(--primary-green);
-      box-shadow: 0 0 0 3px rgba(7, 136, 102, 0.2);
-    }
-
-    .otp-help-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
-      margin-top: 12px;
-      color: var(--text-muted);
-    }
-
-    .edit-num-btn, .resend-otp-btn {
-      background: none;
-      border: none;
-      color: var(--primary-green);
-      font-weight: 800;
-      cursor: pointer;
+    .btn-3d-action:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
     }
 
     /* TRUST HIGHLIGHTS */
@@ -646,21 +643,31 @@
         </button>
       </div>
 
-      <!-- VIEW A: PATIENT MOBILE + OTP LOGIN -->
+      <!-- VIEW A: PATIENT LOGIN & SIGN UP (NO OTP) -->
       <div id="patient-auth-section">
-        <div id="step-mobile-view">
+        <div class="patient-mode-switch">
+          <button type="button" class="mode-pill-btn active" id="btn-patient-mode-login" onclick="IndexPortal.switchPatientMode('login')">
+            Login
+          </button>
+          <button type="button" class="mode-pill-btn" id="btn-patient-mode-signup" onclick="IndexPortal.switchPatientMode('signup')">
+            Sign Up (New User)
+          </button>
+        </div>
+
+        <!-- PATIENT LOGIN FORM -->
+        <div id="step-patient-login">
           <div class="card-title-row">
             <h2>Patient Login</h2>
-            <p>Enter your 10-digit mobile number to access diagnostic checkups, cart, and lab reports.</p>
+            <p>Login with your registered mobile number &amp; password.</p>
           </div>
 
           <div class="form-group">
-            <label for="user-mobile-input">Mobile Number</label>
+            <label for="patient-login-mobile">Mobile Number</label>
             <div class="phone-input-wrap">
               <span class="country-code">🇮🇳 +91</span>
               <input 
                 type="tel" 
-                id="user-mobile-input" 
+                id="patient-login-mobile" 
                 placeholder="Enter 10-digit mobile" 
                 maxlength="10" 
                 autocomplete="tel" 
@@ -668,51 +675,99 @@
                 oninput="IndexPortal.validatePhone(this)"
               >
             </div>
-            <span class="error-hint" id="phone-error-hint">Please enter a valid 10-digit Indian mobile number.</span>
-          </div>
-
-          <button type="button" class="btn-3d-action" id="request-otp-btn" onclick="IndexPortal.requestOtp()">
-            Get OTP ➔
-          </button>
-        </div>
-
-        <div id="step-otp-view" style="display: none;">
-
-          <!-- TOP OTP BANNER WITH AUTO-FILL TRIGGER -->
-          <div id="top-otp-badge" class="otp-top-banner" style="display: none;" onclick="IndexPortal.autoFillOtp()">
-            <div class="otp-badge-content">
-              <span class="badge-icon">⚡</span>
-              <span>Your Login OTP: <strong id="top-otp-display">----</strong></span>
-            </div>
-            <span class="autofill-tag">Auto-Filled ✓</span>
-          </div>
-
-          <div class="card-title-row">
-            <h2>Verify OTP</h2>
-            <p>Enter 4-digit code sent to <strong id="disp-phone-target">+91 ----------</strong></p>
           </div>
 
           <div class="form-group">
-            <div class="otp-boxes-grid">
-              <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
-              <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
-              <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
-              <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+            <label for="patient-login-password">Password</label>
+            <div class="staff-input-wrap">
+              <input 
+                type="password" 
+                id="patient-login-password" 
+                placeholder="Enter your password" 
+                autocomplete="current-password"
+                onkeydown="if(event.key==='Enter') IndexPortal.handlePatientLogin()"
+              >
+              <button type="button" class="pwd-eye-btn" onclick="IndexPortal.togglePwdVisibility('patient-login-password', this)">👁️</button>
+            </div>
+            <span class="error-hint" id="patient-login-error">Invalid mobile number or password.</span>
+          </div>
+
+          <button type="button" class="btn-3d-action" id="patient-login-btn" onclick="IndexPortal.handlePatientLogin()">
+            Login ➔
+          </button>
+
+          <div class="switch-auth-footer">
+            New to Selfcare?
+            <button type="button" onclick="IndexPortal.switchPatientMode('signup')">Create Account (Sign Up)</button>
+          </div>
+        </div>
+
+        <!-- PATIENT SIGN UP FORM -->
+        <div id="step-patient-signup" style="display: none;">
+          <div class="card-title-row">
+            <h2>Patient Sign Up</h2>
+            <p>Create your account once for lifetime access.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="patient-signup-mobile">Mobile Number *</label>
+            <div class="phone-input-wrap">
+              <span class="country-code">🇮🇳 +91</span>
+              <input 
+                type="tel" 
+                id="patient-signup-mobile" 
+                placeholder="Enter 10-digit mobile" 
+                maxlength="10" 
+                autocomplete="tel" 
+                inputmode="numeric" 
+                oninput="IndexPortal.validatePhone(this)"
+              >
             </div>
           </div>
 
-          <button type="button" class="btn-3d-action" id="verify-otp-btn" onclick="IndexPortal.verifyOtp()">
-            Verify & Continue ✓
+          <div class="form-group">
+            <label for="patient-signup-password">Create New Password *</label>
+            <div class="staff-input-wrap">
+              <input 
+                type="password" 
+                id="patient-signup-password" 
+                placeholder="Minimum 4 characters" 
+                autocomplete="new-password"
+                oninput="IndexPortal.checkSignupPasswordMatch()"
+              >
+              <button type="button" class="pwd-eye-btn" onclick="IndexPortal.togglePwdVisibility('patient-signup-password', this)">👁️</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="patient-signup-confirm">Confirm Password *</label>
+            <div class="staff-input-wrap">
+              <input 
+                type="password" 
+                id="patient-signup-confirm" 
+                placeholder="Re-enter new password" 
+                autocomplete="new-password"
+                oninput="IndexPortal.checkSignupPasswordMatch()"
+                onkeydown="if(event.key==='Enter') IndexPortal.handlePatientSignup()"
+              >
+              <button type="button" class="pwd-eye-btn" onclick="IndexPortal.togglePwdVisibility('patient-signup-confirm', this)">👁️</button>
+            </div>
+            <div id="signup-match-indicator" class="pwd-match-status"></div>
+            <span class="error-hint" id="patient-signup-error">Please check details and try again.</span>
+          </div>
+
+          <button type="button" class="btn-3d-action" id="patient-signup-btn" onclick="IndexPortal.handlePatientSignup()">
+            Create Account &amp; Login ✓
           </button>
 
-          <div class="otp-help-row">
-            <button type="button" class="edit-num-btn" onclick="IndexPortal.backToMobile()">✏️ Edit Number</button>
-            <button type="button" class="resend-otp-btn" id="resend-otp-btn" onclick="IndexPortal.resendOtp()">Resend OTP</button>
+          <div class="switch-auth-footer">
+            Already have an account?
+            <button type="button" onclick="IndexPortal.switchPatientMode('login')">Login Here</button>
           </div>
         </div>
       </div>
 
-      <!-- VIEW B: STAFF & ADMIN LOGIN (ID + Password) -->
+      <!-- VIEW B: STAFF & ADMIN LOGIN ONLY (NO SIGN UP) -->
       <div id="staff-auth-section" style="display: none;">
         <div class="card-title-row">
           <h2>Staff & Admin Portal</h2>
@@ -722,20 +777,21 @@
         <div class="form-group">
           <label for="staff-id-input">Admin or Technician ID</label>
           <div class="staff-input-wrap">
-            <input type="text" id="staff-id-input" placeholder="Enter ID (e.g. Techlab... or Techhome...)" autocomplete="username">
+            <input type="text" id="staff-id-input" placeholder="Enter ID" autocomplete="username">
           </div>
         </div>
 
         <div class="form-group">
           <label for="staff-password-input">Password</label>
           <div class="staff-input-wrap">
-            <input type="password" id="staff-password-input" placeholder="Enter password" autocomplete="current-password">
+            <input type="password" id="staff-password-input" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter') IndexPortal.handleStaffLogin()">
+            <button type="button" class="pwd-eye-btn" onclick="IndexPortal.togglePwdVisibility('staff-password-input', this)">👁️</button>
           </div>
           <span class="error-hint" id="staff-error-hint">Invalid Staff ID or Password.</span>
         </div>
 
         <button type="button" class="btn-3d-action" id="staff-login-btn" onclick="IndexPortal.handleStaffLogin()">
-          Login to Workspace ➔
+          Login ➔
         </button>
       </div>
 
@@ -837,23 +893,19 @@
   </main>
 
   <!-- Core JavaScript Stack -->
-  <script src="assets/js/config.js?v=5.8.0"></script>
-  <script src="assets/js/utils.js?v=5.8.0"></script>
-  <script src="assets/js/api.js?v=5.8.0"></script>
-  <script src="assets/js/offline-db.js?v=5.8.0"></script>
-  <script src="assets/js/offline-sync.js?v=5.8.0"></script>
-  <script src="assets/js/auth.js?v=5.8.0"></script>
+  <script src="assets/js/config.js?v=6.0.0"></script>
+  <script src="assets/js/utils.js?v=6.0.0"></script>
+  <script src="assets/js/api.js?v=6.0.0"></script>
+  <script src="assets/js/offline-db.js?v=6.0.0"></script>
+  <script src="assets/js/offline-sync.js?v=6.0.0"></script>
+  <script src="assets/js/auth.js?v=6.0.0"></script>
 
-  <!-- Login Logic for Patient, Admin, and Technician -->
+  <!-- Unified Password Auth Logic for Patient, Admin, and Technician -->
   <script>
     const IndexPortal = {
-      phone: '',
-      generatedOtp: '',
-
       init() {
         this.handleSplashAnimation();
         this.checkExistingLogin();
-        this.bindOtpAutoAdvance();
       },
 
       handleSplashAnimation() {
@@ -868,19 +920,16 @@
         }, 1200);
       },
 
-      /**
-       * Safe Login Check (Prevents Infinite Redirect Loops)
-       */
       checkExistingLogin() {
         const urlParams = new URLSearchParams(window.location.search);
-        
-        // If logout query param is present, purge all cached tokens and stay on login form
+
         if (urlParams.get('logout') === 'true') {
           localStorage.removeItem('selfcare_active_user');
           localStorage.removeItem('selfcare_user_role');
           localStorage.removeItem('selfcare_active_tech');
           localStorage.removeItem('selfcare_active_technician');
           localStorage.removeItem('selfcare_auth_token');
+          localStorage.removeItem('selfcare_permanent_user');
           if (window.history && window.history.replaceState) {
             window.history.replaceState({}, document.title, window.location.pathname);
           }
@@ -894,12 +943,10 @@
           if (userRole === 'admin') {
             window.location.replace('admin.html');
           } else if (userRole === 'technician') {
-            // Only redirect if active technician session data actually exists in storage
             const hasTech = localStorage.getItem('selfcare_active_tech') || localStorage.getItem('selfcare_active_technician');
             if (hasTech) {
               window.location.replace('technician.html');
             } else {
-              // Stale technician flag detected - clear it to break infinite loop!
               localStorage.removeItem('selfcare_user_role');
               localStorage.removeItem('selfcare_active_user');
             }
@@ -929,208 +976,268 @@
         }
       },
 
+      switchPatientMode(mode) {
+        const loginBtn = document.getElementById('btn-patient-mode-login');
+        const signupBtn = document.getElementById('btn-patient-mode-signup');
+        const loginForm = document.getElementById('step-patient-login');
+        const signupForm = document.getElementById('step-patient-signup');
+
+        document.getElementById('patient-login-error').style.display = 'none';
+        document.getElementById('patient-signup-error').style.display = 'none';
+
+        if (mode === 'signup') {
+          loginBtn.classList.remove('active');
+          signupBtn.classList.add('active');
+          loginForm.style.display = 'none';
+          signupForm.style.display = 'block';
+        } else {
+          signupBtn.classList.remove('active');
+          loginBtn.classList.add('active');
+          signupForm.style.display = 'none';
+          loginForm.style.display = 'block';
+        }
+      },
+
+      togglePwdVisibility(inputId, btnEl) {
+        const inp = document.getElementById(inputId);
+        if (!inp) return;
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        if (btnEl) btnEl.textContent = inp.type === 'password' ? '👁️' : '🙈';
+      },
+
       validatePhone(input) {
         input.value = input.value.replace(/\D/g, '').slice(0, 10);
-        document.getElementById('phone-error-hint').style.display = 'none';
+        document.getElementById('patient-login-error').style.display = 'none';
+        document.getElementById('patient-signup-error').style.display = 'none';
       },
 
-      async requestOtp() {
-        const input = document.getElementById('user-mobile-input');
-        const val = input ? input.value.trim() : '';
+      checkSignupPasswordMatch() {
+        const pwd = document.getElementById('patient-signup-password').value;
+        const confirmPwd = document.getElementById('patient-signup-confirm').value;
+        const indicator = document.getElementById('signup-match-indicator');
 
-        if (!/^[6-9]\d{9}$/.test(val)) {
-          document.getElementById('phone-error-hint').style.display = 'block';
-          if (typeof Utils !== 'undefined') Utils.showToast('Please enter a valid 10-digit mobile number', 'error');
-          return;
+        if (!confirmPwd) {
+          indicator.className = 'pwd-match-status';
+          indicator.textContent = '';
+          return false;
         }
 
-        this.phone = val;
-        const btn = document.getElementById('request-otp-btn');
-        btn.textContent = 'Sending OTP...';
-        btn.disabled = true;
+        if (pwd === confirmPwd) {
+          indicator.className = 'pwd-match-status match-ok';
+          indicator.textContent = '✓ Passwords match perfectly';
+          return true;
+        } else {
+          indicator.className = 'pwd-match-status match-err';
+          indicator.textContent = '✗ Passwords do not match';
+          return false;
+        }
+      },
+
+      getPatientAccountsMap() {
+        try {
+          const raw = localStorage.getItem('selfcare_patient_credentials');
+          return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+          return {};
+        }
+      },
+
+      savePatientAccountRecord(mobile, password, serverProfile = null) {
+        const accounts = this.getPatientAccountsMap();
+        accounts[mobile] = {
+          mobile,
+          password,
+          userId: (serverProfile && serverProfile.userId) || `SCD_${mobile}`,
+          name: (serverProfile && serverProfile.name) || accounts[mobile]?.name || 'Valued Customer',
+          updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem('selfcare_patient_credentials', JSON.stringify(accounts));
+      },
+
+      completeLifetimePatientSession(mobile, serverUser = null) {
+        const previousMobile = localStorage.getItem('selfcare_active_user');
+        if (previousMobile && previousMobile !== mobile) {
+          try {
+            const activeCart = localStorage.getItem('selfcare_cart');
+            if (activeCart) localStorage.setItem(`selfcare_cart_${previousMobile}`, activeCart);
+          } catch (e) {}
+        }
+
+        let existingVault = {};
+        try {
+          const rawVault = localStorage.getItem(`selfcare_profile_${mobile}`);
+          if (rawVault) existingVault = JSON.parse(rawVault);
+        } catch (e) {}
+
+        const userData = {
+          ...existingVault,
+          userId: (serverUser && serverUser.userId) ? serverUser.userId : (existingVault.userId || `SCD_${mobile}`),
+          mobile: mobile,
+          phone: mobile,
+          name: (serverUser && serverUser.name) ? serverUser.name : (existingVault.name || 'Valued Customer'),
+          token: (serverUser && serverUser.token) ? serverUser.token : `LIFETIME_PATIENT_TOKEN_${mobile}`,
+          role: 'patient',
+          lifetimeSession: true
+        };
+
+        if (typeof Auth !== 'undefined' && typeof Auth.savePermanentSession === 'function') {
+          Auth.savePermanentSession(userData);
+        }
+
+        const serialized = JSON.stringify(userData);
+        localStorage.setItem('selfcare_active_user', mobile);
+        localStorage.setItem('selfcare_user_role', 'patient');
+        localStorage.setItem('selfcare_auth_token', userData.token);
+        localStorage.setItem('selfcare_customer_profile', serialized);
+        localStorage.setItem('selfcare_permanent_user', serialized);
+        localStorage.setItem(`selfcare_profile_${mobile}`, serialized);
 
         try {
-          let serverRes = null;
+          const userVaultCart = localStorage.getItem(`selfcare_cart_${mobile}`);
+          localStorage.setItem('selfcare_cart', userVaultCart || JSON.stringify([]));
+        } catch (e) {}
 
-          if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.requestOtp === 'function') {
-            try {
-              serverRes = await Api.requestOtp(this.phone);
-            } catch (netErr) {
-              console.warn('[IndexPortal] Server OTP request deferred:', netErr);
-            }
-          }
-
-          this.generatedOtp = (serverRes && (serverRes.devOtp || serverRes.masterOtp))
-            ? String(serverRes.devOtp || serverRes.masterOtp)
-            : Math.floor(1000 + Math.random() * 9000).toString();
-
-          btn.textContent = 'Get OTP ➔';
-          btn.disabled = false;
-
-          document.getElementById('step-mobile-view').style.display = 'none';
-          document.getElementById('step-otp-view').style.display = 'block';
-          document.getElementById('disp-phone-target').textContent = `+91 ${this.phone}`;
-
-          const topBadge = document.getElementById('top-otp-badge');
-          const topDisp = document.getElementById('top-otp-display');
-          if (topBadge && topDisp) {
-            topDisp.textContent = this.generatedOtp;
-            topBadge.style.display = 'flex';
-          }
-
-          const inputs = document.querySelectorAll('#step-otp-view .otp-digit');
-          inputs.forEach(i => i.value = '');
-
-          setTimeout(() => {
-            this.autoFillOtp();
-          }, 200);
-
-          if (typeof Utils !== 'undefined') {
-            Utils.showToast(`Your Selfcare login OTP is: ${this.generatedOtp}`, 'success');
-          }
-        } catch (err) {
-          btn.textContent = 'Get OTP ➔';
-          btn.disabled = false;
-          if (typeof Utils !== 'undefined') Utils.showToast(err.message || 'Error generating OTP', 'error');
-        }
+        if (typeof Utils !== 'undefined') Utils.showToast('Login successful! Redirecting...', 'success');
+        setTimeout(() => window.location.replace('customer.html'), 450);
       },
 
-      autoFillOtp() {
-        if (!this.generatedOtp) return;
-        const digits = String(this.generatedOtp).split('');
-        const inputs = document.querySelectorAll('#step-otp-view .otp-digit');
+      async handlePatientSignup() {
+        const mobileInput = document.getElementById('patient-signup-mobile');
+        const pwdInput = document.getElementById('patient-signup-password');
+        const confirmInput = document.getElementById('patient-signup-confirm');
+        const errHint = document.getElementById('patient-signup-error');
+        const btn = document.getElementById('patient-signup-btn');
 
-        inputs.forEach((input, idx) => {
-          input.value = digits[idx] || '';
-        });
+        const mobile = mobileInput ? mobileInput.value.trim() : '';
+        const password = pwdInput ? pwdInput.value.trim() : '';
+        const confirmPwd = confirmInput ? confirmInput.value.trim() : '';
 
-        if (inputs[inputs.length - 1]) {
-          inputs[inputs.length - 1].focus();
-        }
-      },
+        errHint.style.display = 'none';
 
-      backToMobile() {
-        document.getElementById('step-otp-view').style.display = 'none';
-        document.getElementById('step-mobile-view').style.display = 'block';
-        document.getElementById('user-mobile-input').focus();
-      },
-
-      bindOtpAutoAdvance() {
-        const inputs = document.querySelectorAll('#step-otp-view .otp-digit');
-        inputs.forEach((input, index) => {
-          input.addEventListener('input', (e) => {
-            const val = e.target.value.replace(/\D/g, '');
-            e.target.value = val ? val[0] : '';
-            if (e.target.value && index < inputs.length - 1) inputs[index + 1].focus();
-            const fullOtp = Array.from(inputs).map(i => i.value).join('');
-            if (fullOtp.length === 4) IndexPortal.verifyOtp();
-          });
-
-          input.addEventListener('keydown', (e) => {
-            if (e.key === 'Backspace' && !input.value && index > 0) inputs[index - 1].focus();
-          });
-        });
-      },
-
-      async resendOtp() {
-        this.generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
-        const topDisp = document.getElementById('top-otp-display');
-        if (topDisp) topDisp.textContent = this.generatedOtp;
-
-        this.autoFillOtp();
-
-        if (typeof Utils !== 'undefined') Utils.showToast(`New OTP: ${this.generatedOtp}`, 'success');
-        else alert(`New OTP: ${this.generatedOtp}`);
-      },
-
-      async verifyOtp() {
-        const inputs = document.querySelectorAll('#step-otp-view .otp-digit');
-        const enteredOtp = Array.from(inputs).map(i => i.value).join('');
-
-        if (enteredOtp.length < 4) {
-          if (typeof Utils !== 'undefined') Utils.showToast('Please enter 4-digit OTP', 'error');
+        if (!/^[6-9]\d{9}$/.test(mobile)) {
+          errHint.textContent = 'Please enter a valid 10-digit Indian mobile number.';
+          errHint.style.display = 'block';
+          mobileInput.focus();
           return;
         }
 
-        const verifyBtn = document.getElementById('verify-otp-btn');
-        if (verifyBtn) {
-          verifyBtn.disabled = true;
-          verifyBtn.textContent = 'Verifying...';
+        if (password.length < 4) {
+          errHint.textContent = 'Password must be at least 4 characters long.';
+          errHint.style.display = 'block';
+          pwdInput.focus();
+          return;
         }
+
+        if (password !== confirmPwd) {
+          errHint.textContent = 'Passwords do not match. Please confirm accurately.';
+          errHint.style.display = 'block';
+          confirmInput.focus();
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Creating Account...';
 
         try {
           let serverUser = null;
-
-          if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.verifyOtp === 'function') {
+          if (navigator.onLine && typeof Api !== 'undefined') {
             try {
-              serverUser = await Api.verifyOtp(this.phone, enteredOtp);
-            } catch (netErr) {
-              const errText = netErr.message || '';
-              if (errText.includes('Invalid OTP') || errText.includes('OTP')) {
-                throw netErr;
+              if (typeof Api.patientRegister === 'function') {
+                serverUser = await Api.patientRegister(mobile, password);
+              } else if (typeof Api.request === 'function') {
+                serverUser = await Api.request('patientRegister', { mobile, password, userId: `SCD_${mobile}` }, false);
               }
+            } catch (netErr) {
+              console.warn('[IndexPortal] Cloud signup sync deferred:', netErr);
             }
           }
 
-          if (!serverUser && enteredOtp !== this.generatedOtp && enteredOtp !== '1234') {
-            throw new Error('Invalid OTP entered. Please try again.');
-          }
-
-          const currentMobile = this.phone;
-          const previousMobile = localStorage.getItem('selfcare_active_user');
-
-          if (previousMobile && previousMobile !== currentMobile) {
-            try {
-              const activeCart = localStorage.getItem('selfcare_cart');
-              if (activeCart) localStorage.setItem(`selfcare_cart_${previousMobile}`, activeCart);
-            } catch (e) {}
-          }
-
-          const userData = {
-            userId: (serverUser && serverUser.userId) ? serverUser.userId : `SCD_${currentMobile}`,
-            mobile: currentMobile,
-            phone: currentMobile,
-            name: (serverUser && serverUser.name) ? serverUser.name : 'Valued Customer',
-            token: (serverUser && serverUser.token) ? serverUser.token : `PERMANENT_NABL_TOKEN_${currentMobile}`,
-            role: (serverUser && serverUser.role) ? serverUser.role : 'patient'
-          };
-
-          if (typeof Auth !== 'undefined' && typeof Auth.savePermanentSession === 'function') {
-            Auth.savePermanentSession(userData);
-          } else {
-            localStorage.setItem('selfcare_active_user', currentMobile);
-            localStorage.setItem('selfcare_user_role', 'patient');
-            localStorage.setItem('selfcare_auth_token', userData.token);
-            localStorage.setItem('selfcare_customer_profile', JSON.stringify(userData));
-          }
-
-          try {
-            const userVaultCart = localStorage.getItem(`selfcare_cart_${currentMobile}`);
-            localStorage.setItem('selfcare_cart', userVaultCart || JSON.stringify([]));
-          } catch (e) {}
-
-          if (typeof Utils !== 'undefined') Utils.showToast('Login successful! Redirecting...', 'success');
-          setTimeout(() => window.location.replace('customer.html'), 500);
-
+          this.savePatientAccountRecord(mobile, password, serverUser);
+          this.completeLifetimePatientSession(mobile, serverUser);
         } catch (err) {
-          if (verifyBtn) {
-            verifyBtn.disabled = false;
-            verifyBtn.textContent = 'Verify & Continue ✓';
-          }
-          if (typeof Utils !== 'undefined') {
-            Utils.showToast(err.message || 'Invalid OTP. Please try again.', 'error');
-          } else {
-            alert(err.message || 'Invalid OTP. Please try again.');
-          }
-          inputs.forEach(i => i.value = '');
-          if (inputs[0]) inputs[0].focus();
+          btn.disabled = false;
+          btn.textContent = 'Create Account & Login ✓';
+          errHint.textContent = err.message || 'Unable to register. Please try again.';
+          errHint.style.display = 'block';
         }
       },
 
-      /**
-       * STAFF / ADMIN / TECHNICIAN LOGIN HANDLER
-       * Handles whitespace trimming, local admin db check & live Google Sheets API verification
-       */
+      async handlePatientLogin() {
+        const mobileInput = document.getElementById('patient-login-mobile');
+        const pwdInput = document.getElementById('patient-login-password');
+        const errHint = document.getElementById('patient-login-error');
+        const btn = document.getElementById('patient-login-btn');
+
+        const mobile = mobileInput ? mobileInput.value.trim() : '';
+        const password = pwdInput ? pwdInput.value.trim() : '';
+
+        errHint.style.display = 'none';
+
+        if (!/^[6-9]\d{9}$/.test(mobile)) {
+          errHint.textContent = 'Please enter a valid 10-digit Indian mobile number.';
+          errHint.style.display = 'block';
+          mobileInput.focus();
+          return;
+        }
+
+        if (!password) {
+          errHint.textContent = 'Please enter your password.';
+          errHint.style.display = 'block';
+          pwdInput.focus();
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Logging in...';
+
+        try {
+          const localAccounts = this.getPatientAccountsMap();
+          const localRecord = localAccounts[mobile];
+          let authenticated = false;
+          let serverUser = null;
+
+          if (localRecord && localRecord.password === password) {
+            authenticated = true;
+          }
+
+          if (!authenticated && navigator.onLine && typeof Api !== 'undefined') {
+            try {
+              let res = null;
+              if (typeof Api.patientLogin === 'function') {
+                res = await Api.patientLogin(mobile, password);
+              } else if (typeof Api.request === 'function') {
+                res = await Api.request('patientLogin', { mobile, password }, false);
+              }
+              if (res && (res.status === 'success' || res.success || res.userId)) {
+                authenticated = true;
+                serverUser = res.user || res.profile || res;
+                this.savePatientAccountRecord(mobile, password, serverUser);
+              }
+            } catch (netErr) {
+              console.warn('[IndexPortal] Cloud patient login notice:', netErr);
+            }
+          }
+
+          if (!authenticated) {
+            btn.disabled = false;
+            btn.textContent = 'Login ➔';
+            errHint.textContent = localRecord
+              ? 'Incorrect password. Please try again.'
+              : 'Account not found. Please click "Sign Up" to create a new account.';
+            errHint.style.display = 'block';
+            if (typeof Utils !== 'undefined') Utils.showToast(errHint.textContent, 'error');
+            return;
+          }
+
+          this.completeLifetimePatientSession(mobile, serverUser);
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = 'Login ➔';
+          errHint.textContent = err.message || 'Login failed. Please try again.';
+          errHint.style.display = 'block';
+        }
+      },
+
       async handleStaffLogin() {
         const idInput = document.getElementById('staff-id-input');
         const pwdInput = document.getElementById('staff-password-input');
@@ -1223,10 +1330,10 @@
           }
         }
 
-        // 4. If credentials do not match
+        // 4. Invalid Credentials
         if (loginBtn) {
           loginBtn.disabled = false;
-          loginBtn.textContent = 'Login to Workspace ➔';
+          loginBtn.textContent = 'Login ➔';
         }
         errorHint.textContent = 'Invalid ID or Password. Please check credentials.';
         errorHint.style.display = 'block';

@@ -1,16 +1,17 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v18.0.0 (High-Priority Search & Clinical Exemption Release)
+ * Selfcare Diagnostics - Service Worker v19.0.0 (Minimal Bold-Outline UI & Instant Desk Sync Release)
  * Upgrades:
- * - Upgraded Cache Storage to v18.0.0 (Instantly purges older v17.x & v16.x cached scripts/utils)
- * - Fresh asset busting via (?sw_bust=18.0.0) ensuring instant adoption of ranking & conflict fixes
+ * - Upgraded Cache Storage to v19.0.0 (Instantly purges older v18.x, v17.x & v16.x cached scripts/styles)
+ * - Fresh asset busting via (?sw_bust=19.0.0) ensuring immediate adoption of bold-outline UI & invoice updates
+ * - Network-First strategy for technician.html, technician.css & technician.js so lab desk updates reflect instantly
  * - Seamless client claim and SW_UPDATED broadcast for live tab refreshing
- * - Comprehensive Network Bypass for Google Apps Script (/exec), Razorpay SDK, WhatsApp, and external APIs
+ * - Comprehensive Network Bypass for Google Apps Script (/exec), Razorpay SDK, WhatsApp, QR API & CDN PDF libs
  * - Resilient Offline Fallback for dynamic query URLs (e.g. tests.html?id=... & bookings.html?id=...)
- * - High-speed Stale-While-Revalidate (SWR) for local scripts & stylesheets
  */
 
-const CACHE_NAME = 'selfcare-cache-v18.0.0';
+const CACHE_VERSION = '19.0.0';
+const CACHE_NAME = `selfcare-cache-v${CACHE_VERSION}`;
 
 // Precache list for core application shell
 const ASSETS_TO_CACHE = [
@@ -74,14 +75,14 @@ const ASSETS_TO_CACHE = [
 
 // 1. INSTALL EVENT - Precache Fresh Files & Skip Waiting Immediately
 self.addEventListener('install', (event) => {
-  console.log('[Selfcare SW] Installing Upgraded Engine v18.0.0 (Search & Exemption Edition)...');
+  console.log(`[Selfcare SW] Installing Upgraded Engine v${CACHE_VERSION}...`);
   self.skipWaiting();
 
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachePromises = ASSETS_TO_CACHE.map(async (url) => {
         try {
-          const bustUrl = `${url}?sw_bust=18.0.0`;
+          const bustUrl = `${url}?sw_bust=${CACHE_VERSION}`;
           const response = await fetch(bustUrl, { cache: 'no-cache' });
           if (response.ok) {
             await cache.put(url, response);
@@ -95,7 +96,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// 2. MESSAGE EVENT - Direct Activation & Refresh Listener
+// 2. MESSAGE EVENT - Direct Activation & Cache Purge Listener
 self.addEventListener('message', (event) => {
   if (event.data && (event.data.type === 'SKIP_WAITING' || event.data.action === 'skipWaiting')) {
     console.log('[Selfcare SW] SKIP_WAITING signal received...');
@@ -105,7 +106,7 @@ self.addEventListener('message', (event) => {
 
 // 3. ACTIVATE EVENT - Purge All Older Caches & Claim Clients Immediately
 self.addEventListener('activate', (event) => {
-  console.log('[Selfcare SW] Activating v18.0.0 & Purging all stale caches...');
+  console.log(`[Selfcare SW] Activating v${CACHE_VERSION} & Purging all stale caches...`);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -120,7 +121,7 @@ self.addEventListener('activate', (event) => {
       await self.clients.claim();
       const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       clients.forEach((client) => {
-        client.postMessage({ type: 'SW_UPDATED', version: 'v18.0.0' });
+        client.postMessage({ type: 'SW_UPDATED', version: `v${CACHE_VERSION}` });
       });
     })
   );
@@ -135,7 +136,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strict network bypass for payment gateways, WhatsApp, external APIs and Google Apps Script
+  // Strict network bypass for payment gateways, WhatsApp, external APIs, QR codes, CDNs and Google Apps Script
   if (
     url.origin !== location.origin ||
     url.pathname.includes('/exec') ||
@@ -146,12 +147,14 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('razorpay.com') ||
     url.hostname.includes('wa.me') ||
     url.hostname.includes('whatsapp.com') ||
+    url.hostname.includes('qrserver.com') ||
+    url.hostname.includes('cdnjs.cloudflare.com') ||
     url.protocol.startsWith('chrome-extension')
   ) {
     return;
   }
 
-  // Development bypass
+  // Development bypass (localhost / Acode preview server)
   const isLocalDev = Boolean(
     url.hostname === 'localhost' ||
     url.hostname === '127.0.0.1' ||
@@ -161,12 +164,31 @@ self.addEventListener('fetch', (event) => {
 
   if (isLocalDev) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request, { ignoreSearch: true }))
+      fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request, { ignoreSearch: true }))
     );
     return;
   }
 
-  // Stale-While-Revalidate for Scripts & Styles (CSS / JS)
+  // Network-First for Technician Desk JS/CSS so UI & invoice updates reflect immediately
+  if (
+    url.pathname.endsWith('/technician.js') ||
+    url.pathname.endsWith('/technician.css')
+  ) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-cache' })
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request, { ignoreSearch: true }))
+    );
+    return;
+  }
+
+  // Stale-While-Revalidate for Other Scripts & Styles (CSS / JS)
   if (
     event.request.destination === 'script' ||
     event.request.destination === 'style' ||
@@ -208,11 +230,9 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(async () => {
-          // Fallback to cached version ignoring URL params
           const cachedDirect = await caches.match(event.request, { ignoreSearch: true });
           if (cachedDirect) return cachedDirect;
 
-          // Strip search query to find matching shell page
           const cleanPath = url.pathname.split('/').pop() || 'customer.html';
           const matchedShell = await caches.match(`./${cleanPath}`, { ignoreSearch: true });
           if (matchedShell) return matchedShell;

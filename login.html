@@ -12,117 +12,294 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Versioned Stylesheets -->
-  <link rel="stylesheet" href="assets/css/global.css?v=5.8.0">
-  <link rel="stylesheet" href="assets/css/components.css?v=5.8.0">
-  <link rel="stylesheet" href="assets/css/responsive.css?v=5.8.0">
-  <link rel="stylesheet" href="assets/css/login.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/global.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/login.css?v=6.0.0">
 </head>
 <body>
 
-  <!-- Floating App Header with Brand Logo -->
-  <header class="app-header glass-card">
-    <div class="header-left">
+  <!-- 3D Ambient Background Orbs for Glassmorphism Depth -->
+  <div class="bg-3d-scene" aria-hidden="true">
+    <div class="orb-3d orb-1"></div>
+    <div class="orb-3d orb-2"></div>
+    <div class="orb-3d orb-3"></div>
+  </div>
+
+  <!-- Clean 3D Floating Glass Header -->
+  <header class="app-header glass-3d-header">
+    <div class="header-center-brand">
       <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="header-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
       <div class="fallback-logo" style="display:none;">
         <h1 class="logo-text">SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
         <p class="tagline">Empowering Wellness</p>
       </div>
     </div>
-    <div class="header-right">
-      <span class="secure-badge-pill">🔒 Permanent Login</span>
-    </div>
   </header>
 
   <!-- Main Login Container -->
   <main class="login-container">
 
-    <!-- Hero Branding Banner -->
-    <div class="login-hero-card glass-card animate-fade">
-      <div class="hero-icon-bubble">🧪</div>
-      <h2>Welcome to Selfcare</h2>
-      <p>Enter your 10-digit mobile number to access test bookings, saved carts, and verified NABL lab reports.</p>
+    <!-- ANIMATED MASCOT PARADE ("Welcome to Selfcare" Flag Walker) -->
+    <div class="mascot-parade-stage" aria-hidden="true">
+      <div class="mascot-walker">
+        <svg class="mascot-svg" viewBox="0 0 210 84" width="210" height="84" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="flagGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#099A74" />
+              <stop offset="55%" stop-color="#078866" />
+              <stop offset="100%" stop-color="#045D49" />
+            </linearGradient>
+            <filter id="flagShadow" x="-10%" y="-10%" width="125%" height="135%">
+              <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#033F33" flood-opacity="0.22" />
+            </filter>
+          </defs>
+
+          <!-- Walking Mascot Group with Gentle Bounce -->
+          <g class="mascot-body-bob">
+            <!-- Waving Flag Banner -->
+            <g class="mascot-flag-wave" filter="url(#flagShadow)">
+              <path d="M161 12 Q122 8, 86 12 T14 12 L14 38 Q50 42, 86 38 T158 38 Z"
+                    fill="url(#flagGrad)" stroke="#A7F3D0" stroke-width="1.4" />
+              <text x="86" y="28.5" text-anchor="middle" fill="#FFFFFF"
+                    font-size="11.2" font-weight="800" letter-spacing="0.2">
+                Welcome to Selfcare
+              </text>
+            </g>
+
+            <!-- Flagpole & Gold Finial -->
+            <line x1="154" y1="66" x2="162" y2="10" stroke="#045D49" stroke-width="2.4" stroke-linecap="round" />
+            <circle cx="162" cy="9" r="3.2" fill="#F59E0B" />
+
+            <!-- Ground Soft Shadow -->
+            <ellipse cx="174" cy="78" rx="14" ry="3.5" fill="rgba(4, 93, 73, 0.18)" />
+
+            <!-- Back Leg -->
+            <g class="mascot-leg-back">
+              <rect x="170" y="60" width="5.5" height="14" rx="2.7" fill="#045D49" />
+              <ellipse cx="174" cy="74" rx="4.5" ry="2.5" fill="#10231E" />
+            </g>
+
+            <!-- Front Leg -->
+            <g class="mascot-leg-front">
+              <rect x="174" y="60" width="5.5" height="14" rx="2.7" fill="#078866" />
+              <ellipse cx="178" cy="74" rx="4.5" ry="2.5" fill="#10231E" />
+            </g>
+
+            <!-- White Lab Coat & Emerald Scrubs -->
+            <path d="M164 43 C164 39, 184 39, 184 43 L186 62 L162 62 Z"
+                  fill="#FFFFFF" stroke="#078866" stroke-width="1.4" />
+            <polygon points="171,40 179,40 175,49" fill="#078866" />
+
+            <!-- Cute Chibi Head -->
+            <circle cx="175" cy="27" r="12" fill="#FDCB9E" />
+            <!-- Hair -->
+            <path d="M163 26 C163 16, 187 16, 187 25 C183 21, 170 21, 165 27 Z" fill="#1E293B" />
+            <!-- Happy Eye & Shine -->
+            <circle cx="180" cy="26.5" r="1.7" fill="#10231E" />
+            <circle cx="180.6" cy="25.9" r="0.55" fill="#FFFFFF" />
+            <!-- Cheek & Smile -->
+            <circle cx="178" cy="30.5" r="2" fill="#FDA4AF" opacity="0.75" />
+            <path d="M180 31.5 Q182.5 33.5 184.5 31" fill="none" stroke="#9A3412" stroke-width="1.4" stroke-linecap="round" />
+
+            <!-- Arm Holding Flagpole -->
+            <path d="M172 45 Q164 49 157 48" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" />
+            <path d="M172 45 Q164 49 157 48" fill="none" stroke="#078866" stroke-width="1.3" stroke-linecap="round" />
+            <circle cx="157" cy="48" r="3" fill="#FDCB9E" />
+          </g>
+        </svg>
+      </div>
     </div>
 
-    <!-- STEP 1: MOBILE NUMBER INPUT VIEW -->
-    <section id="view-mobile-step" class="auth-card glass-card animate-fade">
-      <div class="card-head">
-        <h3>Patient Login</h3>
-        <p>One-Time Password (OTP) will be sent via SMS</p>
-      </div>
-
-      <div class="form-group">
-        <label for="mobile-number-input">Mobile Number</label>
-        <div class="phone-input-wrap">
-          <span class="country-code">🇮🇳 +91</span>
-          <input 
-            type="tel" 
-            id="mobile-number-input" 
-            placeholder="Enter 10-digit mobile" 
-            maxlength="10" 
-            autocomplete="tel" 
-            inputmode="numeric"
-            pattern="[0-9]*"
-            oninput="LoginPage.validateMobileInput(this)"
-          >
-        </div>
-        <span class="input-hint" id="mobile-error-hint" style="display: none;">Please enter a valid 10-digit Indian mobile number.</span>
-      </div>
-
-      <button type="button" class="login-action-btn" id="send-otp-btn" onclick="LoginPage.requestOtp()">
-        Get OTP ➔
-      </button>
-
-      <!-- Trust Badges -->
-      <div class="auth-trust-features">
-        <div class="trust-feat">
-          <span>🛡️</span>
-          <small>Never Logs Out Automatically</small>
-        </div>
-        <div class="trust-feat">
-          <span>🛒</span>
-          <small>Permanent Isolated Cart</small>
-        </div>
-      </div>
-    </section>
-
-    <!-- STEP 2: OTP VERIFICATION VIEW -->
-    <section id="view-otp-step" class="auth-card glass-card animate-fade" style="display: none;">
-
-      <!-- TOP OTP DISPLAY BANNER -->
-      <div id="top-otp-badge" class="otp-top-banner" style="display: none;" onclick="LoginPage.autoFillOtp()">
-        <div class="otp-badge-content">
-          <span class="badge-icon">⚡</span>
-          <span>Your Login OTP: <strong id="top-otp-display">----</strong></span>
-        </div>
-        <span class="autofill-tag">Auto-Filled ✓</span>
-      </div>
-
-      <div class="card-head">
-        <h3>Verify OTP</h3>
-        <p>Enter the 4-digit verification code sent to <strong id="disp-entered-mobile">+91 ----------</strong></p>
-        <button type="button" class="change-mobile-link" onclick="LoginPage.goBackToMobileStep()">✏️ Edit Number</button>
-      </div>
-
-      <div class="form-group">
-        <label>4-Digit Verification Code</label>
-        <div class="otp-boxes-grid" id="otp-inputs-container">
-          <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
-          <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
-          <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
-          <input type="tel" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*">
-        </div>
-      </div>
-
-      <button type="button" class="login-action-btn" id="verify-otp-btn" onclick="LoginPage.verifyOtp()">
-        Verify & Continue ✓
-      </button>
-
-      <div class="resend-timer-row">
-        <span id="resend-countdown-text">Resend OTP in <strong>30s</strong></span>
-        <button type="button" id="resend-otp-btn" class="resend-btn" style="display:none;" onclick="LoginPage.resendOtp()">
-          Resend OTP
+    <!-- 3D ROLE SWITCHER TABS -->
+    <div class="role-tabs-card glass-3d-card anim-3d-rise">
+      <div class="role-tabs-wrap">
+        <button type="button" class="role-tab-btn active" id="tab-patient-btn" onclick="LoginPage.switchRoleTab('patient')">
+          <span class="tab-icon">👤</span> Patient Login
+        </button>
+        <button type="button" class="role-tab-btn" id="tab-staff-btn" onclick="LoginPage.switchRoleTab('staff')">
+          <span class="tab-icon">🛡️</span> Staff / Admin
         </button>
       </div>
+    </div>
+
+    <!-- VIEW A: PATIENT AUTH SECTION (LOGIN & SIGN UP - NO OTP) -->
+    <div id="patient-auth-wrapper">
+      
+      <!-- SUB-TABS: LOGIN vs SIGN UP (PATIENT ONLY) -->
+      <div class="patient-subtabs-wrap glass-3d-card anim-3d-rise">
+        <button type="button" class="subtab-btn active" id="subtab-patient-login" onclick="LoginPage.switchPatientMode('login')">
+          Login
+        </button>
+        <button type="button" class="subtab-btn" id="subtab-patient-signup" onclick="LoginPage.switchPatientMode('signup')">
+          Sign Up (New User)
+        </button>
+      </div>
+
+      <!-- STEP 1: PATIENT LOGIN VIEW -->
+      <section id="view-patient-login" class="auth-card glass-3d-card anim-3d-flip">
+        <div class="card-head">
+          <h3>Patient Login</h3>
+          <p>Enter your mobile number and password</p>
+        </div>
+
+        <div class="form-group">
+          <label for="mobile-number-input">Mobile Number</label>
+          <div class="phone-input-wrap input-3d-box">
+            <span class="country-code">🇮🇳 +91</span>
+            <input 
+              type="tel" 
+              id="mobile-number-input" 
+              placeholder="Enter 10-digit mobile" 
+              maxlength="10" 
+              autocomplete="tel" 
+              inputmode="numeric"
+              pattern="[0-9]*"
+              oninput="LoginPage.validateMobileInput(this)"
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="patient-password-input">Enter Password</label>
+          <div class="staff-input-wrap input-3d-box">
+            <input 
+              type="password" 
+              id="patient-password-input" 
+              placeholder="Enter Password" 
+              autocomplete="current-password"
+              onkeydown="if(event.key==='Enter') LoginPage.handlePatientLogin()"
+            >
+            <button type="button" class="pwd-eye-btn" aria-label="Show password" onclick="LoginPage.togglePasswordVisibility('patient-password-input', this)">👁️</button>
+          </div>
+          <span class="input-hint" id="patient-login-error" style="display: none;">Invalid Mobile Number or Password.</span>
+        </div>
+
+        <button type="button" class="login-action-btn btn-3d-glow" id="patient-login-btn" onclick="LoginPage.handlePatientLogin()">
+          <span>Login ➔</span>
+        </button>
+
+        <div class="auth-switch-prompt">
+          Don't have an account? 
+          <button type="button" class="switch-link-btn" onclick="LoginPage.switchPatientMode('signup')">Sign Up Now</button>
+        </div>
+
+        <!-- Trust Badges -->
+        <div class="auth-trust-features">
+          <div class="trust-feat">
+            <span>🛡️</span>
+            <small>Lifetime Session (Never Logs Out)</small>
+          </div>
+          <div class="trust-feat">
+            <span>🛒</span>
+            <small>Permanent Isolated Cart</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 2: PATIENT SIGN UP VIEW -->
+      <section id="view-patient-signup" class="auth-card glass-3d-card anim-3d-flip" style="display: none;">
+        <div class="card-head">
+          <h3>Create Patient Account</h3>
+          <p>Sign up once to access lab reports &amp; doorstep bookings</p>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-mobile-input">Mobile Number *</label>
+          <div class="phone-input-wrap input-3d-box">
+            <span class="country-code">🇮🇳 +91</span>
+            <input 
+              type="tel" 
+              id="signup-mobile-input" 
+              placeholder="Enter 10-digit mobile" 
+              maxlength="10" 
+              autocomplete="tel" 
+              inputmode="numeric"
+              pattern="[0-9]*"
+              oninput="LoginPage.validateMobileInput(this)"
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-password-input">Create New Password *</label>
+          <div class="staff-input-wrap input-3d-box">
+            <input 
+              type="password" 
+              id="signup-password-input" 
+              placeholder="Create new password (min 4 chars)" 
+              autocomplete="new-password"
+              oninput="LoginPage.checkPasswordMatch()"
+            >
+            <button type="button" class="pwd-eye-btn" aria-label="Show password" onclick="LoginPage.togglePasswordVisibility('signup-password-input', this)">👁️</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-confirm-input">Confirm Password *</label>
+          <div class="staff-input-wrap input-3d-box">
+            <input 
+              type="password" 
+              id="signup-confirm-input" 
+              placeholder="Confirm new password" 
+              autocomplete="new-password"
+              oninput="LoginPage.checkPasswordMatch()"
+              onkeydown="if(event.key==='Enter') LoginPage.handlePatientSignup()"
+            >
+            <button type="button" class="pwd-eye-btn" aria-label="Show password" onclick="LoginPage.togglePasswordVisibility('signup-confirm-input', this)">👁️</button>
+          </div>
+          <div id="password-match-badge" class="password-match-badge" style="display: none;"></div>
+          <span class="input-hint" id="patient-signup-error" style="display: none;">Please verify your details.</span>
+        </div>
+
+        <button type="button" class="login-action-btn btn-3d-glow" id="patient-signup-btn" onclick="LoginPage.handlePatientSignup()">
+          <span>Create Account &amp; Login ✓</span>
+        </button>
+
+        <div class="auth-switch-prompt">
+          Already registered? 
+          <button type="button" class="switch-link-btn" onclick="LoginPage.switchPatientMode('login')">Login Here</button>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- VIEW B: CLEAN STAFF & ADMIN LOGIN ONLY (NO SIGN UP) -->
+    <section id="view-staff-step" class="auth-card glass-3d-card anim-3d-flip" style="display: none;">
+      <div class="card-head">
+        <h3>Staff & Admin Login</h3>
+      </div>
+
+      <div class="form-group">
+        <label for="staff-id-input">Enter ID</label>
+        <div class="staff-input-wrap input-3d-box">
+          <input 
+            type="text" 
+            id="staff-id-input" 
+            placeholder="Enter ID" 
+            autocomplete="username"
+          >
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="staff-password-input">Enter Password</label>
+        <div class="staff-input-wrap input-3d-box">
+          <input 
+            type="password" 
+            id="staff-password-input" 
+            placeholder="Enter Password" 
+            autocomplete="current-password"
+            onkeydown="if(event.key==='Enter') LoginPage.handleStaffLogin()"
+          >
+          <button type="button" class="pwd-eye-btn" aria-label="Show password" onclick="LoginPage.togglePasswordVisibility('staff-password-input', this)">👁️</button>
+        </div>
+        <span class="input-hint" id="staff-error-hint" style="display: none;">Invalid Staff ID or Password.</span>
+      </div>
+
+      <button type="button" class="login-action-btn btn-3d-glow" id="staff-login-btn" onclick="LoginPage.handleStaffLogin()">
+        <span>Login ➔</span>
+      </button>
     </section>
 
     <!-- Bottom Safety Guarantee Note -->
@@ -132,13 +309,13 @@
 
   </main>
 
-  <!-- Core JavaScript Scripts Matching Architecture -->
-  <script src="assets/js/config.js?v=5.8.0"></script>
-  <script src="assets/js/utils.js?v=5.8.0"></script>
-  <script src="assets/js/api.js?v=5.8.0"></script>
-  <script src="assets/js/offline-db.js?v=5.8.0"></script>
-  <script src="assets/js/offline-sync.js?v=5.8.0"></script>
-  <script src="assets/js/auth.js?v=5.8.0"></script>
-  <script src="assets/js/login.js?v=5.8.0"></script>
+  <!-- Core JavaScript Scripts -->
+  <script src="assets/js/config.js?v=6.0.0"></script>
+  <script src="assets/js/utils.js?v=6.0.0"></script>
+  <script src="assets/js/api.js?v=6.0.0"></script>
+  <script src="assets/js/offline-db.js?v=6.0.0"></script>
+  <script src="assets/js/offline-sync.js?v=6.0.0"></script>
+  <script src="assets/js/auth.js?v=6.0.0"></script>
+  <script src="assets/js/login.js?v=6.0.0"></script>
 </body>
 </html>

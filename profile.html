@@ -13,10 +13,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Versioned Stylesheets -->
-  <link rel="stylesheet" href="assets/css/global.css?v=15.7.0">
-  <link rel="stylesheet" href="assets/css/components.css?v=15.7.0">
-  <link rel="stylesheet" href="assets/css/responsive.css?v=15.7.0">
-  <link rel="stylesheet" href="assets/css/profile.css?v=15.7.0">
+  <link rel="stylesheet" href="assets/css/global.css?v=16.0.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=16.0.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=16.0.0">
+  <link rel="stylesheet" href="assets/css/profile.css?v=16.0.0">
 </head>
 <body>
 
@@ -34,11 +34,14 @@
   <!-- Main My Account Container -->
   <main class="account-container">
 
-    <!-- Curved Header Banner -->
-    <div class="curved-account-banner">
+    <!-- Header Banner -->
+    <div class="account-banner">
       <div class="banner-title-wrap">
         <span class="user-avatar-icon">👤</span>
-        <h2>My Account</h2>
+        <div>
+          <h2>My Account</h2>
+          <p class="banner-sub-text" id="banner-account-sub">Manage profile, family &amp; membership</p>
+        </div>
       </div>
     </div>
 
@@ -49,101 +52,96 @@
       <div class="menu-item-row" onclick="ProfilePage.openMyProfileModal()">
         <div class="menu-left">
           <span class="menu-icon">👤</span>
-          <span class="menu-label">My Profile</span>
+          <div class="menu-text-col">
+            <span class="menu-label">My Profile</span>
+            <span class="menu-sub-label" id="menu-profile-sub">View &amp; edit personal details</span>
+          </div>
         </div>
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 2. Add Family Members -->
+      <!-- 2. Family Members -->
       <div class="menu-item-row" onclick="ProfilePage.openFamilyMembersModal()">
         <div class="menu-left">
           <span class="menu-icon">👨‍👩‍👧‍👦</span>
-          <span class="menu-label">Add Family Members</span>
+          <div class="menu-text-col">
+            <span class="menu-label">Family Members</span>
+            <span class="menu-sub-label" id="menu-family-sub">Loading members...</span>
+          </div>
         </div>
-        <span class="menu-chevron">›</span>
+        <div class="menu-right-flex">
+          <span class="status-pill" id="menu-family-pill">0</span>
+          <span class="menu-chevron">›</span>
+        </div>
       </div>
 
       <!-- 3. Membership -->
       <div class="menu-item-row" onclick="window.location.href='membership.html'">
         <div class="menu-left">
           <span class="menu-icon">👑</span>
-          <span class="menu-label">Membership</span>
+          <div class="menu-text-col">
+            <span class="menu-label">Membership</span>
+            <span class="menu-sub-label" id="menu-membership-sub">Checking membership status...</span>
+          </div>
         </div>
-        <span class="menu-chevron">›</span>
+        <div class="menu-right-flex">
+          <span class="status-pill" id="menu-membership-pill">Regular</span>
+          <span class="menu-chevron">›</span>
+        </div>
       </div>
 
       <!-- 4. Blood Connect -->
-      <div class="menu-item-row blood-menu-row" onclick="window.location.href='blood.html'">
+      <div class="menu-item-row" onclick="window.location.href='blood.html'">
         <div class="menu-left">
-          <span class="menu-icon animate-pulse-heart">🩸</span>
+          <span class="menu-icon">🩸</span>
           <div class="menu-text-col">
             <span class="menu-label">Blood Connect</span>
-            <div class="blood-badge-group" id="profile-blood-badges">
-              <span class="blood-chip chip-sos" id="chip-active-sos">🚨 0 Active SOS</span>
-              <span class="blood-chip chip-donors" id="chip-total-donors">🩸 0 Donors</span>
+            <div class="sub-chip-group" id="profile-blood-badges">
+              <span class="neutral-chip" id="chip-active-sos">0 Active SOS</span>
+              <span class="neutral-chip" id="chip-total-donors">0 Donors</span>
             </div>
           </div>
         </div>
         <div class="menu-right-flex">
-          <span class="urgent-live-indicator" id="urgent-live-pill" style="display: none;">URGENT</span>
+          <span class="status-pill pill-alert" id="urgent-live-pill" style="display: none;">URGENT</span>
           <span class="menu-chevron">›</span>
         </div>
       </div>
 
       <!-- 5. Refer And Earn -->
-      <div class="menu-item-row refer-menu-row" onclick="window.location.href='refer.html'">
+      <div class="menu-item-row" onclick="window.location.href='refer.html'">
         <div class="menu-left">
-          <span class="menu-icon animate-bounce-gift">🎁</span>
+          <span class="menu-icon">🎁</span>
           <div class="menu-text-col">
             <span class="menu-label">Refer And Earn</span>
-            <div class="refer-badge-group">
-              <span class="refer-chip chip-free-checkup">🎁 Get Free Health Checkup</span>
-              <span class="refer-chip chip-earn-off">100% OFF</span>
-            </div>
+            <span class="menu-sub-label">Get Free Health Checkup • 100% OFF</span>
           </div>
         </div>
         <div class="menu-right-flex">
-          <span class="refer-live-indicator">FREE</span>
+          <span class="status-pill">FREE</span>
           <span class="menu-chevron">›</span>
         </div>
       </div>
 
-      <!-- 6. Get Directions (Branches) -->
-      <div class="menu-item-row branch-menu-row" onclick="ProfilePage.openBranchesModal()">
+      <!-- 6. Rate & Review Us (Direct Google Review Link) -->
+      <a href="https://www.google.com/search?client=ms-android-samsung-rvo1&hs=3Jqq&sca_esv=bd9c22ed1e338c70&biw=384&bih=710&sxsrf=AKL5yDgCm95XDE4UXdMSDFGOAZDy8jH_fw:1793494962814&q=selfcare+diagnostics+-+chennai+reviews&uds=AE2AFgZ1mCZtyFaKGASvh9jAw7YXHq65cI_DrJsjZKqR2cKr-UlvnIynDOn1CgE04eSa3TTMJSR2L0ps57hNAWpDeTFjUkM4ki_oBqgUN1AplQeIxYZ6tMXV4rMez5qrIWytJdxQEl23afc3PGTS-di7CkdaLPmCRas08AqVtUiPu-VyEUEeMullLvK0Bd90j3SDq2Z2Tb0bqw9VTlp84MLn5bJ5_BoupExuIrZKgYDYCFBU3FgBHkjK4lgUE7SNY_Po736KlcT07fYVFkKFY5eFNDDfEBwVqFHkoeJkpEWgagqYMSpoBsgK-_RiLb5JVNL3yTIarKMM5MxiOWFy_RaMl5cupDWOy6KVwy2IV4S6J8eN3Tj4a44ZiP4wVVSX-97PnzejmffMChLUnwVTB-XW0SjlCcyuWuPyYpyPn2y_tfAe9iubi8OajXbLf7JIJdPvKTHtj08NXrm8YunbTdesA90X6nbi849u-ntrqj6Au2Vu-5tcDzcYDiRfmLkD3AdRBmX0fMzO66eD0JlTb791YjiLnngucxv6fRf2q8gqmaTrUmIcVfQM&si=AE1YtOqiKPb2pdLXAi8quZ9vbH4aVq_aX8-3H9iFBLRNK95c7WXML8BjLNXbrVFQMH0I5fTtXZwRsdfnewhWVocRQ7EAViU_tfS_ISWzM6YpSRBp5HDR346N5sgIR7WyDmUgMm6u3xtiwrFddFIBcKCNnfP8Z1_xQ%3D%3D&sa=X&ved=2ahUKEwjptqixyeWXAxXJS2cHHXRdATYQk8gLegQIGhAB&ictx=1"
+         target="_blank"
+         rel="noopener noreferrer"
+         class="menu-item-row">
         <div class="menu-left">
-          <span class="menu-icon">📍</span>
+          <span class="menu-icon">⭐</span>
           <div class="menu-text-col">
-            <span class="menu-label">Get Directions</span>
-            <div class="branch-badge-group">
-              <span class="branch-chip chip-active-branch">● Vettuvankeni</span>
-              <span class="branch-chip chip-upcoming-branch">⏳ Velachery</span>
-            </div>
+            <span class="menu-label">Rate &amp; Review Us</span>
+            <span class="menu-sub-label">5.0 Google Rating</span>
           </div>
         </div>
         <div class="menu-right-flex">
-          <span class="branch-live-pill">MAP</span>
+          <span class="status-pill">5.0 ★</span>
           <span class="menu-chevron">›</span>
         </div>
-      </div>
+      </a>
 
-      <!-- 7. Rate & Review Us -->
-      <div class="menu-item-row review-menu-row" onclick="ProfilePage.openReviewModal()">
-        <div class="menu-left">
-          <span class="menu-icon animate-pulse-star">⭐</span>
-          <div class="menu-text-col">
-            <span class="menu-label">Rate & Review Us</span>
-            <div class="review-badge-group">
-              <span class="review-chip-star">⭐⭐⭐⭐⭐ 5.0 Google Rating</span>
-            </div>
-          </div>
-        </div>
-        <div class="menu-right-flex">
-          <span class="review-top-pill">5.0 ★</span>
-          <span class="menu-chevron">›</span>
-        </div>
-      </div>
-
-      <!-- 8. Privacy & Policy -->
+      <!-- 7. Privacy & Policy -->
       <div class="menu-item-row" onclick="window.location.href='privacy.html'">
         <div class="menu-left">
           <span class="menu-icon">🛡️</span>
@@ -152,20 +150,20 @@
         <span class="menu-chevron">›</span>
       </div>
 
-      <!-- 9. Logout -->
-      <div class="menu-item-row" onclick="ProfilePage.handleLogout()">
-        <div class="menu-left">
-          <span class="menu-icon">🚪</span>
-          <span class="menu-label">Logout</span>
-        </div>
-        <span class="menu-chevron">›</span>
-      </div>
-
-      <!-- 10. Support Desk -->
+      <!-- 8. Support Desk -->
       <div class="menu-item-row" onclick="ProfilePage.openSupportDeskModal()">
         <div class="menu-left">
           <span class="menu-icon">🎧</span>
           <span class="menu-label">Support Desk</span>
+        </div>
+        <span class="menu-chevron">›</span>
+      </div>
+
+      <!-- 9. Logout -->
+      <div class="menu-item-row" onclick="ProfilePage.handleLogout()">
+        <div class="menu-left">
+          <span class="menu-icon">🚪</span>
+          <span class="menu-label text-danger">Logout</span>
         </div>
         <span class="menu-chevron">›</span>
       </div>
@@ -175,12 +173,12 @@
   </main>
 
   <!-- =========================================================================
-       MODALS
+       MODALS (CLEAN FLAT DESIGN)
        ========================================================================= -->
 
   <!-- Modal 1: My Profile Details -->
   <div id="modal-my-profile" class="sia-modal-overlay">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+    <div class="sia-modal-content">
       <div class="sia-modal-header">
         <div class="modal-title-wrap">
           <span>👤</span>
@@ -196,33 +194,63 @@
             <div class="profile-avatar-circle" id="self-avatar-letter">U</div>
             <div>
               <h4 id="self-display-name">Customer Account</h4>
-              <p id="self-display-relation" style="font-size:11px; color:#078866; font-weight:700;">Account Primary (Self)</p>
+              <p id="self-display-relation" class="meta-sub-role">Account Primary (Self)</p>
             </div>
           </div>
 
           <div class="details-data-box">
-            <div class="info-row"><span class="lbl">Mobile:</span><strong class="val" id="self-view-mobile">+91 7010174890</strong></div>
+            <div class="info-row"><span class="lbl">Mobile:</span><strong class="val" id="self-view-mobile">Not provided</strong></div>
+            <div class="info-row"><span class="lbl">Membership:</span><strong class="val" id="self-view-membership">Regular</strong></div>
             <div class="info-row"><span class="lbl">Email:</span><strong class="val" id="self-view-email">Not provided</strong></div>
+            <div class="info-row"><span class="lbl">Date of Birth:</span><strong class="val" id="self-view-dob">Not set</strong></div>
             <div class="info-row"><span class="lbl">Age / Gender:</span><strong class="val" id="self-view-age-gender">Age not set • Male</strong></div>
             <div class="info-row"><span class="lbl">Blood Group:</span><strong class="val" id="self-view-blood">O+</strong></div>
             <div class="info-row"><span class="lbl">Pickup Address:</span><strong class="val" id="self-view-address">Address not provided</strong></div>
             <div class="info-row"><span class="lbl">GPS Location:</span><strong class="val loc-val" id="self-view-location">Not set</strong></div>
           </div>
 
-          <button type="button" class="modal-action-btn" onclick="ProfilePage.toggleSelfEditMode(true)">✏️ Edit Profile Details</button>
+          <button type="button" class="modal-action-btn" style="margin-top: 12px;" onclick="ProfilePage.toggleSelfEditMode(true)">Edit Profile Details</button>
         </div>
 
         <!-- Edit Mode -->
         <div id="profile-edit-mode" style="display: none;">
-          <div class="form-field">
-            <label>Full Name *</label>
-            <input type="text" id="self-edit-name" placeholder="Enter full legal name">
+          <div class="form-row-salutation">
+            <div class="form-field">
+              <label>Salutation *</label>
+              <select id="self-edit-salutation" onchange="ProfilePage.onSalutationChange('self-edit-salutation', 'self-edit-gender')">
+                <option value="Mr.">Mr.</option>
+                <option value="Mrs.">Mrs.</option>
+                <option value="Ms.">Ms.</option>
+                <option value="Master">Master</option>
+                <option value="Baby">Baby</option>
+                <option value="Dr.">Dr.</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Full Name *</label>
+              <input type="text" id="self-edit-name" placeholder="Enter full legal name">
+            </div>
           </div>
 
           <div class="form-row-2">
             <div class="form-field">
-              <label>Mobile Number *</label>
-              <input type="tel" id="self-edit-mobile" maxlength="10" placeholder="10-digit mobile number">
+              <label>Date of Birth *</label>
+              <input type="date" id="self-edit-dob" onchange="ProfilePage.syncAgeInputFromDob('self-edit-dob', 'self-edit-age')" oninput="ProfilePage.syncAgeInputFromDob('self-edit-dob', 'self-edit-age')">
+            </div>
+            <div class="form-field">
+              <label>Age (Auto-Updated)</label>
+              <input type="text" id="self-edit-age" placeholder="Auto from DOB" readonly class="readonly-auto-input">
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Gender *</label>
+              <select id="self-edit-gender">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
             <div class="form-field">
               <label>Blood Group *</label>
@@ -242,22 +270,13 @@
 
           <div class="form-row-2">
             <div class="form-field">
-              <label>Age (Years) *</label>
-              <input type="number" id="self-edit-age" placeholder="e.g. 28" min="1" max="120">
+              <label>Mobile Number *</label>
+              <input type="tel" id="self-edit-mobile" maxlength="10" placeholder="10-digit mobile number">
             </div>
             <div class="form-field">
-              <label>Gender *</label>
-              <select id="self-edit-gender">
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
+              <label>Email (Optional)</label>
+              <input type="email" id="self-edit-email" placeholder="name@example.com">
             </div>
-          </div>
-
-          <div class="form-field">
-            <label>Email Address (Optional)</label>
-            <input type="email" id="self-edit-email" placeholder="name@example.com">
           </div>
 
           <div class="form-field">
@@ -268,14 +287,14 @@
           <div class="form-field">
             <div class="loc-head-flex">
               <label>GPS Location (Optional)</label>
-              <button type="button" class="gps-btn" onclick="ProfilePage.detectGpsLocation('self-edit-location')">📍 Detect GPS</button>
+              <button type="button" class="gps-btn" onclick="ProfilePage.detectGpsLocation('self-edit-location')">Detect GPS</button>
             </div>
             <input type="text" id="self-edit-location" placeholder="Google Maps link or latitude, longitude">
           </div>
 
           <div class="btn-group-row">
             <button id="self-edit-cancel-btn" type="button" class="cancel-btn" onclick="ProfilePage.toggleSelfEditMode(false)">Cancel</button>
-            <button id="self-edit-save-btn" type="button" class="modal-action-btn" onclick="ProfilePage.saveSelfDetails()">Save Profile Details ✓</button>
+            <button id="self-edit-save-btn" type="button" class="modal-action-btn" onclick="ProfilePage.saveSelfDetails()">Save Profile Details</button>
           </div>
         </div>
 
@@ -285,11 +304,11 @@
 
   <!-- Modal 2: Family & Friends Directory -->
   <div id="modal-family-members" class="sia-modal-overlay">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+    <div class="sia-modal-content">
       <div class="sia-modal-header">
         <div class="modal-title-wrap">
           <span id="family-modal-icon">👨‍👩‍👧‍👦</span>
-          <h3 id="family-modal-title">Family & Friends Directory</h3>
+          <h3 id="family-modal-title">Family &amp; Friends Directory</h3>
         </div>
         <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-family-members')">✕</button>
       </div>
@@ -313,14 +332,27 @@
             <button type="button" class="back-link-btn" onclick="ProfilePage.closeMemberForm()">
               ← Back to Members
             </button>
-            <h4 id="member-form-title" style="font-size:13px; font-weight:800; color:#045D49;">Member Profile</h4>
+            <h4 id="member-form-title" class="form-sub-title">Member Profile</h4>
           </div>
 
           <input type="hidden" id="family-edit-id">
 
-          <div class="form-field">
-            <label>Member Name *</label>
-            <input type="text" id="family-name-input" placeholder="Full name of patient">
+          <div class="form-row-salutation">
+            <div class="form-field">
+              <label>Salutation *</label>
+              <select id="family-salutation-select" onchange="ProfilePage.onSalutationChange('family-salutation-select', 'family-gender-select')">
+                <option value="Mr.">Mr.</option>
+                <option value="Mrs.">Mrs.</option>
+                <option value="Ms.">Ms.</option>
+                <option value="Master">Master</option>
+                <option value="Baby">Baby</option>
+                <option value="Dr.">Dr.</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Member Name *</label>
+              <input type="text" id="family-name-input" placeholder="Full name of patient">
+            </div>
           </div>
 
           <div class="form-row-2">
@@ -358,9 +390,16 @@
 
           <div class="form-row-2">
             <div class="form-field">
-              <label>Age (Years) *</label>
-              <input type="number" id="family-age-input" placeholder="Age" min="1" max="120">
+              <label>Date of Birth *</label>
+              <input type="date" id="family-dob-input" onchange="ProfilePage.syncAgeInputFromDob('family-dob-input', 'family-age-input')" oninput="ProfilePage.syncAgeInputFromDob('family-dob-input', 'family-age-input')">
             </div>
+            <div class="form-field">
+              <label>Age (Auto-Updated)</label>
+              <input type="text" id="family-age-input" placeholder="Auto from DOB" readonly class="readonly-auto-input">
+            </div>
+          </div>
+
+          <div class="form-row-2">
             <div class="form-field">
               <label>Gender *</label>
               <select id="family-gender-select">
@@ -369,11 +408,10 @@
                 <option value="Other">Other</option>
               </select>
             </div>
-          </div>
-
-          <div class="form-field">
-            <label>Mobile Number (For Reports & SMS) *</label>
-            <input type="tel" id="family-mobile-input" maxlength="10" placeholder="10-digit mobile number">
+            <div class="form-field">
+              <label>Mobile Number *</label>
+              <input type="tel" id="family-mobile-input" maxlength="10" placeholder="10-digit mobile">
+            </div>
           </div>
 
           <div class="form-field">
@@ -389,121 +427,23 @@
           <div class="form-field">
             <div class="loc-head-flex">
               <label>GPS Location (Optional)</label>
-              <button type="button" class="gps-btn" onclick="ProfilePage.detectGpsLocation('family-location-input')">📍 Detect GPS</button>
+              <button type="button" class="gps-btn" onclick="ProfilePage.detectGpsLocation('family-location-input')">Detect GPS</button>
             </div>
             <input type="text" id="family-location-input" placeholder="Google Maps link">
           </div>
 
           <div class="btn-group-row">
             <button type="button" class="cancel-btn" onclick="ProfilePage.closeMemberForm()">Cancel</button>
-            <button id="family-save-btn" type="button" class="modal-action-btn" onclick="ProfilePage.saveFamilyMember()">Save Member ✓</button>
+            <button id="family-save-btn" type="button" class="modal-action-btn" onclick="ProfilePage.saveFamilyMember()">Save Member</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal 3: Branches -->
-  <div id="modal-branches" class="sia-modal-overlay">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header" style="background: linear-gradient(135deg, #045D49, #078866);">
-        <div class="modal-title-wrap">
-          <span>📍</span>
-          <h3>Our Clinical Diagnostic Centers</h3>
-        </div>
-        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-branches')">✕</button>
-      </div>
-
-      <div class="sia-modal-body">
-        <p style="font-size: 11.5px; color: #475569; margin-bottom: 4px;">
-          Visit our laboratory directly for walk-in testing or schedule a home sample collection.
-        </p>
-
-        <!-- Branch 1: Vettuvankeni (Active) -->
-        <div class="branch-card-item active-branch-box">
-          <div class="branch-card-head">
-            <div>
-              <span class="branch-status-tag tag-live">● Open & Active Branch</span>
-              <h4>Selfcare Diagnostics - Vettuvankeni</h4>
-            </div>
-            <span class="branch-icon-pill">🏥</span>
-          </div>
-
-          <p class="branch-address-text">
-            📍 East Coast Road (ECR), Vettuvankeni, Chennai, Tamil Nadu - 600115
-          </p>
-
-          <div class="branch-action-row">
-            <a href="https://maps.app.goo.gl/XXgRMvUwv4scBRqL7?g_st=ac" target="_blank" rel="noopener noreferrer" class="btn-direction-link">
-              🗺️ Get Directions (Google Maps) →
-            </a>
-          </div>
-        </div>
-
-        <!-- Branch 2: Velachery (Upcoming) -->
-        <div class="branch-card-item upcoming-branch-box">
-          <div class="branch-card-head">
-            <div>
-              <span class="branch-status-tag tag-upcoming">⏳ Upcoming Center</span>
-              <h4>Selfcare Diagnostics - Velachery</h4>
-            </div>
-            <span class="branch-icon-pill">🚧</span>
-          </div>
-
-          <p class="branch-address-text">
-            📍 Velachery Main Road, Chennai, Tamil Nadu (Launching Shortly)
-          </p>
-          <div class="upcoming-note-text">
-            🌱 Diagnostic testing & doorstep phlebotomy hub opening soon!
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal 4: Rate & Review Us -->
-  <div id="modal-review" class="sia-modal-overlay">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
-      <div class="sia-modal-header" style="background: linear-gradient(135deg, #B45309, #D97706);">
-        <div class="modal-title-wrap">
-          <span>⭐</span>
-          <h3>Rate & Review Us</h3>
-        </div>
-        <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-review')">✕</button>
-      </div>
-
-      <div class="sia-modal-body review-modal-body">
-        <div class="review-showcase-box">
-          <span class="review-score-giant">5.0</span>
-          <div class="review-stars-row">★★★★★</div>
-          <span class="review-platform-lbl">Official Google Customer Rating</span>
-        </div>
-
-        <div class="review-growth-callout animate-pulse-glow">
-          <span class="growth-icon">🌱</span>
-          <div class="growth-content">
-            <h4>Your Review is important to us for future growth!</h4>
-            <p>Your honest feedback helps us elevate our clinical care and enables us to provide high-precision, affordable diagnostics to more families.</p>
-          </div>
-        </div>
-
-        <p class="review-sub-instruction">
-          Click the button below to share your experience and rate us 5 stars on Google:
-        </p>
-
-        <a href="https://www.google.com/search?client=ms-android-samsung-rvo1&hs=3Jqq&sca_esv=bd9c22ed1e338c70&biw=384&bih=710&sxsrf=AKL5yDgCm95XDE4UXdMSDFGOAZDy8jH_fw:1793494962814&q=selfcare+diagnostics+-+chennai+reviews&uds=AE2AFgZ1mCZtyFaKGASvh9jAw7YXHq65cI_DrJsjZKqR2cKr-UlvnIynDOn1CgE04eSa3TTMJSR2L0ps57hNAWpDeTFjUkM4ki_oBqgUN1AplQeIxYZ6tMXV4rMez5qrIWytJdxQEl23afc3PGTS-di7CkdaLPmCRas08AqVtUiPu-VyEUEeMullLvK0Bd90j3SDq2Z2Tb0bqw9VTlp84MLn5bJ5_BoupExuIrZKgYDYCFBU3FgBHkjK4lgUE7SNY_Po736KlcT07fYVFkKFY5eFNDDfEBwVqFHkoeJkpEWgagqYMSpoBsgK-_RiLb5JVNL3yTIarKMM5MxiOWFy_RaMl5cupDWOy6KVwy2IV4S6J8eN3Tj4a44ZiP4wVVSX-97PnzejmffMChLUnwVTB-XW0SjlCcyuWuPyYpyPn2y_tfAe9iubmOajXbLf7JIJdPvKTHtj08NXrm8YunbTdesA90X6nbi849u-ntrqj6Au2Vu-5tcDzcYDiRfmLkD3AdRBmX0fMzO66eD0JlTb791YjiLnngucxv6fRf2q8gqmaTrUmIcVfQM&si=AE1YtOqiKPb2pdLXAi8quZ9vbH4aVq_aX8-3H9iFBLRNK95c7WXML8BjLNXbrVFQMH0I5fTtXZwRsdfnewhWVocRQ7EAViU_tfS_ISWzM6YpSRBp5HDR346N5sgIR7WyDmUgMm6u3xtiwrFddFIBcKCNnfP8Z1_xQ%3D%3D&sa=X&ved=2ahUKEwjptqixyeWXAxXJS2cHHXRdATYQk8gLegQIGhAB&ictx=1" 
-           target="_blank" 
-           rel="noopener noreferrer" 
-           class="btn-write-review">
-          ⭐ Write 5-Star Review on Google →
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal 5: Support Desk -->
+  <!-- Modal 3: Support Desk -->
   <div id="modal-support-desk" class="sia-modal-overlay">
-    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+    <div class="sia-modal-content">
       <div class="sia-modal-header">
         <div class="modal-title-wrap">
           <span>🎧</span>
@@ -512,7 +452,7 @@
         <button class="sia-close-btn" onclick="ProfilePage.closeModal('modal-support-desk')">✕</button>
       </div>
       <div class="sia-modal-body">
-        <p style="font-size:12px; color:#536E66; line-height:1.4; margin-bottom:12px;">
+        <p class="modal-helper-text">
           Have questions regarding test preparation, doorstep collection, or reports? Reach out directly:
         </p>
 
@@ -525,7 +465,7 @@
           <span class="channel-arrow">›</span>
         </a>
 
-        <a href="https://wa.me/917010174890?text=Hello%20Selfcare%20Diagnostics,%20I%20need%20assistance" target="_blank" class="support-channel-card whatsapp-channel">
+        <a href="https://wa.me/917010174890?text=Hello%20Selfcare%20Diagnostics,%20I%20need%20assistance" target="_blank" class="support-channel-card">
           <div class="channel-icon">💬</div>
           <div class="channel-info">
             <strong>WhatsApp Live Desk</strong>
@@ -563,13 +503,13 @@
   </nav>
 
   <!-- Core Scripts -->
-  <script src="assets/js/config.js?v=15.7.0"></script>
-  <script src="assets/js/utils.js?v=15.7.0"></script>
-  <script src="assets/js/api.js?v=15.7.0"></script>
-  <script src="assets/js/offline-db.js?v=15.7.0"></script>
-  <script src="assets/js/offline-sync.js?v=15.7.0"></script>
-  <script src="assets/js/auth.js?v=15.7.0"></script>
-  <script src="assets/js/app.js?v=15.7.0"></script>
-  <script src="assets/js/profile.js?v=15.7.0"></script>
+  <script src="assets/js/config.js?v=16.0.0"></script>
+  <script src="assets/js/utils.js?v=16.0.0"></script>
+  <script src="assets/js/api.js?v=16.0.0"></script>
+  <script src="assets/js/offline-db.js?v=16.0.0"></script>
+  <script src="assets/js/offline-sync.js?v=16.0.0"></script>
+  <script src="assets/js/auth.js?v=16.0.0"></script>
+  <script src="assets/js/app.js?v=16.0.0"></script>
+  <script src="assets/js/profile.js?v=16.0.0"></script>
 </body>
 </html>
