@@ -1,14 +1,12 @@
 /* file: assets/js/auth.js */
 /**
- * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.7.1
+ * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.8.0
  * Features:
- * - Loop-Proof Universal Route Guard: Prevents infinite redirect bouncing.
- * - Deep-Link Preservation: Preserves target redirect (?bookingId=...) and returns post-login.
- * - Auto-resolves Technician Desk credentials seamlessly without kickback.
- * - Full VIP Membership & Expiry mapping during OTP verification.
- * - Preserves VIP status and Crown across logins and reloads.
- * - Purges family directory cache & VIP state on logout safely.
- * - 0ms Synchronous local-first session verification.
+ * - Preserves Salutation & Date of Birth (DOB) in permanent profile vault
+ * - Loop-Proof Universal Route Guard: Prevents infinite redirect bouncing
+ * - Deep-Link Preservation: Preserves target redirect (?bookingId=...) and returns post-login
+ * - Full VIP Membership & Expiry mapping across logins and reloads
+ * - 0ms Synchronous local-first lifetime session verification
  */
 
 const Auth = {
@@ -97,6 +95,7 @@ const Auth = {
           userId: `SCD_${activeMobile}`,
           mobile: activeMobile,
           phone: activeMobile,
+          salutation: 'Mr.',
           name: 'Valued Customer',
           relation: 'Self',
           membership: 'Regular'
@@ -138,6 +137,7 @@ const Auth = {
       userId: userData.userId || userData.UserID || existingProfile.userId || `SCD_${cleanMobile}`,
       mobile: cleanMobile,
       phone: cleanMobile,
+      salutation: userData.salutation || userData.Salutation || existingProfile.salutation || 'Mr.',
       name: userData.name || userData.Name || existingProfile.name || 'Valued Customer',
       age: userData.age || userData.Age || existingProfile.age || existingProfile.Age || '',
       dob: userData.dob || userData.DOB || userData.dateOfBirth || existingProfile.dob || '',
@@ -238,7 +238,9 @@ const Auth = {
       const userData = {
         userId: (serverUser && (serverUser.userId || serverUser.UserID)) ? (serverUser.userId || serverUser.UserID) : `SCD_${cleanMobile}`,
         mobile: cleanMobile,
+        salutation: (serverUser && (serverUser.salutation || serverUser.Salutation)) ? (serverUser.salutation || serverUser.Salutation) : 'Mr.',
         name: (serverUser && (serverUser.name || serverUser.Name)) ? (serverUser.name || serverUser.Name) : 'Valued Customer',
+        dob: (serverUser && (serverUser.dob || serverUser.DOB)) ? (serverUser.dob || serverUser.DOB) : '',
         age: (serverUser && (serverUser.age || serverUser.Age)) ? String(serverUser.age || serverUser.Age) : '',
         gender: (serverUser && (serverUser.gender || serverUser.Gender)) ? (serverUser.gender || serverUser.Gender) : 'Male',
         bloodGroup: (serverUser && (serverUser.bloodGroup || serverUser.BloodGroup)) ? (serverUser.bloodGroup || serverUser.BloodGroup) : 'O+',

@@ -1,22 +1,92 @@
 /* file: assets/js/profile.js */
 /**
- * Selfcare Diagnostics - My Account Controller v15.7.0
+ * Selfcare Diagnostics - My Account Controller v16.0.0
  * Features:
- * - Dynamic VIP Crown Engine
- * - Cloud Sync for Profile & Family Vault
- * - Branches Modal (Vettuvankeni & Velachery Upcoming)
- * - 5.0 Star Google Review & Future Growth Modal
- * - Realtime Blood Badges Engine
+ * - Supports Salutation (Mr., Mrs., Ms., Master, Baby, Dr.) & Date of Birth (DOB)
+ * - Instantly calculates exact Age from DOB on input & dynamically updates age every year on page load
+ * - Unwraps both nested (res.data) and top-level backend responses on initial load
+ * - Resolves mobile number across all session/auth storage keys automatically
+ * - Syncs Profile, Family Members, Membership & Blood Connect immediately on page open
  */
 
 const ProfilePage = {
   currentUser: null,
   familyMembers: [],
+  membershipInfo: null,
   _isSavingMember: false,
   _isSavingProfile: false,
 
+  normalizeMobile(raw) {
+    if (!raw) return '';
+    const digits = String(raw).replace(/\D/g, '');
+    return digits.length >= 10 ? digits.slice(-10) : '';
+  },
+
+  isActiveMembershipStatus(status) {
+    if (!status) return false;
+    const s = String(status).trim().toLowerCase();
+    if (s === 'success' || s === 'error' || s === 'regular' || s === 'none') return false;
+    return ['membership', 'vip', 'active', 'carepass', 'gold', 'platinum', 'subscribed', 'yes', 'true'].includes(s);
+  },
+
+  unwrapResponse(res) {
+    if (!res || typeof res !== 'object') return res;
+    if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+      return { ...res, ...res.data };
+    }
+    return res;
+  },
+
+  resolveSessionMobile() {
+    const candidates = [];
+
+    if (typeof localStorage !== 'undefined') {
+      candidates.push(localStorage.getItem('selfcare_active_user'));
+
+      const storageKeys = [
+        'selfcare_permanent_user',
+        'selfcare_customer_profile',
+        'selfcare_user',
+        'user'
+      ];
+      for (const key of storageKeys) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+              candidates.push(parsed.mobile, parsed.Mobile, parsed.phone, parsed.Phone, parsed.userId, parsed.UserID);
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (typeof Auth !== 'undefined' && typeof Auth.getUser === 'function') {
+      try {
+        const authUser = Auth.getUser();
+        if (authUser && typeof authUser === 'object') {
+          candidates.push(authUser.mobile, authUser.Mobile, authUser.phone, authUser.Phone, authUser.userId, authUser.UserID);
+        }
+      } catch (e) {}
+    }
+
+    for (const item of candidates) {
+      const mob = this.normalizeMobile(item);
+      if (mob && mob.length === 10) {
+        if (typeof localStorage !== 'undefined' && !localStorage.getItem('selfcare_active_user')) {
+          localStorage.setItem('selfcare_active_user', mob);
+        }
+        return mob;
+      }
+    }
+
+    return '';
+  },
+
   async init() {
     try {
+      this.setMaxDobLimits();
       this.loadAccountData();
       this.updateCartBadgeUI();
       this.renderBloodConnectBadges();
@@ -25,15 +95,24 @@ const ProfilePage = {
       if (loader) loader.style.display = 'none';
 
       if (navigator.onLine) {
-        setTimeout(() => {
-          this.syncLiveCloudProfile().catch(e => console.warn('[Profile] Background profile sync notice:', e));
-          this.syncLiveCloudFamilyMembers().catch(e => console.warn('[Profile] Background family sync notice:', e));
-          this.syncBloodConnectLive();
-        }, 150);
+        await Promise.allSettled([
+          this.syncLiveCloudProfile(),
+          this.syncLiveCloudFamilyMembers(),
+          this.syncLiveCloudMembership(),
+          this.syncBloodConnectLive()
+        ]);
       }
     } catch (err) {
       console.error('ProfilePage init error:', err);
     }
+  },
+
+  setMaxDobLimits() {
+    const todayIso = new Date().toISOString().split('T')[0];
+    const selfDob = document.getElementById('self-edit-dob');
+    const famDob = document.getElementById('family-dob-input');
+    if (selfDob) selfDob.max = todayIso;
+    if (famDob) famDob.max = todayIso;
   },
 
   safeShowToast(message, type = 'info') {
@@ -44,31 +123,74 @@ const ProfilePage = {
     }
   },
 
-  triggerHaptic() {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(25);
+  normalizeDobInput(rawDob) {
+    if (!rawDob) return '';
+    const cleanStr = String(rawDob).trim();
+    if (!cleanStr) return '';
+
+    // Already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
+      return cleanStr;
     }
+
+    // ISO Timestamp e.g. 1999-07-05T00:00:00.000Z
+    if (/^\d{4}-\d{2}-\d{2}T/.test(cleanStr)) {
+      const d = new Date(cleanStr);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+    }
+
+    // DD/MM/YYYY or DD-MM-YYYY
+    if (/^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(cleanStr)) {
+      const parts = cleanStr.split(/[/-]/);
+      const day = parts[0].padStart(2, '0');
+      const month = parts[1].padStart(2, '0');
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    }
+
+    const parsed = new Date(cleanStr);
+    if (!isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const day = String(parsed.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    return '';
+  },
+
+  parseLocalDate(dateStr) {
+    const normalized = this.normalizeDobInput(dateStr);
+    if (!normalized) return null;
+    const [y, m, d] = normalized.split('-').map(Number);
+    if (!y || !m || !d) return null;
+    const dt = new Date(y, m - 1, d);
+    return isNaN(dt.getTime()) ? null : dt;
   },
 
   calculateAge(dobOrAge) {
-    if (!dobOrAge) return '';
+    if (dobOrAge === null || dobOrAge === undefined) return '';
     const cleanStr = String(dobOrAge).trim();
     if (!cleanStr) return '';
 
+    // Legacy direct numeric age fallback
     const num = Number(cleanStr);
-    if (!isNaN(num) && num > 0 && num < 125) {
+    if (!isNaN(num) && num >= 0 && num < 125 && !cleanStr.includes('-') && !cleanStr.includes('/')) {
       return String(Math.floor(num));
     }
 
-    let birthDate = new Date(cleanStr);
-    if (isNaN(birthDate.getTime()) && /^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(cleanStr)) {
-      const parts = cleanStr.split(/[/-]/);
-      birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-    }
-
-    if (isNaN(birthDate.getTime())) return '';
+    const birthDate = this.parseLocalDate(cleanStr);
+    if (!birthDate) return '';
 
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (birthDate > today) return '';
+
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
@@ -77,186 +199,518 @@ const ProfilePage = {
     return (age >= 0 && age < 125) ? String(age) : '';
   },
 
+  formatAgeDisplay(dob, fallbackAge) {
+    const birthDate = this.parseLocalDate(dob);
+    if (birthDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (birthDate <= today) {
+        let years = today.getFullYear() - birthDate.getFullYear();
+        let months = today.getMonth() - birthDate.getMonth();
+        if (today.getDate() < birthDate.getDate()) {
+          months--;
+        }
+        if (months < 0) {
+          years--;
+          months += 12;
+        }
+        if (years >= 1) {
+          return `${years} ${years === 1 ? 'Yr' : 'Yrs'}`;
+        }
+        if (months >= 1) {
+          return `${months} ${months === 1 ? 'Month' : 'Months'}`;
+        }
+        const diffDays = Math.max(1, Math.floor((today - birthDate) / (1000 * 60 * 60 * 24)));
+        return `${diffDays} ${diffDays === 1 ? 'Day' : 'Days'}`;
+      }
+    }
+
+    const numericAge = this.calculateAge(fallbackAge);
+    return numericAge ? `${numericAge} Yrs` : '';
+  },
+
+  syncAgeInputFromDob(dobInputId, ageInputId) {
+    const dobEl = document.getElementById(dobInputId);
+    const ageEl = document.getElementById(ageInputId);
+    if (!dobEl || !ageEl) return;
+
+    const dobVal = dobEl.value;
+    if (!dobVal) {
+      ageEl.value = '';
+      return;
+    }
+
+    const displayLabel = this.formatAgeDisplay(dobVal, '');
+    ageEl.value = displayLabel || '';
+  },
+
+  onSalutationChange(salutationSelectId, genderSelectId) {
+    const salEl = document.getElementById(salutationSelectId);
+    const genEl = document.getElementById(genderSelectId);
+    if (!salEl || !genEl) return;
+
+    const sal = salEl.value;
+    if (sal === 'Mr.' || sal === 'Master') {
+      genEl.value = 'Male';
+    } else if (sal === 'Mrs.' || sal === 'Ms.') {
+      genEl.value = 'Female';
+    }
+  },
+
+  inferDefaultSalutation(gender, age) {
+    const g = String(gender || '').toLowerCase();
+    const numAge = Number(age);
+    if (!isNaN(numAge) && numAge > 0 && numAge < 12) {
+      return g === 'male' ? 'Master' : 'Baby';
+    }
+    if (g === 'female') return 'Ms.';
+    return 'Mr.';
+  },
+
+  formatFullName(salutation, name) {
+    const cleanName = String(name || '').trim();
+    const cleanSal = String(salutation || '').trim();
+    if (!cleanName) return 'Customer Account';
+    if (!cleanSal) return cleanName;
+    if (cleanName.toLowerCase().startsWith(cleanSal.toLowerCase())) {
+      return cleanName;
+    }
+    return `${cleanSal} ${cleanName}`;
+  },
+
   loadAccountData() {
-    const activeMobile = (typeof localStorage !== 'undefined' && localStorage.getItem('selfcare_active_user')) || '';
+    const resolvedMobile = this.resolveSessionMobile();
+    const storedUser = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
 
     let vaultProfile = {};
-    if (activeMobile) {
+    if (resolvedMobile) {
       try {
-        const rawVault = localStorage.getItem(`selfcare_profile_${activeMobile}`);
+        const rawVault = localStorage.getItem(`selfcare_profile_${resolvedMobile}`);
         if (rawVault) vaultProfile = JSON.parse(rawVault);
       } catch (e) {}
     }
 
-    const storedUser = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
-    const rawAge = storedUser.age || storedUser.Age || vaultProfile.age || vaultProfile.Age || storedUser.dob || vaultProfile.dob || '';
-    const resolvedMobile = activeMobile || storedUser.mobile || vaultProfile.mobile || '';
+    let permanentUser = {};
+    try {
+      const rawPerm = localStorage.getItem('selfcare_permanent_user') || localStorage.getItem('selfcare_customer_profile');
+      if (rawPerm) permanentUser = JSON.parse(rawPerm);
+    } catch (e) {}
+
+    const merged = { ...permanentUser, ...storedUser, ...vaultProfile };
+    const normalizedDob = this.normalizeDobInput(merged.dob || merged.DOB || merged.dateOfBirth || merged.DateOfBirth || '');
+    const rawAge = normalizedDob || merged.age || merged.Age || '';
+    const computedAge = this.calculateAge(rawAge);
+    const gender = merged.gender || merged.Gender || 'Male';
+    const salutation = merged.salutation || merged.Salutation || merged.title || merged.Title || this.inferDefaultSalutation(gender, computedAge);
 
     this.currentUser = {
-      userId: storedUser.userId || storedUser.UserID || vaultProfile.userId || vaultProfile.UserID || (resolvedMobile ? 'SCD_' + resolvedMobile : ''),
-      name: storedUser.name || vaultProfile.name || '',
+      userId: merged.userId || merged.UserID || (resolvedMobile ? 'SCD_' + resolvedMobile : ''),
+      salutation,
+      name: merged.name || merged.Name || '',
       mobile: resolvedMobile,
-      email: storedUser.email || vaultProfile.email || '',
-      age: this.calculateAge(rawAge),
-      gender: storedUser.gender || storedUser.Gender || vaultProfile.gender || vaultProfile.Gender || 'Male',
-      bloodGroup: storedUser.bloodGroup || storedUser.BloodGroup || vaultProfile.bloodGroup || vaultProfile.BloodGroup || 'O+',
-      address: storedUser.address || storedUser.Address || vaultProfile.address || '',
-      location: storedUser.location || storedUser.Location || vaultProfile.location || '',
-      membership: storedUser.membership || vaultProfile.membership || 'Regular',
-      membershipExpiry: storedUser.membershipExpiry || vaultProfile.membershipExpiry || ''
+      email: merged.email || merged.Email || '',
+      dob: normalizedDob,
+      age: computedAge,
+      gender,
+      bloodGroup: merged.bloodGroup || merged.BloodGroup || 'O+',
+      address: merged.address || merged.Address || '',
+      location: merged.location || merged.Location || '',
+      membership: merged.membership || merged.Membership || 'Regular',
+      membershipPlan: merged.membershipPlan || merged.MembershipPlan || '',
+      membershipExpiry: merged.membershipExpiry || merged.MembershipExpiry || ''
     };
 
-    const currentMobile = this.currentUser.mobile;
+    try {
+      const rawMem = (resolvedMobile && localStorage.getItem(`selfcare_membership_${resolvedMobile}`)) || localStorage.getItem('selfcare_membership');
+      if (rawMem) {
+        this.membershipInfo = JSON.parse(rawMem);
+      }
+    } catch (e) {}
 
     try {
       let savedFam = null;
-      if (currentMobile) {
-        savedFam = localStorage.getItem(`selfcare_family_${currentMobile}`);
+      if (resolvedMobile) {
+        savedFam = localStorage.getItem(`selfcare_family_${resolvedMobile}`);
       }
       if (!savedFam) {
         savedFam = localStorage.getItem('selfcare_family_members');
       }
       const parsedFam = savedFam ? JSON.parse(savedFam) : [];
-      this.familyMembers = parsedFam.map(m => ({
-        id: m.id || m.MemberID || m.memberId,
-        primaryUserId: m.primaryUserId || m.PrimaryUserID || (currentMobile ? 'SCD_' + currentMobile : ''),
-        primaryUserName: m.primaryUserName || m.PrimaryUserName || this.currentUser.name,
-        name: m.name || m.Name || 'Member',
-        relation: m.relation || m.Relation || 'Relative',
-        mobile: m.mobile || m.Mobile || '',
-        email: m.email || m.Email || '',
-        age: this.calculateAge(m.age || m.Age),
-        gender: m.gender || m.Gender || '',
-        bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
-        address: m.address || m.Address || '',
-        location: m.location || m.Location || '',
-        membership: m.membership || m.Membership || 'Regular'
-      }));
+      if (Array.isArray(parsedFam)) {
+        this.hydrateFamilyMembers(parsedFam, resolvedMobile, false);
+      }
     } catch (e) {
       this.familyMembers = [];
     }
 
     this.renderSelfProfile();
+    this.renderMembershipSummary();
     this.populateFormInputs();
     this.renderFamilyCards();
   },
 
   async syncLiveCloudProfile() {
-    const activeMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
+    const activeMobile = this.normalizeMobile((this.currentUser && this.currentUser.mobile) || this.resolveSessionMobile());
     if (!navigator.onLine || typeof Api === 'undefined' || !activeMobile) return;
 
     try {
-      let res = null;
-      if (typeof Api.getProfile === 'function') {
-        res = await Api.getProfile(activeMobile);
-      } else if (typeof Api.request === 'function') {
-        res = await Api.request('getProfile', { userId: activeMobile, mobile: activeMobile }, false);
+      let rawRes = null;
+      if (typeof Api.request === 'function') {
+        rawRes = await Api.request('getProfile', { userId: 'SCD_' + activeMobile, mobile: activeMobile }, false);
+      } else if (typeof Api.getProfile === 'function') {
+        rawRes = await Api.getProfile(activeMobile);
       }
 
-      if (res && res.status === 'success' && res.profile) {
-        const p = res.profile;
-        const incomingAge = p.age ?? p.Age ?? p.dob ?? p.DOB;
+      const res = this.unwrapResponse(rawRes);
+      if (!res || typeof res !== 'object') return;
+
+      const p = (res.profile && typeof res.profile === 'object')
+        ? res.profile
+        : ((res.user && typeof res.user === 'object') ? res.user : (res.mobile || res.Mobile || res.Name || res.name ? res : null));
+
+      if (p && typeof p === 'object') {
+        const incomingDob = this.normalizeDobInput(p.dob ?? p.DOB ?? p.dateOfBirth ?? p.DateOfBirth ?? this.currentUser.dob);
+        const incomingAgeRaw = incomingDob || p.age || p.Age;
+        const calculatedAge = (incomingAgeRaw !== undefined && incomingAgeRaw !== null && incomingAgeRaw !== '')
+          ? this.calculateAge(incomingAgeRaw)
+          : this.currentUser.age;
+        const incomingGender = p.gender || p.Gender || this.currentUser.gender;
+        const incomingSalutation = p.salutation || p.Salutation || p.title || p.Title || this.currentUser.salutation || this.inferDefaultSalutation(incomingGender, calculatedAge);
+
+        const incomingMemStatus = p.membership ?? p.Membership ?? p.membershipStatus ?? p.MembershipStatus ?? this.currentUser.membership;
+        const incomingMemPlan = p.membershipPlan ?? p.MembershipPlan ?? p.planName ?? p.PlanName ?? this.currentUser.membershipPlan;
+        const incomingMemExpiry = p.membershipExpiry ?? p.MembershipExpiry ?? p.expiryDate ?? p.ExpiryDate ?? p.validTill ?? p.ValidTill ?? this.currentUser.membershipExpiry;
 
         this.currentUser = {
           ...this.currentUser,
           userId: p.userId || p.UserID || ('SCD_' + activeMobile),
-          name: p.name || p.Name || this.currentUser.name,
-          age: (incomingAge !== undefined && incomingAge !== null && incomingAge !== '') ? this.calculateAge(incomingAge) : this.currentUser.age,
-          gender: p.gender || p.Gender || this.currentUser.gender,
+          salutation: incomingSalutation,
+          name: (p.name || p.Name || '').trim() || this.currentUser.name,
+          mobile: activeMobile,
+          dob: incomingDob,
+          age: calculatedAge,
+          gender: incomingGender,
           bloodGroup: p.bloodGroup || p.BloodGroup || this.currentUser.bloodGroup,
-          email: p.email || p.Email || this.currentUser.email,
-          address: p.address || p.Address || this.currentUser.address,
-          location: p.location || p.Location || this.currentUser.location,
-          membership: p.membership || this.currentUser.membership || 'Regular',
-          membershipExpiry: p.membershipExpiry || this.currentUser.membershipExpiry || ''
+          email: (p.email !== undefined ? p.email : (p.Email !== undefined ? p.Email : this.currentUser.email)),
+          address: (p.address !== undefined ? p.address : (p.Address !== undefined ? p.Address : this.currentUser.address)),
+          location: (p.location !== undefined ? p.location : (p.Location !== undefined ? p.Location : this.currentUser.location)),
+          membership: incomingMemStatus || 'Regular',
+          membershipPlan: incomingMemPlan || '',
+          membershipExpiry: incomingMemExpiry || ''
         };
 
         const serialized = JSON.stringify(this.currentUser);
+        localStorage.setItem('selfcare_active_user', activeMobile);
         localStorage.setItem(`selfcare_profile_${activeMobile}`, serialized);
         localStorage.setItem('selfcare_customer_profile', serialized);
         localStorage.setItem('selfcare_permanent_user', serialized);
 
-        this.renderSelfProfile();
-        this.populateFormInputs();
-
-        const incomingFam = res.familyMembers || res.members;
-        if (Array.isArray(incomingFam) && incomingFam.length > 0) {
-          this.hydrateFamilyMembers(incomingFam, activeMobile);
+        if (res.membership && typeof res.membership === 'object') {
+          this.applyMembershipPayload(res.membership, activeMobile);
+        } else if (this.isActiveMembershipStatus(this.currentUser.membership)) {
+          this.applyMembershipPayload({
+            membership: this.currentUser.membership,
+            planName: this.currentUser.membershipPlan || 'CarePass VIP',
+            expiryDate: this.currentUser.membershipExpiry
+          }, activeMobile);
         }
+
+        this.renderSelfProfile();
+        this.renderMembershipSummary();
+        this.populateFormInputs();
+      }
+
+      const incomingFam = res.familyMembers || res.members || res.family;
+      if (Array.isArray(incomingFam) && incomingFam.length > 0) {
+        this.hydrateFamilyMembers(incomingFam, activeMobile, true);
       }
     } catch (err) {
       console.warn('[Profile] Background profile sync notice:', err);
     }
   },
 
-  async syncLiveCloudFamilyMembers() {
-    const activeMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
+  async syncLiveCloudMembership() {
+    const activeMobile = this.normalizeMobile((this.currentUser && this.currentUser.mobile) || this.resolveSessionMobile());
     if (!navigator.onLine || typeof Api === 'undefined' || !activeMobile) return;
 
+    const userId = (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile);
+
     try {
-      let res = null;
-      if (typeof Api.getFamilyMembers === 'function') {
-        res = await Api.getFamilyMembers(activeMobile);
-      } else if (typeof Api.request === 'function') {
-        res = await Api.request('getFamilyMembers', {
+      let rawRes = null;
+      if (typeof Api.request === 'function') {
+        rawRes = await Api.request('getMembershipStatus', {
           mobile: activeMobile,
           primaryMobile: activeMobile,
-          userId: (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile),
-          primaryUserId: (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile)
+          userId: userId,
+          primaryUserId: userId
+        }, false);
+      } else if (typeof Api.getMembership === 'function') {
+        rawRes = await Api.getMembership(activeMobile);
+      }
+
+      const res = this.unwrapResponse(rawRes);
+      if (!res || typeof res !== 'object') return;
+
+      const memObj = (res.membership && typeof res.membership === 'object') ? { ...res, ...res.membership } : res;
+      this.applyMembershipPayload(memObj, activeMobile);
+
+      if (Array.isArray(memObj.familyMembers) && memObj.familyMembers.length > 0 && this.familyMembers.length === 0) {
+        this.hydrateFamilyMembers(memObj.familyMembers, activeMobile, true);
+      }
+
+      this.renderSelfProfile();
+      this.renderMembershipSummary();
+      this.renderFamilyCards();
+    } catch (err) {
+      console.warn('[Profile] Membership sync notice:', err);
+    }
+  },
+
+  applyMembershipPayload(raw, activeMobile) {
+    if (!raw || typeof raw !== 'object') return;
+
+    const explicitStatus = raw.membership || raw.Membership || raw.membershipStatus || raw.MembershipStatus || '';
+    const boolVip = (raw.isPrimaryVip === true || raw.isMember === true);
+    const status = explicitStatus || (boolVip ? 'Membership' : 'Regular');
+    const isVip = boolVip || this.isActiveMembershipStatus(status);
+
+    const planName = raw.planName || raw.PlanName || raw.membershipPlan || raw.MembershipPlan || raw.plan || raw.Plan || (isVip ? 'CarePass VIP' : 'Regular');
+    const expiryDate = raw.expiryDate || raw.ExpiryDate || raw.primaryExpiry || raw.membershipExpiry || raw.MembershipExpiry || raw.validTill || raw.ValidTill || '';
+    const coveredMembers = raw.paidFamilyMemberIds || raw.coveredMembers || raw.CoveredMembers || [];
+
+    this.membershipInfo = {
+      status: isVip ? 'Membership' : 'Regular',
+      isPrimaryVip: isVip,
+      planName,
+      expiryDate,
+      coveredMembers: Array.isArray(coveredMembers) ? coveredMembers : []
+    };
+
+    if (this.currentUser) {
+      this.currentUser.membership = this.membershipInfo.status;
+      this.currentUser.membershipPlan = planName;
+      this.currentUser.membershipExpiry = expiryDate;
+    }
+
+    const serializedMem = JSON.stringify(this.membershipInfo);
+    localStorage.setItem('selfcare_membership', serializedMem);
+    if (activeMobile) {
+      localStorage.setItem(`selfcare_membership_${activeMobile}`, serializedMem);
+      if (this.currentUser) {
+        const serializedUser = JSON.stringify(this.currentUser);
+        localStorage.setItem(`selfcare_profile_${activeMobile}`, serializedUser);
+        localStorage.setItem('selfcare_customer_profile', serializedUser);
+        localStorage.setItem('selfcare_permanent_user', serializedUser);
+      }
+    }
+  },
+
+  async syncLiveCloudFamilyMembers() {
+    const activeMobile = this.normalizeMobile((this.currentUser && this.currentUser.mobile) || this.resolveSessionMobile());
+    if (!navigator.onLine || typeof Api === 'undefined' || !activeMobile) return;
+
+    const userId = (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile);
+
+    try {
+      let rawRes = null;
+      if (typeof Api.request === 'function') {
+        rawRes = await Api.request('getFamilyMembers', {
+          mobile: activeMobile,
+          primaryMobile: activeMobile,
+          userId: userId,
+          primaryUserId: userId
         }, false);
       }
 
-      let incomingList = [];
-      if (Array.isArray(res)) {
-        incomingList = res;
-      } else if (res && (res.status === 'success' || res.success)) {
-        incomingList = res.familyMembers || res.members || res.data || [];
-      } else if (res && Array.isArray(res.data)) {
-        incomingList = res.data;
+      const res = this.unwrapResponse(rawRes);
+      let incomingList = this.extractArrayFromResponse(res);
+
+      if ((!incomingList || incomingList.length === 0) && typeof Api.getFamilyMembers === 'function') {
+        const fallbackRaw = await Api.getFamilyMembers(activeMobile).catch(() => null);
+        const fallbackRes = this.unwrapResponse(fallbackRaw);
+        const fallbackList = this.extractArrayFromResponse(fallbackRes);
+        if (fallbackList && fallbackList.length > 0) {
+          incomingList = fallbackList;
+        }
       }
 
       if (Array.isArray(incomingList)) {
-        this.hydrateFamilyMembers(incomingList, activeMobile);
+        if (incomingList.length > 0 || (res && res.status === 'success')) {
+          this.hydrateFamilyMembers(incomingList, activeMobile, true);
+        }
       }
     } catch (err) {
       console.warn('[Profile] Background family sync notice:', err);
     }
   },
 
-  hydrateFamilyMembers(list, activeMobile) {
+  extractArrayFromResponse(res) {
+    if (!res) return null;
+    if (Array.isArray(res)) return res;
+    if (typeof res === 'object') {
+      if (Array.isArray(res.familyMembers)) return res.familyMembers;
+      if (Array.isArray(res.members)) return res.members;
+      if (Array.isArray(res.family)) return res.family;
+      if (Array.isArray(res.records)) return res.records;
+      if (Array.isArray(res.rows)) return res.rows;
+      if (Array.isArray(res.data)) return res.data;
+    }
+    return null;
+  },
+
+  hydrateFamilyMembers(list, activeMobile, persist = true) {
     if (!Array.isArray(list)) return;
 
-    this.familyMembers = list.map(m => ({
-      id: m.id || m.MemberID || m.memberId || ('FAM_' + Date.now()),
-      primaryUserId: m.primaryUserId || m.PrimaryUserID || ('SCD_' + activeMobile),
-      primaryUserName: m.primaryUserName || m.PrimaryUserName || (this.currentUser && this.currentUser.name) || '',
-      name: m.name || m.Name || 'Member',
-      relation: m.relation || m.Relation || 'Relative',
-      mobile: m.mobile || m.Mobile || '',
-      email: m.email || m.Email || '',
-      age: this.calculateAge(m.age || m.Age),
-      gender: m.gender || m.Gender || '',
-      bloodGroup: m.bloodGroup || m.BloodGroup || 'O+',
-      address: m.address || m.Address || '',
-      location: m.location || m.Location || '',
-      membership: m.membership || m.Membership || 'Regular'
-    }));
+    const baseTs = Date.now();
+    this.familyMembers = list.map((m, idx) => {
+      const dob = this.normalizeDobInput(m.dob ?? m.DOB ?? m.dateOfBirth ?? m.DateOfBirth ?? '');
+      const age = this.calculateAge(dob || m.age || m.Age);
+      const gender = m.gender || m.Gender || '';
+      const salutation = m.salutation || m.Salutation || m.title || m.Title || this.inferDefaultSalutation(gender, age);
 
-    const serialized = JSON.stringify(this.familyMembers);
-    localStorage.setItem('selfcare_family_members', serialized);
-    if (activeMobile) {
-      localStorage.setItem(`selfcare_family_${activeMobile}`, serialized);
+      return {
+        id: m.id || m.MemberID || m.memberId || m['Member ID'] || m.member_id || `FAM_${baseTs}_${idx}`,
+        primaryUserId: m.primaryUserId || m.PrimaryUserID || m['Primary User ID'] || (activeMobile ? 'SCD_' + activeMobile : ''),
+        primaryUserName: m.primaryUserName || m.PrimaryUserName || (this.currentUser && this.currentUser.name) || '',
+        salutation,
+        name: m.name || m.Name || m.fullName || m['Full Name'] || 'Member',
+        relation: m.relation || m.Relation || m.relationship || m.Relationship || 'Relative',
+        mobile: this.normalizeMobile(m.mobile || m.Mobile || m.phone || m.Phone || ''),
+        email: m.email || m.Email || '',
+        dob,
+        age,
+        gender,
+        bloodGroup: m.bloodGroup || m.BloodGroup || m['Blood Group'] || 'O+',
+        address: m.address || m.Address || '',
+        location: m.location || m.Location || '',
+        membership: m.membership || m.Membership || m.membershipStatus || 'Regular',
+        expiryDate: m.expiryDate || m.MembershipExpiry || ''
+      };
+    });
+
+    if (persist) {
+      const serialized = JSON.stringify(this.familyMembers);
+      localStorage.setItem('selfcare_family_members', serialized);
+      if (activeMobile) {
+        localStorage.setItem(`selfcare_family_${activeMobile}`, serialized);
+      }
     }
 
     this.renderFamilyCards();
+    this.updateFamilyMenuSummary();
+  },
+
+  updateFamilyMenuSummary() {
+    const subEl = document.getElementById('menu-family-sub');
+    const pillEl = document.getElementById('menu-family-pill');
+    const count = this.familyMembers.length;
+
+    if (pillEl) {
+      pillEl.textContent = String(count);
+      if (count > 0) {
+        pillEl.classList.add('pill-active');
+      } else {
+        pillEl.classList.remove('pill-active');
+      }
+    }
+
+    if (subEl) {
+      if (count === 0) {
+        subEl.textContent = 'Add family members for quick booking';
+      } else {
+        const names = this.familyMembers.slice(0, 2).map(m => this.formatFullName(m.salutation, m.name)).join(', ');
+        subEl.textContent = count > 2 ? `${names} +${count - 2} more` : names;
+      }
+    }
+  },
+
+  isSelfVIP() {
+    const utilVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function')
+      ? Utils.isPatientVIP('SELF')
+      : false;
+    const userMemVip = this.currentUser && this.isActiveMembershipStatus(this.currentUser.membership);
+    const infoMemVip = this.membershipInfo && (this.membershipInfo.isPrimaryVip === true || this.isActiveMembershipStatus(this.membershipInfo.status));
+    return Boolean(utilVip || userMemVip || infoMemVip);
+  },
+
+  isMemberVIP(member) {
+    if (!member) return false;
+    const utilVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function')
+      ? Utils.isPatientVIP(member.id)
+      : false;
+    const directVip = this.isActiveMembershipStatus(member.membership);
+    const coveredList = (this.membershipInfo && Array.isArray(this.membershipInfo.coveredMembers))
+      ? this.membershipInfo.coveredMembers
+      : [];
+    const inCovered = coveredList.some(c => {
+      if (typeof c === 'string') return c === member.id || c.toLowerCase() === (member.name || '').toLowerCase();
+      if (c && typeof c === 'object') return (c.id || c.memberId || c.MemberID) === member.id;
+      return false;
+    });
+    return Boolean(utilVip || directVip || inCovered);
+  },
+
+  formatDisplayDate(dateStr) {
+    if (!dateStr) return '';
+    const localDt = this.parseLocalDate(dateStr);
+    if (localDt) {
+      return localDt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  },
+
+  renderMembershipSummary() {
+    const subEl = document.getElementById('menu-membership-sub');
+    const pillEl = document.getElementById('menu-membership-pill');
+    const viewRowEl = document.getElementById('self-view-membership');
+
+    const isVip = this.isSelfVIP();
+    const planName = (this.membershipInfo && this.membershipInfo.planName)
+      || (this.currentUser && this.currentUser.membershipPlan)
+      || (isVip ? 'CarePass VIP' : 'Regular');
+    const rawExpiry = (this.membershipInfo && this.membershipInfo.expiryDate)
+      || (this.currentUser && this.currentUser.membershipExpiry)
+      || '';
+    const expiry = this.formatDisplayDate(rawExpiry);
+
+    if (pillEl) {
+      pillEl.textContent = isVip ? 'ACTIVE' : 'Regular';
+      if (isVip) {
+        pillEl.classList.add('pill-active');
+      } else {
+        pillEl.classList.remove('pill-active');
+      }
+    }
+
+    if (subEl) {
+      if (isVip) {
+        subEl.textContent = expiry ? `${planName} • Valid till ${expiry}` : `${planName} • Active Member`;
+      } else {
+        subEl.textContent = 'Standard Plan • Tap to view benefits';
+      }
+    }
+
+    if (viewRowEl) {
+      if (isVip) {
+        viewRowEl.textContent = expiry ? `${planName} (Valid till ${expiry})` : `${planName} (Active)`;
+      } else {
+        viewRowEl.textContent = 'Regular (No active plan)';
+      }
+    }
   },
 
   openMyProfileModal() {
-    this.triggerHaptic();
     this.renderSelfProfile();
     this.populateFormInputs();
     this.toggleSelfEditMode(false);
     this.openModal('modal-my-profile');
+
+    if (navigator.onLine) {
+      this.syncLiveCloudProfile().catch(() => {});
+      this.syncLiveCloudMembership().catch(() => {});
+    }
   },
 
   renderSelfProfile() {
@@ -266,36 +720,41 @@ const ProfilePage = {
     const relationSubEl = document.getElementById('self-display-relation');
     const mobileEl = document.getElementById('self-view-mobile');
     const emailEl = document.getElementById('self-view-email');
+    const dobEl = document.getElementById('self-view-dob');
     const ageGenderEl = document.getElementById('self-view-age-gender');
     const bloodEl = document.getElementById('self-view-blood');
     const addressEl = document.getElementById('self-view-address');
     const locEl = document.getElementById('self-view-location');
+    const bannerSubEl = document.getElementById('banner-account-sub');
+    const menuProfileSubEl = document.getElementById('menu-profile-sub');
 
-    const displayName = (u.name && u.name.trim()) ? u.name : 'Customer Account';
+    const rawName = (u.name && u.name.trim()) ? u.name.trim() : '';
+    const displayName = rawName ? this.formatFullName(u.salutation, rawName) : 'Customer Account';
+    const safeName = (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(displayName) : displayName;
+    const isSelfVip = this.isSelfVIP();
 
-    const formattedName = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function') 
-      ? Utils.formatVIPName(displayName, 'SELF') 
-      : Utils.escapeHtml(displayName);
-
-    const isSelfVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function')
-      ? Utils.isPatientVIP('SELF')
-      : false;
-
-    if (nameEl) nameEl.innerHTML = formattedName;
-    if (avatarEl) avatarEl.textContent = displayName.charAt(0).toUpperCase();
+    if (nameEl) nameEl.innerHTML = isSelfVip ? `${safeName} 👑` : safeName;
+    if (avatarEl) avatarEl.textContent = (rawName || displayName).charAt(0).toUpperCase();
+    if (bannerSubEl) bannerSubEl.textContent = u.mobile ? `${displayName} • +91 ${u.mobile}` : displayName;
+    if (menuProfileSubEl) menuProfileSubEl.textContent = u.mobile ? `${displayName} • +91 ${u.mobile}` : 'View & edit personal details';
 
     if (relationSubEl) {
-      relationSubEl.innerHTML = isSelfVip 
-        ? 'Account Primary (Self) • <span style="color:#D97706; font-weight:800;">⭐ CarePass VIP Member</span>' 
+      relationSubEl.textContent = isSelfVip
+        ? 'Account Primary (Self) • Active VIP Member'
         : 'Account Primary (Self)';
     }
 
+    const formattedAge = this.formatAgeDisplay(u.dob, u.age);
+
     if (mobileEl) mobileEl.textContent = u.mobile ? `+91 ${u.mobile}` : 'Not provided';
     if (emailEl) emailEl.textContent = u.email || 'Not provided';
-    if (ageGenderEl) ageGenderEl.textContent = `${u.age ? u.age + ' Yrs' : 'Age not set'} • ${u.gender || 'Male'}`;
+    if (dobEl) dobEl.textContent = u.dob ? this.formatDisplayDate(u.dob) : 'Not set';
+    if (ageGenderEl) ageGenderEl.textContent = `${formattedAge || 'Age not set'} • ${u.gender || 'Male'}`;
     if (bloodEl) bloodEl.textContent = u.bloodGroup || 'O+';
     if (addressEl) addressEl.textContent = u.address || 'Address not provided';
     if (locEl) locEl.textContent = u.location || 'Not set';
+
+    this.renderMembershipSummary();
   },
 
   populateFormInputs() {
@@ -305,9 +764,13 @@ const ProfilePage = {
       if (el) el.value = (val !== undefined && val !== null) ? val : '';
     };
 
+    const salEl = document.getElementById('self-edit-salutation');
+    if (salEl) salEl.value = u.salutation || this.inferDefaultSalutation(u.gender, u.age);
+
     setVal('self-edit-name', u.name);
     setVal('self-edit-mobile', u.mobile);
-    setVal('self-edit-age', u.age);
+    setVal('self-edit-dob', u.dob);
+    setVal('self-edit-age', this.formatAgeDisplay(u.dob, u.age));
     setVal('self-edit-email', u.email);
     setVal('self-edit-address', u.address);
     setVal('self-edit-location', u.location);
@@ -320,7 +783,6 @@ const ProfilePage = {
   },
 
   toggleSelfEditMode(isEdit) {
-    this.triggerHaptic();
     const viewMode = document.getElementById('profile-view-mode');
     const editMode = document.getElementById('profile-edit-mode');
     if (viewMode) viewMode.style.display = isEdit ? 'none' : 'block';
@@ -330,17 +792,16 @@ const ProfilePage = {
   },
 
   async saveSelfDetails() {
-    this.triggerHaptic();
-
     if (this._isSavingProfile) return;
 
     const saveBtn = document.getElementById('self-edit-save-btn');
-    const originalText = saveBtn ? saveBtn.innerHTML : 'Save Profile Details ✓';
+    const originalText = saveBtn ? saveBtn.textContent : 'Save Profile Details';
 
+    const salutation = document.getElementById('self-edit-salutation').value;
     const name = document.getElementById('self-edit-name').value.trim();
-    const mobile = document.getElementById('self-edit-mobile').value.replace(/\D/g, '').slice(-10);
+    const mobile = this.normalizeMobile(document.getElementById('self-edit-mobile').value);
     const bloodGroup = document.getElementById('self-edit-blood').value;
-    const rawAge = document.getElementById('self-edit-age').value.trim();
+    const dob = this.normalizeDobInput(document.getElementById('self-edit-dob').value);
     const gender = document.getElementById('self-edit-gender').value;
     const email = document.getElementById('self-edit-email').value.trim();
     const address = document.getElementById('self-edit-address').value.trim();
@@ -352,22 +813,30 @@ const ProfilePage = {
       return;
     }
 
+    if (!dob) {
+      this.safeShowToast('Please select your Date of Birth', 'error');
+      document.getElementById('self-edit-dob').focus();
+      return;
+    }
+
     try {
       this._isSavingProfile = true;
       if (saveBtn) {
         saveBtn.disabled = true;
-        saveBtn.innerHTML = 'Saving Details... ⏳';
+        saveBtn.textContent = 'Saving...';
       }
 
-      const calculatedAge = this.calculateAge(rawAge);
-      const activeMobile = mobile || (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
+      const calculatedAge = this.calculateAge(dob);
+      const activeMobile = mobile || this.normalizeMobile((this.currentUser && this.currentUser.mobile) || this.resolveSessionMobile());
 
       this.currentUser = {
         ...this.currentUser,
         userId: (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile),
+        salutation,
         name,
         mobile: activeMobile,
         bloodGroup,
+        dob,
         age: calculatedAge,
         gender,
         email,
@@ -376,6 +845,7 @@ const ProfilePage = {
       };
 
       const serialized = JSON.stringify(this.currentUser);
+      localStorage.setItem('selfcare_active_user', activeMobile);
       localStorage.setItem(`selfcare_profile_${activeMobile}`, serialized);
       localStorage.setItem('selfcare_customer_profile', serialized);
       localStorage.setItem('selfcare_permanent_user', serialized);
@@ -388,7 +858,9 @@ const ProfilePage = {
         const cloudPayload = {
           userId: this.currentUser.userId,
           mobile: activeMobile,
+          salutation: this.currentUser.salutation,
           name: this.currentUser.name,
+          dob: this.currentUser.dob,
           age: this.currentUser.age,
           gender: this.currentUser.gender,
           bloodGroup: this.currentUser.bloodGroup,
@@ -415,14 +887,13 @@ const ProfilePage = {
       this._isSavingProfile = false;
       if (saveBtn) {
         saveBtn.disabled = false;
-        saveBtn.innerHTML = originalText;
+        saveBtn.textContent = originalText;
       }
     }
   },
 
   /* ================= FAMILY DIRECTORY ================= */
   openFamilyMembersModal() {
-    this.triggerHaptic();
     this.renderFamilyCards();
     this.closeMemberForm();
     this.openModal('modal-family-members');
@@ -439,6 +910,7 @@ const ProfilePage = {
 
     const count = this.familyMembers.length;
     if (countEl) countEl.textContent = `${count} ${count === 1 ? 'Member' : 'Members'} Saved`;
+    this.updateFamilyMenuSummary();
 
     if (count === 0) {
       container.innerHTML = `
@@ -454,54 +926,53 @@ const ProfilePage = {
       return;
     }
 
-    container.innerHTML = this.familyMembers.map(m => {
-      const isMemberVip = (typeof Utils !== 'undefined' && typeof Utils.isPatientVIP === 'function') 
-        ? Utils.isPatientVIP(m.id) 
-        : (m.membership === 'Membership');
+    const esc = (str) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(str) : String(str || '');
 
-      const memberTitleWithCrown = (typeof Utils !== 'undefined' && typeof Utils.formatVIPName === 'function')
-        ? Utils.formatVIPName(m.name, m.id)
-        : Utils.escapeHtml(m.name);
+    container.innerHTML = this.familyMembers.map(m => {
+      const isMemberVip = this.isMemberVIP(m);
+      const displayName = this.formatFullName(m.salutation, m.name);
+      const formattedAge = this.formatAgeDisplay(m.dob, m.age);
+      const formattedDob = m.dob ? this.formatDisplayDate(m.dob) : 'Not set';
 
       return `
-        <div class="member-display-card" style="${isMemberVip ? 'border-color:#FCD34D; background:#FFFDF7;' : ''}">
+        <div class="member-display-card">
           <div class="member-card-header">
             <div class="member-title-group">
-              <span class="member-name-text">${memberTitleWithCrown}</span>
-              <span class="member-relation-badge">${Utils.escapeHtml(m.relation || 'Relative')}</span>
-              ${isMemberVip ? '<span style="background:#FEF3C7; color:#92400E; font-size:9.5px; font-weight:800; padding:2px 6px; border-radius:4px; border:1px solid #FCD34D;">👑 VIP</span>' : ''}
+              <span class="member-name-text">${esc(displayName)}</span>
+              <span class="member-relation-badge">${esc(m.relation || 'Relative')}</span>
+              ${isMemberVip ? '<span class="member-vip-badge">VIP</span>' : ''}
             </div>
             <div class="member-actions-group">
-              <button type="button" class="card-btn-edit" onclick="ProfilePage.editFamilyMember('${m.id}')">✏️ Edit</button>
-              <button type="button" class="card-btn-delete" onclick="ProfilePage.deleteFamilyMember('${m.id}')">🗑️</button>
+              <button type="button" class="card-btn-edit" onclick="ProfilePage.editFamilyMember('${esc(m.id)}')">Edit</button>
+              <button type="button" class="card-btn-delete" onclick="ProfilePage.deleteFamilyMember('${esc(m.id)}')">Delete</button>
             </div>
           </div>
 
           <div class="member-card-body-grid">
             <div class="member-info-item">
               <span class="info-label">Mobile Number</span>
-              <span class="info-val mobile-highlight">${m.mobile ? '+91 ' + m.mobile : 'Not provided'}</span>
+              <span class="info-val mobile-highlight">${m.mobile ? '+91 ' + esc(m.mobile) : 'Not provided'}</span>
             </div>
             <div class="member-info-item">
-              <span class="info-label">Age & Gender</span>
-              <span class="info-val">${m.age ? m.age + ' Yrs' : 'Age not set'} • ${m.gender || 'Not specified'}</span>
+              <span class="info-label">Age &amp; Gender</span>
+              <span class="info-val">${formattedAge ? esc(formattedAge) : 'Age not set'} • ${esc(m.gender || 'Not specified')}</span>
+            </div>
+            <div class="member-info-item">
+              <span class="info-label">Date of Birth</span>
+              <span class="info-val">${esc(formattedDob)}</span>
             </div>
             <div class="member-info-item">
               <span class="info-label">Blood Group</span>
-              <span class="info-val">${m.bloodGroup || 'O+'}</span>
-            </div>
-            <div class="member-info-item">
-              <span class="info-label">Email Address</span>
-              <span class="info-val" style="word-break: break-all; font-size:11px;">${m.email ? Utils.escapeHtml(m.email) : 'Not provided'}</span>
+              <span class="info-val">${esc(m.bloodGroup || 'O+')}</span>
             </div>
             <div class="member-info-item">
               <span class="info-label">Pickup Address</span>
-              <span class="info-val" style="font-size:11px;">${Utils.escapeHtml(m.address || 'Same as primary')}</span>
+              <span class="info-val">${esc(m.address || 'Same as primary')}</span>
             </div>
             <div class="member-info-item">
               <span class="info-label">GPS Location</span>
-              <span class="info-val" style="font-size:11px;">
-                ${m.location ? `<a href="${Utils.escapeHtml(m.location)}" target="_blank" rel="noopener noreferrer" style="color:#059669; font-weight:700; text-decoration:underline;">📍 Open Map</a>` : 'Not set'}
+              <span class="info-val">
+                ${m.location ? `<a href="${esc(m.location)}" target="_blank" rel="noopener noreferrer" style="color:#078866; text-decoration:underline;">Open Map</a>` : 'Not set'}
               </span>
             </div>
           </div>
@@ -511,7 +982,6 @@ const ProfilePage = {
   },
 
   openMemberForm(memberId = null) {
-    this.triggerHaptic();
     const listView = document.getElementById('family-list-view');
     const formView = document.getElementById('family-form-view');
     const formTitle = document.getElementById('member-form-title');
@@ -527,12 +997,14 @@ const ProfilePage = {
     if (memberId) {
       const target = this.familyMembers.find(m => m.id === memberId);
       if (target) {
-        if (formTitle) formTitle.textContent = `Edit Details: ${target.name}`;
+        if (formTitle) formTitle.textContent = `Edit Details: ${this.formatFullName(target.salutation, target.name)}`;
         setVal('family-edit-id', target.id);
+        setVal('family-salutation-select', target.salutation || this.inferDefaultSalutation(target.gender, target.age));
         setVal('family-name-input', target.name);
         setVal('family-relation-select', target.relation || 'Father');
         setVal('family-blood-select', target.bloodGroup || 'O+');
-        setVal('family-age-input', target.age || '');
+        setVal('family-dob-input', target.dob || '');
+        setVal('family-age-input', this.formatAgeDisplay(target.dob, target.age));
         setVal('family-gender-select', target.gender || 'Male');
         setVal('family-mobile-input', target.mobile || '');
         setVal('family-email-input', target.email || '');
@@ -544,9 +1016,11 @@ const ProfilePage = {
 
     if (formTitle) formTitle.textContent = 'Add New Member';
     setVal('family-edit-id', '');
+    setVal('family-salutation-select', 'Mr.');
     setVal('family-name-input', '');
     setVal('family-relation-select', 'Father');
     setVal('family-blood-select', 'O+');
+    setVal('family-dob-input', '');
     setVal('family-age-input', '');
     setVal('family-gender-select', 'Male');
     setVal('family-mobile-input', '');
@@ -556,7 +1030,6 @@ const ProfilePage = {
   },
 
   closeMemberForm() {
-    this.triggerHaptic();
     const listView = document.getElementById('family-list-view');
     const formView = document.getElementById('family-form-view');
     if (listView) listView.style.display = 'block';
@@ -568,26 +1041,31 @@ const ProfilePage = {
   },
 
   async saveFamilyMember() {
-    this.triggerHaptic();
-
     if (this._isSavingMember) return;
 
-    const saveBtn = document.getElementById('family-save-btn') || document.querySelector('#family-form-view .modal-action-btn');
-    const originalText = saveBtn ? saveBtn.innerHTML : 'Save Member ✓';
+    const saveBtn = document.getElementById('family-save-btn');
+    const originalText = saveBtn ? saveBtn.textContent : 'Save Member';
 
     const editId = document.getElementById('family-edit-id').value.trim();
+    const salutation = document.getElementById('family-salutation-select').value;
     const name = document.getElementById('family-name-input').value.trim();
     const relation = document.getElementById('family-relation-select').value;
     const bloodGroup = document.getElementById('family-blood-select').value;
-    const rawAge = document.getElementById('family-age-input').value.trim();
+    const dob = this.normalizeDobInput(document.getElementById('family-dob-input').value);
     const gender = document.getElementById('family-gender-select').value;
-    const mobile = document.getElementById('family-mobile-input').value.replace(/\D/g, '').slice(-10);
+    const mobile = this.normalizeMobile(document.getElementById('family-mobile-input').value);
     const email = document.getElementById('family-email-input').value.trim();
     const address = document.getElementById('family-address-input').value.trim();
     const location = document.getElementById('family-location-input').value.trim();
 
     if (!name) {
       this.safeShowToast('Please enter member name', 'error');
+      return;
+    }
+
+    if (!dob) {
+      this.safeShowToast('Please select Date of Birth', 'error');
+      document.getElementById('family-dob-input').focus();
       return;
     }
 
@@ -600,10 +1078,10 @@ const ProfilePage = {
       this._isSavingMember = true;
       if (saveBtn) {
         saveBtn.disabled = true;
-        saveBtn.innerHTML = 'Saving Member... ⏳';
+        saveBtn.textContent = 'Saving...';
       }
 
-      const activeMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
+      const activeMobile = this.normalizeMobile((this.currentUser && this.currentUser.mobile) || this.resolveSessionMobile());
       if (!activeMobile) {
         this.safeShowToast('User session expired. Please re-login.', 'error');
         return;
@@ -613,7 +1091,7 @@ const ProfilePage = {
       const activeUserId = (this.currentUser && this.currentUser.userId) || ('SCD_' + activeMobile);
 
       const finalMemberId = editId || `FAM_${Date.now()}`;
-      const calculatedAge = this.calculateAge(rawAge);
+      const calculatedAge = this.calculateAge(dob);
 
       let existingMembership = 'Regular';
       if (editId) {
@@ -633,9 +1111,11 @@ const ProfilePage = {
         PrimaryUserName: activeName,
         primaryMobile: activeMobile,
         PrimaryMobile: activeMobile,
+        salutation,
         name,
         relation,
         bloodGroup,
+        dob,
         age: calculatedAge,
         gender,
         mobile,
@@ -669,20 +1149,19 @@ const ProfilePage = {
 
       this.renderFamilyCards();
       this.closeMemberForm();
-      this.safeShowToast(`${name} details saved successfully!`, 'success');
+      this.safeShowToast(`${this.formatFullName(salutation, name)} details saved successfully!`, 'success');
     } finally {
       this._isSavingMember = false;
       if (saveBtn) {
         saveBtn.disabled = false;
-        saveBtn.innerHTML = originalText;
+        saveBtn.textContent = originalText;
       }
     }
   },
 
   async deleteFamilyMember(id) {
-    this.triggerHaptic();
     const target = this.familyMembers.find(m => m.id === id);
-    const memberName = target ? target.name : 'Member';
+    const memberName = target ? this.formatFullName(target.salutation, target.name) : 'Member';
 
     if (!confirm(`Are you sure you want to remove ${memberName}?`)) return;
 
@@ -690,12 +1169,17 @@ const ProfilePage = {
     const serialized = JSON.stringify(this.familyMembers);
     localStorage.setItem('selfcare_family_members', serialized);
 
-    const currentMobile = (this.currentUser && this.currentUser.mobile) || localStorage.getItem('selfcare_active_user');
+    const currentMobile = this.normalizeMobile((this.currentUser && this.currentUser.mobile) || this.resolveSessionMobile());
     if (currentMobile) localStorage.setItem(`selfcare_family_${currentMobile}`, serialized);
 
     if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
       try {
-        await Api.request('deleteFamilyMember', { id, memberId: id, primaryMobile: currentMobile }, false);
+        await Api.request('deleteFamilyMember', {
+          id,
+          memberId: id,
+          primaryMobile: currentMobile,
+          primaryUserId: currentMobile ? 'SCD_' + currentMobile : ''
+        }, false);
       } catch (err) {}
     }
 
@@ -703,20 +1187,7 @@ const ProfilePage = {
     this.safeShowToast(`${memberName} removed.`, 'info');
   },
 
-  /* ================= 📍 BRANCHES & DIRECTIONS MODAL ================= */
-  openBranchesModal() {
-    this.triggerHaptic();
-    this.openModal('modal-branches');
-  },
-
-  /* ================= ⭐ GOOGLE REVIEW MODAL ================= */
-  openReviewModal() {
-    this.triggerHaptic();
-    this.openModal('modal-review');
-  },
-
   handleLogout() {
-    this.triggerHaptic();
     if (confirm('Are you sure you want to log out?')) {
       if (typeof Auth !== 'undefined' && Auth.logout) {
         Auth.logout();
@@ -728,12 +1199,10 @@ const ProfilePage = {
   },
 
   openSupportDeskModal() {
-    this.triggerHaptic();
     this.openModal('modal-support-desk');
   },
 
   detectGpsLocation(targetInputId) {
-    this.triggerHaptic();
     if (!navigator.geolocation) {
       this.safeShowToast('GPS Geolocation is not supported by your browser', 'error');
       return;
@@ -757,14 +1226,13 @@ const ProfilePage = {
   },
 
   closeModal(id) {
-    this.triggerHaptic();
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   },
 
   updateCartBadgeUI() {
     const badges = document.querySelectorAll('.cart-badge');
-    const activeUser = localStorage.getItem('selfcare_active_user');
+    const activeUser = this.resolveSessionMobile();
     let raw = activeUser ? localStorage.getItem(`selfcare_cart_${activeUser}`) : null;
     if (raw === null) raw = localStorage.getItem('selfcare_cart') ?? localStorage.getItem('cart');
 
@@ -802,21 +1270,11 @@ const ProfilePage = {
       const urgentPill = document.getElementById('urgent-live-pill');
 
       if (sosChip) {
-        if (sosCount > 0) {
-          sosChip.textContent = `🚨 ${sosCount} Active SOS`;
-          sosChip.style.background = '#FEE2E2';
-          sosChip.style.color = '#DC2626';
-          sosChip.style.fontWeight = '900';
-        } else {
-          sosChip.textContent = `✅ 0 Urgent SOS`;
-          sosChip.style.background = '#F1F5F9';
-          sosChip.style.color = '#64748B';
-          sosChip.style.fontWeight = '700';
-        }
+        sosChip.textContent = sosCount > 0 ? `${sosCount} Active SOS` : `0 Urgent SOS`;
       }
 
       if (donorChip) {
-        donorChip.textContent = `🩸 ${donorCount} Donors`;
+        donorChip.textContent = `${donorCount} Donors`;
       }
 
       if (urgentPill) {
@@ -830,7 +1288,8 @@ const ProfilePage = {
   async syncBloodConnectLive() {
     if (!navigator.onLine || typeof Api === 'undefined' || typeof Api.request !== 'function') return;
     try {
-      const res = await Api.request('getBloodData', {}, false).catch(() => null);
+      const rawRes = await Api.request('getBloodData', {}, false).catch(() => null);
+      const res = this.unwrapResponse(rawRes);
       if (res && res.status === 'success') {
         if (Array.isArray(res.requests)) {
           localStorage.setItem('selfcare_blood_requests', JSON.stringify(res.requests));

@@ -1,9 +1,9 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - API Gateway v6.6.0 (Clinical Report & Verification Edition)
+ * Selfcare Diagnostics - API Gateway v6.7.0 (Password Auth & Salutation Edition)
  * Updates:
- * - Added updateReport endpoint for diagnostic laboratory findings & vitals
- * - Added getBookingReport endpoint for retrieving verified reports
+ * - Added patientRegister & patientLogin endpoints for password-based patient auth
+ * - Added updateReport & getBookingReport endpoints for diagnostic laboratory findings
  * - High-speed In-Memory TTL Response Caching for Instant UI updates
  * - Dedicated endpoints for Referral, VIP, Blood SOS, and Razorpay
  */
@@ -46,6 +46,10 @@ const Api = {
 
     if (fastReadActions.includes(action)) {
       return 8500;
+    }
+
+    if (action === 'patientLogin' || action === 'patientRegister' || action === 'staffLogin') {
+      return 15000;
     }
 
     if (action === 'validateReferralCode' || action === 'claimReferralReward' || action === 'getReferralData') {
@@ -219,6 +223,18 @@ const Api = {
   // ==========================================================
   // AUTHENTICATION & PROFILE APIS
   // ==========================================================
+  async patientRegister(mobile, password) {
+    return this.request('patientRegister', {
+      mobile,
+      password,
+      userId: `SCD_${mobile}`
+    }, false);
+  },
+
+  async patientLogin(mobile, password) {
+    return this.request('patientLogin', { mobile, password }, false);
+  },
+
   async requestOtp(mobile) {
     return this.request('requestOtp', { mobile }, false);
   },
