@@ -1,12 +1,13 @@
 /* file: assets/css/login.css */
 /**
- * Selfcare Diagnostics - Mobile + OTP Login Stylesheet
+ * Selfcare Diagnostics - 3D Glassmorphism Authentication Stylesheet v6.0.0
  * Features:
- * - 3D Glassmorphism Cards with Emerald Theme
- * - Country Flag Phone Input with Focus Glow
- * - Top OTP Banner with Auto-Fill Tag
- * - Auto-advancing 4-Digit OTP Boxes
- * - Mobile Tactile Button Feedback
+ * - Floating 3D Ambient Background Orbs for Real Frosted Glass Refraction
+ * - Centered 3D Floating Glass Header
+ * - Animated "Welcome to Selfcare" Flag-Walking Lab Mascot
+ * - Patient Login & Sign Up Sub-Tabs with Live Password Match Indicator
+ * - Multi-Layered 3D Glassmorphism Cards with Specular Rim Highlights
+ * - Tactile 3D Recessed Inputs & Shimmering Emerald CTA Buttons
  */
 
 :root {
@@ -14,14 +15,17 @@
   --dark-green: #045D49;
   --deep-green: #033F33;
   --light-green: #35C39A;
-  --bg-main: #F4FBF9;
+  --bg-main: #EAF7F3;
   --text-main: #10231E;
   --text-muted: #536E66;
   --white: #FFFFFF;
-  --glass-bg: rgba(255, 255, 255, 0.96);
-  --glass-border: rgba(7, 136, 102, 0.2);
-  --radius-md: 14px;
-  --shadow-3d: 0 16px 40px rgba(3, 63, 51, 0.08), 0 4px 10px rgba(7, 136, 102, 0.05);
+  --glass-surface: rgba(255, 255, 255, 0.72);
+  --glass-border-light: rgba(255, 255, 255, 0.92);
+  --glass-border-emerald: rgba(7, 136, 102, 0.22);
+  --shadow-3d-card:
+    0 24px 48px -12px rgba(3, 63, 51, 0.16),
+    0 8px 20px -6px rgba(7, 136, 102, 0.10),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.95);
 }
 
 * {
@@ -33,152 +37,321 @@
 }
 
 body {
-  background-color: var(--bg-main);
+  background: linear-gradient(145deg, #E2F5EF 0%, #F4FBF9 48%, #DCF2EB 100%);
   color: var(--text-main);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+  perspective: 1200px;
 }
 
+/* =========================================
+   1. 3D AMBIENT FLOATING ORBS (BACKGROUND)
+   ========================================= */
+.bg-3d-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.orb-3d {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(55px);
+  opacity: 0.65;
+  will-change: transform;
+}
+
+.orb-1 {
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle at 30% 30%, #35C39A, #078866);
+  top: -60px;
+  left: -70px;
+  animation: floatOrb1 9s ease-in-out infinite alternate;
+}
+
+.orb-2 {
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle at 70% 30%, #6EE7B7, #045D49);
+  bottom: 4%;
+  right: -80px;
+  animation: floatOrb2 11s ease-in-out infinite alternate;
+}
+
+.orb-3 {
+  width: 190px;
+  height: 190px;
+  background: radial-gradient(circle, rgba(53, 195, 154, 0.55), rgba(7, 136, 102, 0.15));
+  top: 42%;
+  left: 55%;
+  animation: floatOrb3 8s ease-in-out infinite alternate;
+}
+
+@keyframes floatOrb1 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(35px, 45px, 20px) scale(1.12); }
+}
+
+@keyframes floatOrb2 {
+  0% { transform: translate3d(0, 0, 0) scale(1.05); }
+  100% { transform: translate3d(-40px, -35px, 20px) scale(0.95); }
+}
+
+@keyframes floatOrb3 {
+  0% { transform: translate3d(-20px, 15px, 0) scale(0.9); }
+  100% { transform: translate3d(20px, -25px, 30px) scale(1.1); }
+}
+
+/* =========================================
+   2. 3D FLOATING GLASS HEADER (CENTERED)
+   ========================================= */
+.glass-3d-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border-bottom: 1px solid var(--glass-border-light);
+  box-shadow:
+    0 10px 30px rgba(3, 63, 51, 0.08),
+    inset 0 -1px 0 rgba(7, 136, 102, 0.15);
+}
+
+.header-center-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: logoFloat 4s ease-in-out infinite alternate;
+}
+
+.header-logo {
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 12px rgba(7, 136, 102, 0.22));
+}
+
+.fallback-logo {
+  text-align: center;
+}
+
+.logo-text {
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--dark-green);
+  letter-spacing: 0.8px;
+}
+
+.logo-sub {
+  color: #E4005A;
+}
+
+.tagline {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+@keyframes logoFloat {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-2.5px); }
+}
+
+/* =========================================
+   3. CONTAINER & 3D GLASS CARDS
+   ========================================= */
 .login-container {
-  padding: 16px 18px 40px 18px;
-  max-width: 440px;
+  position: relative;
+  z-index: 10;
+  padding: 14px 18px 40px 18px;
+  max-width: 430px;
   width: 100%;
   margin: 0 auto;
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  transform-style: preserve-3d;
 }
 
-.glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-3d);
+.glass-3d-card {
+  background: var(--glass-surface);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  border-top: 1.5px solid var(--glass-border-light);
+  border-left: 1.5px solid var(--glass-border-light);
+  border-right: 1px solid var(--glass-border-emerald);
+  border-bottom: 1.5px solid var(--glass-border-emerald);
+  border-radius: 22px;
+  box-shadow: var(--shadow-3d-card);
+  transform-style: preserve-3d;
 }
 
-/* Header */
-.app-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
+/* =========================================
+   4. ANIMATED "WELCOME TO SELFCARE" MASCOT
+   ========================================= */
+.mascot-parade-stage {
+  position: relative;
+  width: 100%;
+  height: 86px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border-bottom: 1.5px dashed rgba(7, 136, 102, 0.25);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%);
+  pointer-events: none;
+}
+
+.mascot-walker {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  will-change: transform;
+  animation: walkLeftToRight 8.5s linear infinite;
+}
+
+.mascot-body-bob {
+  animation: mascotBounce 0.48s ease-in-out infinite alternate;
+}
+
+.mascot-flag-wave {
+  transform-box: fill-box;
+  transform-origin: right center;
+  animation: flagFlutter 0.9s ease-in-out infinite alternate;
+}
+
+.mascot-leg-front {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: swingFront 0.48s ease-in-out infinite alternate;
+}
+
+.mascot-leg-back {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: swingBack 0.48s ease-in-out infinite alternate;
+}
+
+@keyframes walkLeftToRight {
+  0% { transform: translateX(-215px); }
+  100% { transform: translateX(420px); }
+}
+
+@keyframes mascotBounce {
+  0% { transform: translateY(0px); }
+  100% { transform: translateY(-3px); }
+}
+
+@keyframes flagFlutter {
+  0% { transform: skewY(-2deg) scaleX(0.98); }
+  100% { transform: skewY(2.5deg) scaleX(1.01); }
+}
+
+@keyframes swingFront {
+  0% { transform: rotate(-22deg); }
+  100% { transform: rotate(22deg); }
+}
+
+@keyframes swingBack {
+  0% { transform: rotate(22deg); }
+  100% { transform: rotate(-22deg); }
+}
+
+/* =========================================
+   5. 3D ROLE SWITCHER TABS & PATIENT SUBTABS
+   ========================================= */
+.role-tabs-card {
+  padding: 6px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+}
+
+.role-tabs-wrap {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 18px;
-  background: rgba(255, 255, 255, 0.98);
-  border-bottom: 1px solid var(--glass-border);
+  gap: 6px;
+  background: rgba(7, 136, 102, 0.08);
+  padding: 4px;
+  border-radius: 14px;
+  box-shadow: inset 0 2px 5px rgba(3, 63, 51, 0.08);
 }
 
-.header-logo {
-  height: 38px;
-  object-fit: contain;
-}
-
-.secure-badge-pill {
-  font-size: 11px;
+.role-tab-btn {
+  flex: 1;
+  padding: 11px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 11px;
+  font-size: 13px;
   font-weight: 800;
-  color: #047857;
-  background: #ECFDF5;
-  border: 1px solid #A7F3D0;
-  padding: 4px 10px;
-  border-radius: 20px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Hero Branding Card */
-.login-hero-card {
-  padding: 20px 18px;
-  text-align: center;
-  margin-bottom: 16px;
-}
-
-.hero-icon-bubble {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(7, 136, 102, 0.1);
-  color: var(--primary-green);
+  color: var(--text-muted);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  margin: 0 auto 10px auto;
-  border: 1px solid rgba(7, 136, 102, 0.2);
+  gap: 7px;
+  transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.login-hero-card h2 {
-  font-size: 18px;
-  font-weight: 800;
+.role-tab-btn.active {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F4FBF9 100%);
   color: var(--dark-green);
-  margin-bottom: 6px;
+  transform: translateY(-1px) scale(1.01);
+  box-shadow:
+    0 8px 18px rgba(7, 136, 102, 0.18),
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 #FFFFFF;
 }
 
-.login-hero-card p {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  line-height: 1.45;
-  max-width: 320px;
-  margin: 0 auto;
+.role-tab-btn:active {
+  transform: scale(0.97);
 }
 
-/* Auth Main Card */
-.auth-card {
-  padding: 22px 20px;
-  margin-bottom: 16px;
-}
-
-/* Top OTP Banner */
-.otp-top-banner {
+/* Patient Login / Sign Up Subtabs */
+.patient-subtabs-wrap {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
-  border: 1.5px solid #078866;
-  border-radius: 12px;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(7, 136, 102, 0.12);
-  animation: slideDown 0.3s ease-out;
+  gap: 6px;
+  padding: 5px;
+  margin-bottom: 14px;
+  border-radius: 14px;
 }
 
-.otp-badge-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.subtab-btn {
+  flex: 1;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
   font-size: 12.5px;
-  font-weight: 700;
-  color: #045D49;
-}
-
-.otp-badge-content strong {
-  font-size: 16px;
-  color: #078866;
-  letter-spacing: 2px;
-  background: #ffffff;
-  padding: 2px 8px;
-  border-radius: 6px;
-  border: 1px dashed #078866;
-}
-
-.autofill-tag {
-  font-size: 10.5px;
   font-weight: 800;
-  color: #045D49;
-  background: #A7F3D0;
-  padding: 3px 8px;
-  border-radius: 20px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.22s ease;
 }
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+.subtab-btn.active {
+  background: var(--primary-green);
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(7, 136, 102, 0.22);
+}
+
+/* =========================================
+   6. AUTH CARD & FORM ELEMENTS
+   ========================================= */
+.auth-card {
+  padding: 24px 20px;
+  margin-bottom: 18px;
 }
 
 .card-head {
@@ -186,65 +359,62 @@ body {
 }
 
 .card-head h3 {
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 900;
   color: var(--dark-green);
+  letter-spacing: -0.2px;
   margin-bottom: 4px;
 }
 
 .card-head p {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
-.change-mobile-link {
-  background: transparent;
-  border: none;
-  color: var(--primary-green);
-  font-size: 11.5px;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 6px;
-  padding: 0;
-  display: inline-block;
-}
-
-/* Phone Input */
 .form-group {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .form-group label {
   display: block;
-  font-size: 11.5px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 800;
   color: var(--dark-green);
   margin-bottom: 6px;
+  letter-spacing: 0.2px;
 }
 
-.phone-input-wrap {
+/* 3D Recessed Glass Input Boxes */
+.input-3d-box {
   display: flex;
   align-items: center;
-  background: #ffffff;
-  border: 1.5px solid rgba(7, 136, 102, 0.3);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1.5px solid rgba(7, 136, 102, 0.24);
+  border-radius: 14px;
   overflow: hidden;
-  transition: all 0.2s ease;
+  box-shadow:
+    inset 0 2px 5px rgba(3, 63, 51, 0.05),
+    0 2px 6px rgba(255, 255, 255, 0.8);
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.phone-input-wrap:focus-within {
+.input-3d-box:focus-within {
+  background: #FFFFFF;
   border-color: var(--primary-green);
-  box-shadow: 0 0 0 3px rgba(7, 136, 102, 0.15);
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 22px -6px rgba(7, 136, 102, 0.24),
+    0 0 0 3.5px rgba(7, 136, 102, 0.16);
 }
 
 .country-code {
-  padding: 12px 12px;
-  font-size: 13px;
+  padding: 13px 12px;
+  font-size: 13.5px;
   font-weight: 800;
   color: var(--dark-green);
-  background: #F0FDF9;
-  border-right: 1px solid rgba(7, 136, 102, 0.2);
+  background: rgba(236, 253, 245, 0.85);
+  border-right: 1px solid rgba(7, 136, 102, 0.18);
   white-space: nowrap;
 }
 
@@ -252,99 +422,163 @@ body {
   flex: 1;
   border: none;
   outline: none;
-  padding: 12px 14px;
+  padding: 13px 14px;
   font-size: 15px;
   font-weight: 700;
   color: var(--text-main);
-  letter-spacing: 1px;
+  background: transparent;
+  letter-spacing: 0.8px;
+}
+
+.staff-input-wrap input {
+  flex: 1;
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 13px 14px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  background: transparent;
+}
+
+.pwd-eye-btn {
+  background: transparent;
+  border: none;
+  padding: 0 14px;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.pwd-eye-btn:active {
+  opacity: 1;
+  transform: scale(0.92);
 }
 
 .input-hint {
   display: block;
-  font-size: 10.5px;
+  font-size: 11px;
+  font-weight: 700;
   color: #DC2626;
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
-/* OTP 4-Boxes Grid */
-.otp-boxes-grid {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin: 10px 0 6px 0;
-}
-
-.otp-digit {
-  width: 54px;
-  height: 56px;
-  text-align: center;
-  font-size: 22px;
-  font-weight: 800;
-  border: 1.5px solid rgba(7, 136, 102, 0.3);
-  border-radius: 12px;
-  background: #ffffff;
-  color: var(--dark-green);
-  outline: none;
-  transition: all 0.2s ease;
-}
-
-.otp-digit:focus {
-  border-color: var(--primary-green);
-  box-shadow: 0 0 0 3px rgba(7, 136, 102, 0.2);
-  transform: translateY(-2px);
-}
-
-/* Action Button */
-.login-action-btn {
-  width: 100%;
-  padding: 13px;
-  border-radius: 12px;
-  border: none;
-  background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 6px 18px rgba(7, 136, 102, 0.3);
-  touch-action: manipulation;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-
-.login-action-btn:active {
-  transform: scale(0.97);
-  box-shadow: 0 2px 8px rgba(7, 136, 102, 0.2);
-}
-
-.login-action-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Resend Timer */
-.resend-timer-row {
-  margin-top: 14px;
-  text-align: center;
+/* =========================================
+   7. LIVE PASSWORD MATCH INDICATOR & LINKS
+   ========================================= */
+.password-match-badge {
+  margin-top: 7px;
+  padding: 6px 10px;
+  border-radius: 9px;
   font-size: 11.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.password-match-badge.match-ok {
+  background: #ECFDF5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+}
+
+.password-match-badge.match-err {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.auth-switch-prompt {
+  margin-top: 15px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
 }
 
-.resend-btn {
+.switch-link-btn {
   background: none;
   border: none;
   color: var(--primary-green);
-  font-weight: 800;
   font-size: 12px;
-  cursor: pointer;
+  font-weight: 800;
   text-decoration: underline;
+  cursor: pointer;
+  margin-left: 3px;
 }
 
-/* Trust Features */
+/* =========================================
+   8. 3D GLOSSY SHIMMER ACTION BUTTON
+   ========================================= */
+.btn-3d-glow {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  background: linear-gradient(135deg, #099A74 0%, #078866 50%, #045D49 100%);
+  color: #ffffff;
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow:
+    0 12px 24px -6px rgba(7, 136, 102, 0.42),
+    0 4px 0 #034637,
+    inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  touch-action: manipulation;
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.14s ease;
+}
+
+.btn-3d-glow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 65%;
+  height: 100%;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  animation: btnShimmer 3.8s infinite;
+}
+
+.btn-3d-glow:active {
+  transform: translateY(3px) scale(0.985);
+  box-shadow:
+    0 5px 12px -3px rgba(7, 136, 102, 0.35),
+    0 1px 0 #034637;
+}
+
+.btn-3d-glow:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@keyframes btnShimmer {
+  0% { left: -120%; }
+  35% { left: 160%; }
+  100% { left: 160%; }
+}
+
+/* =========================================
+   9. TRUST BADGES & FOOTER
+   ========================================= */
 .auth-trust-features {
   display: flex;
   justify-content: space-around;
   margin-top: 18px;
   padding-top: 14px;
-  border-top: 1px dashed rgba(7, 136, 102, 0.2);
+  border-top: 1px dashed rgba(7, 136, 102, 0.22);
 }
 
 .trust-feat {
@@ -363,22 +597,45 @@ body {
   color: var(--text-muted);
 }
 
-/* Footer Guarantee */
 .login-footer-guarantee {
   text-align: center;
-  margin-top: 10px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #64748B;
+  margin-top: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #4B665E;
   line-height: 1.4;
 }
 
-/* Smooth Fade */
-.animate-fade {
-  animation: fadeIn 0.25s ease-out;
+/* =========================================
+   10. 3D ENTRANCE & FLIP KEYFRAMES
+   ========================================= */
+.anim-3d-rise {
+  animation: rise3D 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+.anim-3d-flip {
+  animation: flipIn3D 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top center;
+}
+
+@keyframes rise3D {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, -30px) rotateX(6deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotateX(0deg);
+  }
+}
+
+@keyframes flipIn3D {
+  from {
+    opacity: 0;
+    transform: perspective(900px) rotateX(-8deg) translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(900px) rotateX(0deg) translateY(0) scale(1);
+  }
 }
