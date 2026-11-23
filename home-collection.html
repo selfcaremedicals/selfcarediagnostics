@@ -1,0 +1,469 @@
+<!-- file: home-collection.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Selfcare Captain • Home Collection & Payouts</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0F172A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Core Versioned Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=6.7.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=6.7.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=6.7.0">
+  <link rel="stylesheet" href="assets/css/home-collection.css?v=3.0.0">
+
+  <!-- Razorpay Checkout SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body class="hc-body-bg">
+
+  <!-- Ambient 3D Mesh Background Orbs -->
+  <div class="hc-ambient-bg" aria-hidden="true">
+    <div class="hc-orb hc-orb-1"></div>
+    <div class="hc-orb hc-orb-2"></div>
+    <div class="hc-orb hc-orb-3"></div>
+  </div>
+
+  <!-- =========================================================
+       MAIN CAPTAIN APPLICATION SHELL
+       ========================================================= -->
+  <div id="hc-app-shell">
+
+    <!-- Sticky Glass Header with Rapido-style Online/Offline Duty Switch -->
+    <header class="hc-header no-print-section">
+      <div class="hc-brand-left" onclick="HomeCollectionApp.switchTab('orders')" style="cursor: pointer;">
+        <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="hc-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <div class="hc-fallback-brand" style="display: none;">
+          <h1 class="hc-logo-text">SELFCARE <span>CAPTAIN</span></h1>
+          <p class="hc-tagline">Home Sample Collection</p>
+        </div>
+      </div>
+
+      <!-- Rapido Duty Toggle Switch -->
+      <div class="hc-duty-pill" id="hc-duty-pill-box">
+        <span class="duty-lbl" id="hc-duty-label">OFFLINE</span>
+        <label class="hc-switch">
+          <input type="checkbox" id="hc-duty-toggle" onchange="HomeCollectionApp.toggleDuty(this.checked)">
+          <span class="hc-slider"></span>
+        </label>
+      </div>
+      
+      <div class="hc-header-right">
+        <div class="hc-wallet-chip" onclick="HomeCollectionApp.switchTab('wallet')" title="Open Wallet">
+          <span class="w-tag">WALLET</span>
+          <strong id="hc-header-wallet">₹0</strong>
+        </div>
+        <button type="button" class="hc-profile-chip" onclick="HomeCollectionApp.switchTab('profile')" title="Captain Profile">
+          <span id="hc-header-avatar">SC</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Live 10 KM Radius GPS Radar Bar -->
+    <div class="hc-gps-bar">
+      <div class="gps-info-left">
+        <span class="gps-pulse-dot" id="hc-gps-dot"></span>
+        <span id="hc-gps-status-text">Duty Offline • Switch ON to receive Customer Home Pickups (≤ 10 km)</span>
+      </div>
+      <button type="button" class="hc-gps-btn" onclick="HomeCollectionApp.refreshGps(false)">📍 GPS</button>
+    </div>
+
+    <!-- Main Workstation -->
+    <main class="hc-main-wrapper">
+
+      <!-- =========================================================
+           VIEW 1: LIVE CUSTOMER APPOINTMENTS (TODAY & TOMORROW)
+           ========================================================= -->
+      <div id="hc-view-orders" class="hc-tab-view">
+
+        <!-- Day-wise / Weekly-wise / Monthly-wise Performance Summary -->
+        <section class="hc-glass-card">
+          <div class="hc-card-header">
+            <div>
+              <h4>Collections & Earnings Report</h4>
+              <span class="hc-sub-caption">Synced with Selfcare Backend</span>
+            </div>
+            <input type="date" id="hc-stats-date-picker" class="hc-date-input" onchange="HomeCollectionApp.renderPerformanceStats()">
+          </div>
+
+          <div class="hc-stats-grid">
+            <div class="hc-stat-tile hc-3d-tile">
+              <span class="stat-period" id="hc-stat-day-lbl">Day-Wise (Today)</span>
+              <strong class="stat-visits" id="hc-stat-day-visits">0 Visits</strong>
+              <span class="stat-earn" id="hc-stat-day-earn">₹0</span>
+            </div>
+
+            <div class="hc-stat-tile hc-3d-tile">
+              <span class="stat-period">Weekly-Wise</span>
+              <strong class="stat-visits" id="hc-stat-week-visits">0 Visits</strong>
+              <span class="stat-earn" id="hc-stat-week-earn">₹0</span>
+            </div>
+
+            <div class="hc-stat-tile hc-3d-tile">
+              <span class="stat-period">Monthly-Wise</span>
+              <strong class="stat-visits" id="hc-stat-month-visits">0 Visits</strong>
+              <span class="stat-earn" id="hc-stat-month-earn">₹0</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ACTIVE ONGOING PICKUP TRIP (Shown once Captain accepts a booking) -->
+        <div id="hc-active-trip-box" style="display: none;"></div>
+
+        <!-- INCOMING CUSTOMER BOOKINGS WITHIN 10 KM -->
+        <section class="hc-glass-card">
+          <div class="hc-card-header" style="flex-wrap: wrap; gap: 8px;">
+            <div>
+              <h4>Customer Home Bookings (≤ 10 km)</h4>
+              <span class="hc-sub-caption">Direct Customer Bookings Only • Lab Desk Excluded</span>
+            </div>
+            <button type="button" class="hc-pill-btn" onclick="HomeCollectionApp.syncBookings(true)">
+              ↻ Sync Live
+            </button>
+          </div>
+
+          <!-- Schedule Filter Pills -->
+          <div class="hc-filter-pills">
+            <button type="button" class="hc-filter-btn active" id="hc-flt-ALL" onclick="HomeCollectionApp.setDayFilter('ALL')">
+              All Active (<span id="hc-cnt-all">0</span>)
+            </button>
+            <button type="button" class="hc-filter-btn" id="hc-flt-TODAY" onclick="HomeCollectionApp.setDayFilter('TODAY')">
+              Today On-Time (<span id="hc-cnt-today">0</span>)
+            </button>
+            <button type="button" class="hc-filter-btn" id="hc-flt-TOMORROW" onclick="HomeCollectionApp.setDayFilter('TOMORROW')">
+              Tomorrow (<span id="hc-cnt-tomorrow">0</span>)
+            </button>
+          </div>
+
+          <div id="hc-incoming-list" class="hc-cards-stack"></div>
+        </section>
+      </div>
+
+      <!-- =========================================================
+           VIEW 2: WALLET, RAZORPAY & DAILY/WEEKLY/MONTHLY PAYOUTS
+           ========================================================= -->
+      <div id="hc-view-wallet" class="hc-tab-view" style="display: none;">
+
+        <!-- Wallet Balance & Rate Card -->
+        <section class="hc-glass-card">
+          <div class="hc-card-header">
+            <h4>Captain Earnings Wallet</h4>
+            <span class="hc-rate-badge">₹150 Single • ₹250 Multi-Visit</span>
+          </div>
+
+          <div class="wallet-balance-hero">
+            <div>
+              <span class="wallet-sub-lbl">Available Withdrawable Balance</span>
+              <h2 id="hc-wallet-avail" class="wallet-hero-num">₹0</h2>
+            </div>
+            <button type="button" class="hc-btn-3d-primary" style="width: auto; padding: 11px 20px;" onclick="HomeCollectionApp.openPayoutModal()">
+              Withdraw Payout ➔
+            </button>
+          </div>
+
+          <div class="hc-stats-grid" style="margin-top: 14px;">
+            <div class="hc-stat-tile hc-3d-tile">
+              <span class="stat-period">Total Earned</span>
+              <strong class="stat-visits" id="hc-wallet-total">₹0</strong>
+            </div>
+            <div class="hc-stat-tile hc-3d-tile">
+              <span class="stat-period">Paid Out</span>
+              <strong class="stat-visits" id="hc-wallet-paidout">₹0</strong>
+            </div>
+            <div class="hc-stat-tile hc-3d-tile">
+              <span class="stat-period">Cash Collected</span>
+              <strong class="stat-visits" id="hc-wallet-cod">₹0</strong>
+            </div>
+          </div>
+
+          <!-- COD Cash Settlement via Razorpay -->
+          <div id="hc-cod-settle-box" class="hc-cod-banner" style="display: none;">
+            <div>
+              <strong>Pending Customer Cash Deposit</strong>
+              <span>Deposit received customer cash to Selfcare Lab via Razorpay</span>
+            </div>
+            <button type="button" class="hc-btn-outline-bold" onclick="HomeCollectionApp.payCodViaRazorpay()">
+              Settle via Razorpay
+            </button>
+          </div>
+        </section>
+
+        <!-- Day / Week / Month Breakdown Card in Wallet -->
+        <section class="hc-glass-card">
+          <div class="hc-card-header">
+            <h4>Period-Wise Collection Breakdown</h4>
+            <span class="hc-pill-tag">Visits & Earnings</span>
+          </div>
+          <div class="hc-stats-grid">
+            <div class="hc-stat-tile hc-3d-tile">
+              <span class="stat-period">Today</span>
+              <strong class="stat-visits" id="hc-w-day-cnt">0 Visits</strong>
+              <span class="stat-earn" id="hc-w-day-amt">₹0</span>
+            </div>
+            <div class="hc-stat-tile hc-3d-tile">
+              <span class="stat-period">This Week</span>
+              <strong class="stat-visits" id="hc-w-week-cnt">0 Visits</strong>
+              <span class="stat-earn" id="hc-w-week-amt">₹0</span>
+            </div>
+            <div class="hc-stat-tile hc-3d-tile">
+              <span class="stat-period">This Month</span>
+              <strong class="stat-visits" id="hc-w-month-cnt">0 Visits</strong>
+              <span class="stat-earn" id="hc-w-month-amt">₹0</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Payout Frequency Selector (Daily / Weekly / Monthly) -->
+        <section class="hc-glass-card">
+          <div class="hc-card-header">
+            <h4>Payout Schedule Settings</h4>
+            <span class="hc-pill-tag" id="hc-cycle-pill">DAILY PAYOUT</span>
+          </div>
+
+          <div class="hc-cycle-grid">
+            <div class="hc-cycle-card active" id="cycle-card-DAILY" onclick="HomeCollectionApp.selectPayoutCycle('DAILY')">
+              <strong>Daily Payout</strong>
+              <span>Every Night 9 PM</span>
+            </div>
+            <div class="hc-cycle-card" id="cycle-card-WEEKLY" onclick="HomeCollectionApp.selectPayoutCycle('WEEKLY')">
+              <strong>Weekly Payout</strong>
+              <span>Every Sunday</span>
+            </div>
+            <div class="hc-cycle-card" id="cycle-card-MONTHLY" onclick="HomeCollectionApp.selectPayoutCycle('MONTHLY')">
+              <strong>Monthly Payout</strong>
+              <span>1st of Month</span>
+            </div>
+          </div>
+
+          <div class="hc-bank-strip">
+            <div>
+              <span class="bank-lbl">Admin Verified UPI / Bank Account</span>
+              <strong id="hc-linked-upi-text" class="bank-val">Configured by Admin</strong>
+            </div>
+            <span class="hc-lock-pill">🔒 Admin Controlled</span>
+          </div>
+        </section>
+
+        <!-- Wallet Transactions Ledger -->
+        <section class="hc-glass-card">
+          <div class="hc-card-header">
+            <h4>Wallet Credits & Payout Ledger</h4>
+          </div>
+          <div id="hc-ledger-container" class="hc-cards-stack"></div>
+        </section>
+      </div>
+
+      <!-- =========================================================
+           VIEW 3: COMPLETED HOME COLLECTION TRIPS
+           ========================================================= -->
+      <div id="hc-view-history" class="hc-tab-view" style="display: none;">
+        <section class="hc-glass-card">
+          <div class="hc-card-header">
+            <h4>Completed Home Visits</h4>
+            <span class="hc-pill-tag" id="hc-history-count">0 Trips</span>
+          </div>
+          <div id="hc-history-container" class="hc-cards-stack"></div>
+        </section>
+      </div>
+
+      <!-- =========================================================
+           VIEW 4: CAPTAIN PROFILE & CUSTOMER RATINGS (ADMIN LOCKED)
+           ========================================================= -->
+      <div id="hc-view-profile" class="hc-tab-view" style="display: none;">
+        
+        <!-- 3D Glass Captain ID Card -->
+        <section class="hc-glass-card hc-profile-hero-card">
+          <div class="hc-profile-top-bar">
+            <span class="hc-verified-badge">✓ VERIFIED PHLEBOTOMIST</span>
+            <span class="hc-lock-pill">🔒 Admin Managed</span>
+          </div>
+
+          <div class="hc-profile-identity">
+            <div class="hc-profile-avatar-3d" id="hc-prof-avatar">SC</div>
+            <div>
+              <h3 id="hc-prof-name" class="hc-prof-name">Captain Name</h3>
+              <p id="hc-prof-id-line" class="hc-prof-id">ID: SCDTECH001 • Vettuvankeni Hub</p>
+              <div class="hc-rating-pill-hero">
+                <span class="hc-star-icon">★</span>
+                <strong id="hc-prof-rating-avg">4.9</strong>
+                <span id="hc-prof-rating-count">(0 Customer Ratings)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Read-Only Admin Issued Credentials & Details -->
+          <div class="hc-prof-details-grid">
+            <div class="hc-prof-detail-item">
+              <span>Captain ID</span>
+              <strong id="hc-prof-detail-id">—</strong>
+            </div>
+            <div class="hc-prof-detail-item">
+              <span>Registered Mobile</span>
+              <strong id="hc-prof-detail-mobile">—</strong>
+            </div>
+            <div class="hc-prof-detail-item">
+              <span>Assigned Zone</span>
+              <strong id="hc-prof-detail-zone">ECR & OMR (10 km)</strong>
+            </div>
+            <div class="hc-prof-detail-item">
+              <span>Payout UPI / Bank</span>
+              <strong id="hc-prof-detail-upi">—</strong>
+            </div>
+          </div>
+
+          <div class="hc-admin-notice-box">
+            ℹ️ Profile details, ID, password & payout bank details can only be edited or controlled by <strong>Selfcare Diagnostics Admin</strong>.
+          </div>
+        </section>
+
+        <!-- Customer Ratings & Feedback Breakdown -->
+        <section class="hc-glass-card">
+          <div class="hc-card-header">
+            <div>
+              <h4>Customer Ratings & Feedback</h4>
+              <span class="hc-sub-caption">Live ratings synced from backend</span>
+            </div>
+            <span class="hc-rate-badge" id="hc-rating-badge-right">★ 4.9 / 5.0</span>
+          </div>
+
+          <div class="hc-rating-bars-wrap" id="hc-rating-bars"></div>
+          <div id="hc-reviews-list" class="hc-cards-stack" style="margin-top: 14px;"></div>
+        </section>
+
+        <!-- Logout Button -->
+        <button type="button" class="hc-btn-danger-outline" onclick="HomeCollectionApp.logoutCaptain()">
+          🚪 Sign Out Captain Session
+        </button>
+      </div>
+
+    </main>
+
+    <!-- Fixed 4-Tab Glass Bottom Navigation -->
+    <nav class="hc-bottom-bar">
+      <button type="button" class="hc-tab-btn active" id="tab-btn-orders" onclick="HomeCollectionApp.switchTab('orders')">
+        <span class="nav-ico">🛵</span>
+        <strong>Live Orders</strong>
+      </button>
+      <button type="button" class="hc-tab-btn" id="tab-btn-wallet" onclick="HomeCollectionApp.switchTab('wallet')">
+        <span class="nav-ico">💳</span>
+        <strong>Wallet</strong>
+      </button>
+      <button type="button" class="hc-tab-btn" id="tab-btn-history" onclick="HomeCollectionApp.switchTab('history')">
+        <span class="nav-ico">📋</span>
+        <strong>History</strong>
+      </button>
+      <button type="button" class="hc-tab-btn" id="tab-btn-profile" onclick="HomeCollectionApp.switchTab('profile')">
+        <span class="nav-ico">👤</span>
+        <strong>Profile</strong>
+      </button>
+    </nav>
+  </div>
+
+  <!-- =========================================================
+       RAPIDO-STYLE FULL-SCREEN INCOMING BOOKING POPUP OVERLAY
+       ========================================================= -->
+  <div id="hc-rapido-popup" class="hc-rapido-overlay" style="display: none;">
+    <div class="hc-rapido-card">
+      <div class="hc-rapido-pulse-ring"></div>
+
+      <div class="hc-rapido-top">
+        <span class="hc-rapido-live-tag">🔔 NEW HOME COLLECTION REQUEST</span>
+        <div class="hc-rapido-timer" id="hc-rapido-timer">30s</div>
+      </div>
+
+      <div class="hc-rapido-payout-hero">
+        <span class="hc-rapido-earn-lbl">YOUR TRIP EARNING</span>
+        <h2 id="hc-rap-fee">₹150</h2>
+        <span id="hc-rap-visit-type" class="hc-rapido-visit-pill">Single Visit • 2.4 km away</span>
+      </div>
+
+      <div class="hc-rapido-route-box">
+        <div class="hc-route-point">
+          <span class="hc-dot-green"></span>
+          <div>
+            <small>CUSTOMER PICKUP LOCATION</small>
+            <strong id="hc-rap-patient">Patient Name</strong>
+            <p id="hc-rap-address">Address details</p>
+          </div>
+        </div>
+        <div class="hc-route-line"></div>
+        <div class="hc-route-point">
+          <span class="hc-dot-dark"></span>
+          <div>
+            <small>SCHEDULE & PAYMENT MODE</small>
+            <strong id="hc-rap-slot">Today • 07:30 AM - 08:30 AM</strong>
+            <div id="hc-rap-payment-badge" class="hc-rap-pay-pill">✅ PAID ONLINE</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hc-rapido-tests" id="hc-rap-tests">Tests: CBC, FBS, Lipid Profile</div>
+
+      <div class="hc-rapido-actions">
+        <button type="button" class="hc-btn-rapido-decline" onclick="HomeCollectionApp.declineIncomingPopup()">
+          ✕ Decline
+        </button>
+        <button type="button" class="hc-btn-rapido-accept" onclick="HomeCollectionApp.acceptIncomingPopup()">
+          ✓ Accept Pickup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODALS
+       ========================================================= -->
+
+  <!-- Modal 1: Customer 4-Digit Pickup OTP Verification -->
+  <div id="hc-otp-modal" class="hc-modal-overlay" style="display: none;">
+    <div class="hc-modal-card" style="text-align: center;">
+      <h3>Customer Pickup OTP</h3>
+      <p>Enter the 4-digit verification code (last 4 digits of Booking ID) to confirm doorstep sample collection.</p>
+      <input type="tel" id="hc-otp-input" maxlength="4" placeholder="0000" class="hc-otp-field">
+      <div class="hc-modal-actions">
+        <button type="button" class="hc-btn-secondary" style="flex:1;" onclick="HomeCollectionApp.closeModal('hc-otp-modal')">Cancel</button>
+        <button type="button" class="hc-btn-3d-primary" style="flex:1.5;" onclick="HomeCollectionApp.verifyOtpAndCollect()">Verify & Collect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Payout Withdrawal Modal -->
+  <div id="hc-payout-modal" class="hc-modal-overlay" style="display: none;">
+    <div class="hc-modal-card">
+      <h3>Request Wallet Payout</h3>
+      <p>Available Balance: <strong id="hc-modal-avail">₹0</strong> • Cycle: <strong id="hc-modal-cycle">DAILY</strong></p>
+
+      <div class="hc-glass-field">
+        <label>Withdrawal Amount (₹) *</label>
+        <input type="number" id="hc-payout-amt" placeholder="Minimum ₹150">
+      </div>
+
+      <div class="hc-glass-field">
+        <label>Settlement Channel</label>
+        <select id="hc-payout-channel">
+          <option value="RAZORPAYX_UPI">Instant UPI Transfer (RazorpayX)</option>
+          <option value="BANK_IMPS">Bank Account IMPS / NEFT</option>
+        </select>
+      </div>
+
+      <div class="hc-modal-actions">
+        <button type="button" class="hc-btn-secondary" style="flex:1;" onclick="HomeCollectionApp.closeModal('hc-payout-modal')">Cancel</button>
+        <button type="button" class="hc-btn-3d-primary" style="flex:1.5;" onclick="HomeCollectionApp.confirmPayout()">Confirm Payout</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core Scripts -->
+  <script src="assets/js/config.js?v=8.4.0"></script>
+  <script src="assets/js/utils.js?v=12.2.0"></script>
+  <script src="assets/js/api.js?v=6.8.0"></script>
+  <script src="assets/js/offline-db.js?v=5.2.0"></script>
+  <script src="assets/js/offline-sync.js?v=5.2.0"></script>
+  <script src="assets/js/home-collection.js?v=3.2.0"></script>
+</body>
+</html>

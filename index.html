@@ -30,75 +30,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>Selfcare Diagnostics - Empowering Wellness</title>
   <meta name="description" content="Selfcare Diagnostics - Diagnostic laboratory in Chennai offering blood tests, health checkups, preventive health packages and convenient home sample collection.">
-
   <meta name="robots" content="index, follow">
-
   <link rel="canonical" href="https://selfcarediagnostics.in/">
-
   <meta property="og:title" content="Selfcare Diagnostics | Diagnostic Laboratory in Chennai">
   <meta property="og:description" content="Blood tests, health checkups, preventive health packages and home sample collection from Selfcare Diagnostics.">
   <meta property="og:url" content="https://selfcarediagnostics.in/">
-  <meta property="og:type" content="website"> 
-  
+  <meta property="og:type" content="website">
+
   <link rel="icon" type="image/png" href="https://selfcarediagnostics.in/assets/images/logo.png">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#078866">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <!-- Versioned Global Stylesheets -->
-  <link rel="stylesheet" href="assets/css/global.css?v=6.0.0">
-  <link rel="stylesheet" href="assets/css/components.css?v=6.0.0">
-  <link rel="stylesheet" href="assets/css/responsive.css?v=6.0.0">
-
   <style>
-    :root {
-      --primary-green: #078866;
-      --dark-green: #045D49;
-      --deep-green: #033F33;
-      --light-green: #35C39A;
-      --bg-main: #F4FBF9;
-      --text-main: #10231E;
-      --text-muted: #536E66;
-      --white: #FFFFFF;
-      --glass-bg: rgba(255, 255, 255, 0.92);
-      --glass-border: rgba(7, 136, 102, 0.18);
-      --shadow-3d: 0 18px 45px rgba(3, 63, 51, 0.1), 0 4px 12px rgba(7, 136, 102, 0.05);
-    }
-
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      -webkit-tap-highlight-color: transparent;
     }
 
     body {
-      background: radial-gradient(circle at 50% 15%, #E6F7F2 0%, var(--bg-main) 70%);
-      color: var(--text-main);
       min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* 1. INITIAL SPLASH INTRO ANIMATION */
-    #splash-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
       background: linear-gradient(135deg, #033F33, #045D49, #078866);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s ease;
+      color: #FFFFFF;
+      text-align: center;
+      padding: 20px;
     }
 
-    .splash-logo-wrap {
+    .splash-wrap {
       display: flex;
       flex-direction: column;
       align-items: center;
-      animation: splashPop 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      animation: splashPop 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
 
     .splash-logo {
@@ -107,11 +76,10 @@
       filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.35));
     }
 
-    .splash-fallback-title {
-      font-size: 26px;
+    .splash-title {
+      font-size: 24px;
       font-weight: 900;
-      color: #ffffff;
-      letter-spacing: 1.5px;
+      letter-spacing: 1.2px;
       margin-top: 10px;
     }
 
@@ -122,1228 +90,90 @@
       margin-top: 4px;
     }
 
-    .splash-pulse-ring {
-      width: 40px;
-      height: 40px;
+    .spinner {
+      width: 36px;
+      height: 36px;
       border: 3px solid rgba(255, 255, 255, 0.25);
-      border-top-color: #ffffff;
+      border-top-color: #FFFFFF;
       border-radius: 50%;
-      animation: spinRing 0.8s linear infinite;
-      margin-top: 24px;
+      animation: spin 0.75s linear infinite;
+      margin-top: 22px;
     }
 
     @keyframes splashPop {
-      0% { opacity: 0; transform: scale(0.6) translateY(20px); }
-      100% { opacity: 1; transform: scale(1) translateY(0); }
+      from { opacity: 0; transform: scale(0.85) translateY(12px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
     }
 
-    @keyframes spinRing {
+    @keyframes spin {
       to { transform: rotate(360deg); }
-    }
-
-    /* 2. MAIN APP PORTAL CONTAINER */
-    .portal-container {
-      max-width: 480px;
-      margin: 0 auto;
-      padding: 30px 18px 40px 18px;
-      opacity: 0;
-      transform: translateY(16px);
-      transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    .portal-container.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* 3. 3D FLOATING LOGO HERO */
-    .top-logo-hero {
-      text-align: center;
-      margin-bottom: 16px;
-      animation: floatHero 4s ease-in-out infinite alternate;
-    }
-
-    .brand-3d-badge {
-      display: inline-block;
-      padding: 14px 22px;
-      background: var(--glass-bg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      border-radius: 20px;
-      box-shadow: var(--shadow-3d);
-    }
-
-    .main-brand-logo {
-      height: 44px;
-      object-fit: contain;
-      filter: drop-shadow(0 4px 8px rgba(7, 136, 102, 0.2));
-    }
-
-    .fallback-brand-text h1 {
-      font-size: 20px;
-      font-weight: 900;
-      color: var(--dark-green);
-      letter-spacing: 1px;
-    }
-
-    .fallback-brand-text .logo-sub {
-      color: #E4005A;
-    }
-
-    .brand-tagline {
-      font-size: 11px;
-      color: var(--text-muted);
-      font-weight: 700;
-      margin-top: 3px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-    }
-
-    @keyframes floatHero {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(-4px); }
-    }
-
-    /* 4. GLASS CARD */
-    .glass-card {
-      background: var(--glass-bg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      border-radius: 18px;
-      box-shadow: var(--shadow-3d);
-    }
-
-    /* ROLE SWITCHER TABS (Patient vs Staff/Admin) */
-    .role-tabs-wrap {
-      display: flex;
-      gap: 6px;
-      background: #EAF6F2;
-      padding: 4px;
-      border-radius: 12px;
-      margin-bottom: 16px;
-    }
-
-    .role-tab-btn {
-      flex: 1;
-      padding: 9px;
-      border: none;
-      background: transparent;
-      border-radius: 9px;
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--text-muted);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-
-    .role-tab-btn.active {
-      background: #ffffff;
-      color: var(--dark-green);
-      box-shadow: 0 4px 12px rgba(7, 136, 102, 0.12);
-    }
-
-    /* PATIENT MODE SUB-TABS (Login vs Sign Up) */
-    .patient-mode-switch {
-      display: flex;
-      gap: 6px;
-      background: #F1F5F9;
-      padding: 3px;
-      border-radius: 10px;
-      margin-bottom: 16px;
-      border: 1px solid #E2E8F0;
-    }
-
-    .mode-pill-btn {
-      flex: 1;
-      padding: 7px 10px;
-      border: none;
-      background: transparent;
-      border-radius: 8px;
-      font-size: 11.5px;
-      font-weight: 800;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.18s ease;
-    }
-
-    .mode-pill-btn.active {
-      background: var(--primary-green);
-      color: #ffffff;
-    }
-
-    /* LOGIN CARD */
-    .login-card {
-      padding: 22px 20px;
-      margin-bottom: 20px;
-    }
-
-    .card-title-row h2 {
-      font-size: 16.5px;
-      font-weight: 800;
-      color: var(--dark-green);
-      margin-bottom: 3px;
-    }
-
-    .card-title-row p {
-      font-size: 11.5px;
-      color: var(--text-muted);
-      line-height: 1.4;
-      margin-bottom: 14px;
-    }
-
-    .form-group {
-      margin-bottom: 14px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 11.5px;
-      font-weight: 800;
-      color: var(--dark-green);
-      margin-bottom: 5px;
-    }
-
-    .phone-input-wrap, .staff-input-wrap {
-      display: flex;
-      align-items: center;
-      background: #ffffff;
-      border: 1.5px solid rgba(7, 136, 102, 0.28);
-      border-radius: 12px;
-      overflow: hidden;
-      transition: all 0.2s ease;
-    }
-
-    .phone-input-wrap:focus-within, .staff-input-wrap:focus-within {
-      border-color: var(--primary-green);
-      box-shadow: 0 0 0 3px rgba(7, 136, 102, 0.15);
-    }
-
-    .country-code {
-      padding: 11px 12px;
-      font-size: 13px;
-      font-weight: 800;
-      color: var(--dark-green);
-      background: #F0FDF9;
-      border-right: 1px solid rgba(7, 136, 102, 0.2);
-      white-space: nowrap;
-    }
-
-    .phone-input-wrap input, .staff-input-wrap input {
-      flex: 1;
-      width: 100%;
-      border: none;
-      outline: none;
-      padding: 11px 14px;
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--text-main);
-      background: transparent;
-    }
-
-    .pwd-eye-btn {
-      background: transparent;
-      border: none;
-      padding: 0 12px;
-      font-size: 15px;
-      cursor: pointer;
-      opacity: 0.75;
-    }
-
-    .error-hint {
-      display: none;
-      font-size: 10.5px;
-      color: #DC2626;
-      margin-top: 5px;
-      font-weight: 700;
-    }
-
-    .pwd-match-status {
-      display: none;
-      font-size: 11px;
-      font-weight: 800;
-      margin-top: 6px;
-      padding: 5px 10px;
-      border-radius: 8px;
-    }
-
-    .pwd-match-status.match-ok {
-      display: block;
-      background: #ECFDF5;
-      color: #047857;
-      border: 1px solid #A7F3D0;
-    }
-
-    .pwd-match-status.match-err {
-      display: block;
-      background: #FEF2F2;
-      color: #DC2626;
-      border: 1px solid #FECACA;
-    }
-
-    .switch-auth-footer {
-      text-align: center;
-      margin-top: 14px;
-      font-size: 12px;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .switch-auth-footer button {
-      background: none;
-      border: none;
-      color: var(--primary-green);
-      font-weight: 800;
-      text-decoration: underline;
-      cursor: pointer;
-      font-size: 12px;
-      margin-left: 4px;
-    }
-
-    .btn-3d-action {
-      width: 100%;
-      padding: 13px;
-      border-radius: 12px;
-      border: none;
-      background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
-      color: #ffffff;
-      font-size: 13.5px;
-      font-weight: 800;
-      cursor: pointer;
-      box-shadow: 0 8px 20px rgba(7, 136, 102, 0.25);
-      touch-action: manipulation;
-      transition: all 0.15s ease;
-    }
-
-    .btn-3d-action:active {
-      transform: scale(0.97);
-    }
-
-    .btn-3d-action:disabled {
-      opacity: 0.65;
-      cursor: not-allowed;
-    }
-
-    /* TRUST HIGHLIGHTS */
-    .trust-card {
-      padding: 16px 18px;
-      margin-bottom: 20px;
-    }
-
-    .trust-hero-stat {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid rgba(7, 136, 102, 0.12);
-      margin-bottom: 12px;
-    }
-
-    .stat-badge-circle {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
-      border: 1px solid #A7F3D0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-    }
-
-    .stat-details h3 {
-      font-size: 15px;
-      font-weight: 900;
-      color: var(--dark-green);
-    }
-
-    .stat-details p {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    .trust-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .trust-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #ffffff;
-      padding: 9px 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(7, 136, 102, 0.12);
-    }
-
-    .trust-item span {
-      font-size: 17px;
-    }
-
-    .trust-item strong {
-      display: block;
-      font-size: 11px;
-      color: var(--text-main);
-      font-weight: 700;
-    }
-
-    .trust-item small {
-      font-size: 9.5px;
-      color: var(--text-muted);
-    }
-
-    /* CENTER DETAILS */
-    .center-details-card {
-      padding: 16px 18px;
-      margin-bottom: 20px;
-    }
-
-    .center-details-card h4 {
-      font-size: 13.5px;
-      font-weight: 800;
-      color: var(--dark-green);
-      margin-bottom: 5px;
-    }
-
-    .center-details-card p {
-      font-size: 11.5px;
-      color: var(--text-muted);
-      line-height: 1.45;
-    }
-
-    .timings-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #EFF6FF;
-      border: 1px solid #BFDBFE;
-      color: #1D4ED8;
-      font-size: 10.5px;
-      font-weight: 800;
-      padding: 4px 10px;
-      border-radius: 20px;
-      margin-top: 10px;
-    }
-
-    /* CONTACT CHANNELS */
-    .contact-channels-group {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-bottom: 24px;
-    }
-
-    .contact-channel-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 14px;
-      border-radius: 12px;
-      text-decoration: none;
-      background: #ffffff;
-      border: 1px solid rgba(7, 136, 102, 0.18);
-      transition: transform 0.15s ease;
-    }
-
-    .contact-channel-row:active {
-      transform: scale(0.98);
-    }
-
-    .contact-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .channel-bubble {
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 17px;
-    }
-
-    .call-bubble { background: #ECFDF5; }
-    .whatsapp-bubble { background: #DCFCE7; }
-    .email-bubble { background: #F3E8FF; }
-
-    .channel-info strong {
-      display: block;
-      font-size: 12px;
-      color: var(--text-main);
-      font-weight: 800;
-    }
-
-    .channel-info span {
-      font-size: 10.5px;
-      color: var(--text-muted);
-    }
-
-    .channel-arrow {
-      color: var(--primary-green);
-      font-size: 15px;
-      font-weight: 800;
-    }
-
-    .page-footer {
-      text-align: center;
-      font-size: 10.5px;
-      color: var(--text-muted);
-      line-height: 1.5;
     }
   </style>
 </head>
 <body>
 
-  <!-- 1. SPLASH SCREEN -->
-  <div id="splash-overlay">
-    <div class="splash-logo-wrap">
-      <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="splash-logo" onerror="this.style.display='none'; document.getElementById('splash-fallback').style.display='block';">
-      <div id="splash-fallback" style="display:none;" class="splash-fallback-title">
-        SELFCARE <span style="color:#A7F3D0;">DIAGNOSTICS</span>
-      </div>
-      <p class="splash-sub">Empowering Wellness</p>
-      <div class="splash-pulse-ring"></div>
+  <div class="splash-wrap">
+    <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="splash-logo" onerror="this.style.display='none'; document.getElementById('fb-title').style.display='block';">
+    <div id="fb-title" style="display:none;" class="splash-title">
+      SELFCARE <span style="color:#A7F3D0;">DIAGNOSTICS</span>
     </div>
+    <p class="splash-sub">Empowering Wellness</p>
+    <div class="spinner"></div>
   </div>
 
-  <!-- 2. MAIN CONTAINER -->
-  <main class="portal-container" id="main-portal">
-
-    <!-- 3D FLOATING LOGO HERO -->
-    <div class="top-logo-hero">
-      <div class="brand-3d-badge">
-        <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="main-brand-logo" onerror="this.style.display='none'; document.getElementById('main-brand-fallback').style.display='block';">
-        <div id="main-brand-fallback" style="display: none;" class="fallback-brand-text">
-          <h1>SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
-        </div>
-        <p class="brand-tagline">Empowering Wellness</p>
-      </div>
-    </div>
-
-    <!-- MAIN LOGIN CARD -->
-    <section class="login-card glass-card">
-      
-      <!-- ROLE SELECTOR TABS -->
-      <div class="role-tabs-wrap">
-        <button type="button" class="role-tab-btn active" id="tab-patient-btn" onclick="IndexPortal.switchRoleTab('patient')">
-          <span>👤</span> Patient Login
-        </button>
-        <button type="button" class="role-tab-btn" id="tab-staff-btn" onclick="IndexPortal.switchRoleTab('staff')">
-          <span>🛡️</span> Staff / Admin
-        </button>
-      </div>
-
-      <!-- VIEW A: PATIENT LOGIN & SIGN UP (NO OTP) -->
-      <div id="patient-auth-section">
-        <div class="patient-mode-switch">
-          <button type="button" class="mode-pill-btn active" id="btn-patient-mode-login" onclick="IndexPortal.switchPatientMode('login')">
-            Login
-          </button>
-          <button type="button" class="mode-pill-btn" id="btn-patient-mode-signup" onclick="IndexPortal.switchPatientMode('signup')">
-            Sign Up (New User)
-          </button>
-        </div>
-
-        <!-- PATIENT LOGIN FORM -->
-        <div id="step-patient-login">
-          <div class="card-title-row">
-            <h2>Patient Login</h2>
-            <p>Login with your registered mobile number &amp; password.</p>
-          </div>
-
-          <div class="form-group">
-            <label for="patient-login-mobile">Mobile Number</label>
-            <div class="phone-input-wrap">
-              <span class="country-code">🇮🇳 +91</span>
-              <input 
-                type="tel" 
-                id="patient-login-mobile" 
-                placeholder="Enter 10-digit mobile" 
-                maxlength="10" 
-                autocomplete="tel" 
-                inputmode="numeric" 
-                oninput="IndexPortal.validatePhone(this)"
-              >
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="patient-login-password">Password</label>
-            <div class="staff-input-wrap">
-              <input 
-                type="password" 
-                id="patient-login-password" 
-                placeholder="Enter your password" 
-                autocomplete="current-password"
-                onkeydown="if(event.key==='Enter') IndexPortal.handlePatientLogin()"
-              >
-              <button type="button" class="pwd-eye-btn" onclick="IndexPortal.togglePwdVisibility('patient-login-password', this)">👁️</button>
-            </div>
-            <span class="error-hint" id="patient-login-error">Invalid mobile number or password.</span>
-          </div>
-
-          <button type="button" class="btn-3d-action" id="patient-login-btn" onclick="IndexPortal.handlePatientLogin()">
-            Login ➔
-          </button>
-
-          <div class="switch-auth-footer">
-            New to Selfcare?
-            <button type="button" onclick="IndexPortal.switchPatientMode('signup')">Create Account (Sign Up)</button>
-          </div>
-        </div>
-
-        <!-- PATIENT SIGN UP FORM -->
-        <div id="step-patient-signup" style="display: none;">
-          <div class="card-title-row">
-            <h2>Patient Sign Up</h2>
-            <p>Create your account once for lifetime access.</p>
-          </div>
-
-          <div class="form-group">
-            <label for="patient-signup-mobile">Mobile Number *</label>
-            <div class="phone-input-wrap">
-              <span class="country-code">🇮🇳 +91</span>
-              <input 
-                type="tel" 
-                id="patient-signup-mobile" 
-                placeholder="Enter 10-digit mobile" 
-                maxlength="10" 
-                autocomplete="tel" 
-                inputmode="numeric" 
-                oninput="IndexPortal.validatePhone(this)"
-              >
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="patient-signup-password">Create New Password *</label>
-            <div class="staff-input-wrap">
-              <input 
-                type="password" 
-                id="patient-signup-password" 
-                placeholder="Minimum 4 characters" 
-                autocomplete="new-password"
-                oninput="IndexPortal.checkSignupPasswordMatch()"
-              >
-              <button type="button" class="pwd-eye-btn" onclick="IndexPortal.togglePwdVisibility('patient-signup-password', this)">👁️</button>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="patient-signup-confirm">Confirm Password *</label>
-            <div class="staff-input-wrap">
-              <input 
-                type="password" 
-                id="patient-signup-confirm" 
-                placeholder="Re-enter new password" 
-                autocomplete="new-password"
-                oninput="IndexPortal.checkSignupPasswordMatch()"
-                onkeydown="if(event.key==='Enter') IndexPortal.handlePatientSignup()"
-              >
-              <button type="button" class="pwd-eye-btn" onclick="IndexPortal.togglePwdVisibility('patient-signup-confirm', this)">👁️</button>
-            </div>
-            <div id="signup-match-indicator" class="pwd-match-status"></div>
-            <span class="error-hint" id="patient-signup-error">Please check details and try again.</span>
-          </div>
-
-          <button type="button" class="btn-3d-action" id="patient-signup-btn" onclick="IndexPortal.handlePatientSignup()">
-            Create Account &amp; Login ✓
-          </button>
-
-          <div class="switch-auth-footer">
-            Already have an account?
-            <button type="button" onclick="IndexPortal.switchPatientMode('login')">Login Here</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- VIEW B: STAFF & ADMIN LOGIN ONLY (NO SIGN UP) -->
-      <div id="staff-auth-section" style="display: none;">
-        <div class="card-title-row">
-          <h2>Staff & Admin Portal</h2>
-          <p>Login for Lab Administrators and Field Phlebotomy Technicians.</p>
-        </div>
-
-        <div class="form-group">
-          <label for="staff-id-input">Admin or Technician ID</label>
-          <div class="staff-input-wrap">
-            <input type="text" id="staff-id-input" placeholder="Enter ID" autocomplete="username">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="staff-password-input">Password</label>
-          <div class="staff-input-wrap">
-            <input type="password" id="staff-password-input" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter') IndexPortal.handleStaffLogin()">
-            <button type="button" class="pwd-eye-btn" onclick="IndexPortal.togglePwdVisibility('staff-password-input', this)">👁️</button>
-          </div>
-          <span class="error-hint" id="staff-error-hint">Invalid Staff ID or Password.</span>
-        </div>
-
-        <button type="button" class="btn-3d-action" id="staff-login-btn" onclick="IndexPortal.handleStaffLogin()">
-          Login ➔
-        </button>
-      </div>
-
-    </section>
-
-    <!-- 1000+ TRUSTED CUSTOMERS -->
-    <section class="trust-card glass-card">
-      <div class="trust-hero-stat">
-        <div class="stat-badge-circle">👥</div>
-        <div class="stat-details">
-          <h3>1000+ Trusted Customers</h3>
-          <p>Delivering certified and dependable healthcare diagnostics across Chennai.</p>
-        </div>
-      </div>
-
-      <div class="trust-grid">
-        <div class="trust-item">
-          <span>🛡️</span>
-          <div>
-            <strong>NABL Standards</strong>
-            <small>Accredited Labs</small>
-          </div>
-        </div>
-        <div class="trust-item">
-          <span>🛵</span>
-          <div>
-            <strong>Doorstep Pickup</strong>
-            <small>Certified Cold-Chain</small>
-          </div>
-        </div>
-        <div class="trust-item">
-          <span>⚡</span>
-          <div>
-            <strong>Fast Reports</strong>
-            <small>Direct on WhatsApp</small>
-          </div>
-        </div>
-        <div class="trust-item">
-          <span>🏷️</span>
-          <div>
-            <strong>Transparent MRP</strong>
-            <small>Special Discounts</small>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- SELFCARE DETAILS -->
-    <section class="center-details-card glass-card">
-      <h4>🏢 Selfcare Diagnostics Central Laboratory</h4>
-      <p>Providing high-precision automated clinical pathology, biochemistry, hematology, and preventive health checkups with barcoded vacutainer sample collection.</p>
-      
-      <div class="timings-pill">
-        <span>⏱️</span> Open All 7 Days: 7:00 AM – 9:00 PM
-      </div>
-    </section>
-
-    <!-- CONTACT CHANNELS -->
-    <section class="contact-channels-group">
-      <a href="tel:+917010174890" class="contact-channel-row glass-card">
-        <div class="contact-left">
-          <div class="channel-bubble call-bubble">📞</div>
-          <div class="channel-info">
-            <strong>Customer Care Support</strong>
-            <span>+91 7010174890</span>
-          </div>
-        </div>
-        <span class="channel-arrow">›</span>
-      </a>
-
-      <a href="https://wa.me/917010174890?text=Hi%20Selfcare%20Diagnostics,%20I%20would%20like%20to%20enquire%20about%20lab%20tests." target="_blank" class="contact-channel-row glass-card">
-        <div class="contact-left">
-          <div class="channel-bubble whatsapp-bubble">💬</div>
-          <div class="channel-info">
-            <strong>WhatsApp Live Enquiry</strong>
-            <span>Chat directly with lab coordinator</span>
-          </div>
-        </div>
-        <span class="channel-arrow">›</span>
-      </a>
-
-      <a href="mailto:selfcaremedicals@gmail.com?subject=Selfcare%20Diagnostic%20Enquiry" class="contact-channel-row glass-card">
-        <div class="contact-left">
-          <div class="channel-bubble email-bubble">✉️</div>
-          <div class="channel-info">
-            <strong>Email Support</strong>
-            <span>selfcaremedicals@gmail.com</span>
-          </div>
-        </div>
-        <span class="channel-arrow">›</span>
-      </a>
-    </section>
-
-    <footer class="page-footer">
-      <p>© 2026 Selfcare Diagnostics. Chennai, Tamil Nadu.</p>
-      <p>Certified Pathology & Preventive Diagnostic Services.</p>
-    </footer>
-
-  </main>
-
-  <!-- Core JavaScript Stack -->
-  <script src="assets/js/config.js?v=6.0.0"></script>
-  <script src="assets/js/utils.js?v=6.0.0"></script>
-  <script src="assets/js/api.js?v=6.0.0"></script>
-  <script src="assets/js/offline-db.js?v=6.0.0"></script>
-  <script src="assets/js/offline-sync.js?v=6.0.0"></script>
-  <script src="assets/js/auth.js?v=6.0.0"></script>
-
-  <!-- Unified Password Auth Logic for Patient, Admin, and Technician -->
   <script>
-    const IndexPortal = {
-      init() {
-        this.handleSplashAnimation();
-        this.checkExistingLogin();
-      },
+    (function () {
+      const params = new URLSearchParams(window.location.search);
 
-      handleSplashAnimation() {
-        setTimeout(() => {
-          const splash = document.getElementById('splash-overlay');
-          const portal = document.getElementById('main-portal');
-          if (splash) {
-            splash.style.opacity = '0';
-            setTimeout(() => { splash.style.display = 'none'; }, 600);
-          }
-          if (portal) portal.classList.add('visible');
-        }, 1200);
-      },
-
-      checkExistingLogin() {
-        const urlParams = new URLSearchParams(window.location.search);
-
-        if (urlParams.get('logout') === 'true') {
-          localStorage.removeItem('selfcare_active_user');
-          localStorage.removeItem('selfcare_user_role');
-          localStorage.removeItem('selfcare_active_tech');
-          localStorage.removeItem('selfcare_active_technician');
-          localStorage.removeItem('selfcare_auth_token');
-          localStorage.removeItem('selfcare_permanent_user');
-          if (window.history && window.history.replaceState) {
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-          return;
-        }
-
-        const userRole = localStorage.getItem('selfcare_user_role');
-        const activeUser = localStorage.getItem('selfcare_active_user');
-
-        if (activeUser && userRole) {
-          if (userRole === 'admin') {
-            window.location.replace('admin.html');
-          } else if (userRole === 'technician') {
-            const hasTech = localStorage.getItem('selfcare_active_tech') || localStorage.getItem('selfcare_active_technician');
-            if (hasTech) {
-              window.location.replace('technician.html');
-            } else {
-              localStorage.removeItem('selfcare_user_role');
-              localStorage.removeItem('selfcare_active_user');
-            }
-          } else {
-            window.location.replace('customer.html');
-          }
-        }
-      },
-
-      switchRoleTab(role) {
-        const patientTab = document.getElementById('tab-patient-btn');
-        const staffTab = document.getElementById('tab-staff-btn');
-        const patientSec = document.getElementById('patient-auth-section');
-        const staffSec = document.getElementById('staff-auth-section');
-
-        if (role === 'staff') {
-          patientTab.classList.remove('active');
-          staffTab.classList.add('active');
-          patientSec.style.display = 'none';
-          staffSec.style.display = 'block';
-          document.getElementById('staff-error-hint').style.display = 'none';
-        } else {
-          staffTab.classList.remove('active');
-          patientTab.classList.add('active');
-          staffSec.style.display = 'none';
-          patientSec.style.display = 'block';
-        }
-      },
-
-      switchPatientMode(mode) {
-        const loginBtn = document.getElementById('btn-patient-mode-login');
-        const signupBtn = document.getElementById('btn-patient-mode-signup');
-        const loginForm = document.getElementById('step-patient-login');
-        const signupForm = document.getElementById('step-patient-signup');
-
-        document.getElementById('patient-login-error').style.display = 'none';
-        document.getElementById('patient-signup-error').style.display = 'none';
-
-        if (mode === 'signup') {
-          loginBtn.classList.remove('active');
-          signupBtn.classList.add('active');
-          loginForm.style.display = 'none';
-          signupForm.style.display = 'block';
-        } else {
-          signupBtn.classList.remove('active');
-          loginBtn.classList.add('active');
-          signupForm.style.display = 'none';
-          loginForm.style.display = 'block';
-        }
-      },
-
-      togglePwdVisibility(inputId, btnEl) {
-        const inp = document.getElementById(inputId);
-        if (!inp) return;
-        inp.type = inp.type === 'password' ? 'text' : 'password';
-        if (btnEl) btnEl.textContent = inp.type === 'password' ? '👁️' : '🙈';
-      },
-
-      validatePhone(input) {
-        input.value = input.value.replace(/\D/g, '').slice(0, 10);
-        document.getElementById('patient-login-error').style.display = 'none';
-        document.getElementById('patient-signup-error').style.display = 'none';
-      },
-
-      checkSignupPasswordMatch() {
-        const pwd = document.getElementById('patient-signup-password').value;
-        const confirmPwd = document.getElementById('patient-signup-confirm').value;
-        const indicator = document.getElementById('signup-match-indicator');
-
-        if (!confirmPwd) {
-          indicator.className = 'pwd-match-status';
-          indicator.textContent = '';
-          return false;
-        }
-
-        if (pwd === confirmPwd) {
-          indicator.className = 'pwd-match-status match-ok';
-          indicator.textContent = '✓ Passwords match perfectly';
-          return true;
-        } else {
-          indicator.className = 'pwd-match-status match-err';
-          indicator.textContent = '✗ Passwords do not match';
-          return false;
-        }
-      },
-
-      getPatientAccountsMap() {
-        try {
-          const raw = localStorage.getItem('selfcare_patient_credentials');
-          return raw ? JSON.parse(raw) : {};
-        } catch (e) {
-          return {};
-        }
-      },
-
-      savePatientAccountRecord(mobile, password, serverProfile = null) {
-        const accounts = this.getPatientAccountsMap();
-        accounts[mobile] = {
-          mobile,
-          password,
-          userId: (serverProfile && serverProfile.userId) || `SCD_${mobile}`,
-          name: (serverProfile && serverProfile.name) || accounts[mobile]?.name || 'Valued Customer',
-          updatedAt: new Date().toISOString()
-        };
-        localStorage.setItem('selfcare_patient_credentials', JSON.stringify(accounts));
-      },
-
-      completeLifetimePatientSession(mobile, serverUser = null) {
-        const previousMobile = localStorage.getItem('selfcare_active_user');
-        if (previousMobile && previousMobile !== mobile) {
-          try {
-            const activeCart = localStorage.getItem('selfcare_cart');
-            if (activeCart) localStorage.setItem(`selfcare_cart_${previousMobile}`, activeCart);
-          } catch (e) {}
-        }
-
-        let existingVault = {};
-        try {
-          const rawVault = localStorage.getItem(`selfcare_profile_${mobile}`);
-          if (rawVault) existingVault = JSON.parse(rawVault);
-        } catch (e) {}
-
-        const userData = {
-          ...existingVault,
-          userId: (serverUser && serverUser.userId) ? serverUser.userId : (existingVault.userId || `SCD_${mobile}`),
-          mobile: mobile,
-          phone: mobile,
-          name: (serverUser && serverUser.name) ? serverUser.name : (existingVault.name || 'Valued Customer'),
-          token: (serverUser && serverUser.token) ? serverUser.token : `LIFETIME_PATIENT_TOKEN_${mobile}`,
-          role: 'patient',
-          lifetimeSession: true
-        };
-
-        if (typeof Auth !== 'undefined' && typeof Auth.savePermanentSession === 'function') {
-          Auth.savePermanentSession(userData);
-        }
-
-        const serialized = JSON.stringify(userData);
-        localStorage.setItem('selfcare_active_user', mobile);
-        localStorage.setItem('selfcare_user_role', 'patient');
-        localStorage.setItem('selfcare_auth_token', userData.token);
-        localStorage.setItem('selfcare_customer_profile', serialized);
-        localStorage.setItem('selfcare_permanent_user', serialized);
-        localStorage.setItem(`selfcare_profile_${mobile}`, serialized);
-
-        try {
-          const userVaultCart = localStorage.getItem(`selfcare_cart_${mobile}`);
-          localStorage.setItem('selfcare_cart', userVaultCart || JSON.stringify([]));
-        } catch (e) {}
-
-        if (typeof Utils !== 'undefined') Utils.showToast('Login successful! Redirecting...', 'success');
-        setTimeout(() => window.location.replace('customer.html'), 450);
-      },
-
-      async handlePatientSignup() {
-        const mobileInput = document.getElementById('patient-signup-mobile');
-        const pwdInput = document.getElementById('patient-signup-password');
-        const confirmInput = document.getElementById('patient-signup-confirm');
-        const errHint = document.getElementById('patient-signup-error');
-        const btn = document.getElementById('patient-signup-btn');
-
-        const mobile = mobileInput ? mobileInput.value.trim() : '';
-        const password = pwdInput ? pwdInput.value.trim() : '';
-        const confirmPwd = confirmInput ? confirmInput.value.trim() : '';
-
-        errHint.style.display = 'none';
-
-        if (!/^[6-9]\d{9}$/.test(mobile)) {
-          errHint.textContent = 'Please enter a valid 10-digit Indian mobile number.';
-          errHint.style.display = 'block';
-          mobileInput.focus();
-          return;
-        }
-
-        if (password.length < 4) {
-          errHint.textContent = 'Password must be at least 4 characters long.';
-          errHint.style.display = 'block';
-          pwdInput.focus();
-          return;
-        }
-
-        if (password !== confirmPwd) {
-          errHint.textContent = 'Passwords do not match. Please confirm accurately.';
-          errHint.style.display = 'block';
-          confirmInput.focus();
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = 'Creating Account...';
-
-        try {
-          let serverUser = null;
-          if (navigator.onLine && typeof Api !== 'undefined') {
-            try {
-              if (typeof Api.patientRegister === 'function') {
-                serverUser = await Api.patientRegister(mobile, password);
-              } else if (typeof Api.request === 'function') {
-                serverUser = await Api.request('patientRegister', { mobile, password, userId: `SCD_${mobile}` }, false);
-              }
-            } catch (netErr) {
-              console.warn('[IndexPortal] Cloud signup sync deferred:', netErr);
-            }
-          }
-
-          this.savePatientAccountRecord(mobile, password, serverUser);
-          this.completeLifetimePatientSession(mobile, serverUser);
-        } catch (err) {
-          btn.disabled = false;
-          btn.textContent = 'Create Account & Login ✓';
-          errHint.textContent = err.message || 'Unable to register. Please try again.';
-          errHint.style.display = 'block';
-        }
-      },
-
-      async handlePatientLogin() {
-        const mobileInput = document.getElementById('patient-login-mobile');
-        const pwdInput = document.getElementById('patient-login-password');
-        const errHint = document.getElementById('patient-login-error');
-        const btn = document.getElementById('patient-login-btn');
-
-        const mobile = mobileInput ? mobileInput.value.trim() : '';
-        const password = pwdInput ? pwdInput.value.trim() : '';
-
-        errHint.style.display = 'none';
-
-        if (!/^[6-9]\d{9}$/.test(mobile)) {
-          errHint.textContent = 'Please enter a valid 10-digit Indian mobile number.';
-          errHint.style.display = 'block';
-          mobileInput.focus();
-          return;
-        }
-
-        if (!password) {
-          errHint.textContent = 'Please enter your password.';
-          errHint.style.display = 'block';
-          pwdInput.focus();
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = 'Logging in...';
-
-        try {
-          const localAccounts = this.getPatientAccountsMap();
-          const localRecord = localAccounts[mobile];
-          let authenticated = false;
-          let serverUser = null;
-
-          if (localRecord && localRecord.password === password) {
-            authenticated = true;
-          }
-
-          if (!authenticated && navigator.onLine && typeof Api !== 'undefined') {
-            try {
-              let res = null;
-              if (typeof Api.patientLogin === 'function') {
-                res = await Api.patientLogin(mobile, password);
-              } else if (typeof Api.request === 'function') {
-                res = await Api.request('patientLogin', { mobile, password }, false);
-              }
-              if (res && (res.status === 'success' || res.success || res.userId)) {
-                authenticated = true;
-                serverUser = res.user || res.profile || res;
-                this.savePatientAccountRecord(mobile, password, serverUser);
-              }
-            } catch (netErr) {
-              console.warn('[IndexPortal] Cloud patient login notice:', netErr);
-            }
-          }
-
-          if (!authenticated) {
-            btn.disabled = false;
-            btn.textContent = 'Login ➔';
-            errHint.textContent = localRecord
-              ? 'Incorrect password. Please try again.'
-              : 'Account not found. Please click "Sign Up" to create a new account.';
-            errHint.style.display = 'block';
-            if (typeof Utils !== 'undefined') Utils.showToast(errHint.textContent, 'error');
-            return;
-          }
-
-          this.completeLifetimePatientSession(mobile, serverUser);
-        } catch (err) {
-          btn.disabled = false;
-          btn.textContent = 'Login ➔';
-          errHint.textContent = err.message || 'Login failed. Please try again.';
-          errHint.style.display = 'block';
-        }
-      },
-
-      async handleStaffLogin() {
-        const idInput = document.getElementById('staff-id-input');
-        const pwdInput = document.getElementById('staff-password-input');
-        const errorHint = document.getElementById('staff-error-hint');
-        const loginBtn = document.getElementById('staff-login-btn');
-
-        const enteredId = idInput ? idInput.value.replace(/\s+/g, '').toLowerCase() : '';
-        const enteredPwd = pwdInput ? pwdInput.value.trim() : '';
-
-        errorHint.style.display = 'none';
-
-        if (!enteredId || !enteredPwd) {
-          errorHint.textContent = 'Please enter both ID and Password.';
-          errorHint.style.display = 'block';
-          return;
-        }
-
-        if (loginBtn) {
-          loginBtn.disabled = true;
-          loginBtn.textContent = 'Verifying Credentials...';
-        }
-
-        // 1. Check ADMIN CREDENTIALS
-        if (enteredId === 'admin@selfcare' && enteredPwd === 'admin@123') {
-          localStorage.setItem('selfcare_active_user', 'admin@selfcare');
-          localStorage.setItem('selfcare_user_role', 'admin');
-          localStorage.setItem('selfcare_auth_token', 'SELFCARE_ADMIN_TOKEN_SECURE');
-
-          if (typeof Utils !== 'undefined') Utils.showToast('Welcome, Administrator!', 'success');
-          setTimeout(() => window.location.replace('admin.html'), 400);
-          return;
-        }
-
-        // 2. Check TECHNICIAN CREDENTIALS in localStorage
-        let technicians = [];
-        try {
-          const storedTechs = localStorage.getItem('selfcare_technicians');
-          if (storedTechs) technicians = JSON.parse(storedTechs);
-        } catch (e) {}
-
-        const matchedTech = technicians.find(t => {
-          const tId = String(t.id || t.loginId || t.TechID || t.LoginID || '').replace(/\s+/g, '').toLowerCase();
-          const tPwd = String(t.pass || t.password || t.Password || '').trim();
-          return tId === enteredId && tPwd === enteredPwd;
-        });
-
-        if (matchedTech) {
-          const techId = matchedTech.id || matchedTech.loginId || matchedTech.TechID || enteredId;
-          const techData = {
-            id: techId,
-            name: matchedTech.name || matchedTech.Name || techId,
-            zone: matchedTech.zone || matchedTech.ZoneArea || 'Chennai Zone',
-            role: 'technician'
-          };
-          localStorage.setItem('selfcare_active_user', techId);
-          localStorage.setItem('selfcare_user_role', 'technician');
-          localStorage.setItem('selfcare_active_tech', JSON.stringify(techData));
-          localStorage.setItem('selfcare_active_technician', JSON.stringify(techData));
-          localStorage.setItem('selfcare_auth_token', `TECH_TOKEN_${techId}`);
-
-          if (typeof Utils !== 'undefined') Utils.showToast(`Welcome Technician ${techData.name}!`, 'success');
-          setTimeout(() => window.location.replace('technician.html'), 400);
-          return;
-        }
-
-        // 3. Live Google Sheets Backend Verification via Api.staffLogin
-        if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.staffLogin === 'function') {
-          try {
-            const serverRes = await Api.staffLogin(enteredId, enteredPwd);
-            if (serverRes && (serverRes.success || serverRes.userId)) {
-              const techId = serverRes.userId || serverRes.techId || enteredId;
-              const techData = {
-                id: techId,
-                name: serverRes.name || techId,
-                zone: serverRes.area || serverRes.zone || 'Chennai Zone',
-                role: serverRes.role || 'technician'
-              };
-              localStorage.setItem('selfcare_active_user', techId);
-              localStorage.setItem('selfcare_user_role', 'technician');
-              localStorage.setItem('selfcare_active_tech', JSON.stringify(techData));
-              localStorage.setItem('selfcare_active_technician', JSON.stringify(techData));
-              localStorage.setItem('selfcare_auth_token', `TECH_TOKEN_${techId}`);
-
-              if (typeof Utils !== 'undefined') Utils.showToast(`Welcome Technician ${techData.name}!`, 'success');
-              setTimeout(() => window.location.replace('technician.html'), 400);
-              return;
-            }
-          } catch (netErr) {
-            console.warn('[IndexPortal] Live staff login check notice:', netErr);
-          }
-        }
-
-        // 4. Invalid Credentials
-        if (loginBtn) {
-          loginBtn.disabled = false;
-          loginBtn.textContent = 'Login ➔';
-        }
-        errorHint.textContent = 'Invalid ID or Password. Please check credentials.';
-        errorHint.style.display = 'block';
-        if (typeof Utils !== 'undefined') Utils.showToast('Invalid credentials', 'error');
+      if (params.get('logout') === 'true') {
+        localStorage.removeItem('selfcare_active_user');
+        localStorage.removeItem('selfcare_user_role');
+        localStorage.removeItem('selfcare_active_tech');
+        localStorage.removeItem('selfcare_active_technician');
+        localStorage.removeItem('selfcare_captain_session');
+        localStorage.removeItem('selfcare_tech_workspace');
+        localStorage.removeItem('selfcare_auth_token');
+        localStorage.removeItem('selfcare_permanent_user');
+        window.location.replace('login.html');
+        return;
       }
-    };
 
-    document.addEventListener('DOMContentLoaded', () => {
-      IndexPortal.init();
-    });
+      const role = localStorage.getItem('selfcare_user_role');
+      const activeUser = localStorage.getItem('selfcare_active_user');
+      const permanentUser = localStorage.getItem('selfcare_permanent_user');
+      const queryStr = window.location.search || '';
+
+      setTimeout(() => {
+        if (role === 'admin' && activeUser && activeUser.toUpperCase().startsWith('SCDADMIN')) {
+          window.location.replace('admin.html');
+          return;
+        }
+
+        if (role === 'technician' && activeUser && activeUser.toUpperCase().startsWith('SCDTECH')) {
+          const lastWorkspace = localStorage.getItem('selfcare_tech_workspace') || 'technician.html';
+          window.location.replace(lastWorkspace);
+          return;
+        }
+
+        if (activeUser || permanentUser) {
+          if (!activeUser && permanentUser) {
+            try {
+              const p = JSON.parse(permanentUser);
+              const mob = p.mobile || p.phone;
+              if (mob) {
+                localStorage.setItem('selfcare_active_user', mob);
+                localStorage.setItem('selfcare_user_role', 'patient');
+                localStorage.setItem('selfcare_auth_token', p.token || `LIFETIME_PATIENT_TOKEN_${mob}`);
+              }
+            } catch (e) {}
+          }
+          window.location.replace('customer.html' + queryStr);
+          return;
+        }
+
+        window.location.replace('login.html' + queryStr);
+      }, 450);
+    })();
   </script>
 </body>
 </html>

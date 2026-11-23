@@ -15,11 +15,11 @@
   <link rel="stylesheet" href="assets/css/global.css?v=6.0.0">
   <link rel="stylesheet" href="assets/css/components.css?v=6.0.0">
   <link rel="stylesheet" href="assets/css/responsive.css?v=6.0.0">
-  <link rel="stylesheet" href="assets/css/login.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/login.css?v=7.0.0">
 </head>
 <body>
 
-  <!-- 3D Ambient Background Orbs for Glassmorphism Depth -->
+  <!-- 3D Ambient Background Orbs -->
   <div class="bg-3d-scene" aria-hidden="true">
     <div class="orb-3d orb-1"></div>
     <div class="orb-3d orb-2"></div>
@@ -40,7 +40,7 @@
   <!-- Main Login Container -->
   <main class="login-container">
 
-    <!-- ANIMATED MASCOT PARADE ("Welcome to Selfcare" Flag Walker) -->
+    <!-- ANIMATED MASCOT PARADE -->
     <div class="mascot-parade-stage" aria-hidden="true">
       <div class="mascot-walker">
         <svg class="mascot-svg" viewBox="0 0 210 84" width="210" height="84" xmlns="http://www.w3.org/2000/svg">
@@ -55,9 +55,7 @@
             </filter>
           </defs>
 
-          <!-- Walking Mascot Group with Gentle Bounce -->
           <g class="mascot-body-bob">
-            <!-- Waving Flag Banner -->
             <g class="mascot-flag-wave" filter="url(#flagShadow)">
               <path d="M161 12 Q122 8, 86 12 T14 12 L14 38 Q50 42, 86 38 T158 38 Z"
                     fill="url(#flagGrad)" stroke="#A7F3D0" stroke-width="1.4" />
@@ -67,42 +65,31 @@
               </text>
             </g>
 
-            <!-- Flagpole & Gold Finial -->
             <line x1="154" y1="66" x2="162" y2="10" stroke="#045D49" stroke-width="2.4" stroke-linecap="round" />
             <circle cx="162" cy="9" r="3.2" fill="#F59E0B" />
-
-            <!-- Ground Soft Shadow -->
             <ellipse cx="174" cy="78" rx="14" ry="3.5" fill="rgba(4, 93, 73, 0.18)" />
 
-            <!-- Back Leg -->
             <g class="mascot-leg-back">
               <rect x="170" y="60" width="5.5" height="14" rx="2.7" fill="#045D49" />
               <ellipse cx="174" cy="74" rx="4.5" ry="2.5" fill="#10231E" />
             </g>
 
-            <!-- Front Leg -->
             <g class="mascot-leg-front">
               <rect x="174" y="60" width="5.5" height="14" rx="2.7" fill="#078866" />
               <ellipse cx="178" cy="74" rx="4.5" ry="2.5" fill="#10231E" />
             </g>
 
-            <!-- White Lab Coat & Emerald Scrubs -->
             <path d="M164 43 C164 39, 184 39, 184 43 L186 62 L162 62 Z"
                   fill="#FFFFFF" stroke="#078866" stroke-width="1.4" />
             <polygon points="171,40 179,40 175,49" fill="#078866" />
 
-            <!-- Cute Chibi Head -->
             <circle cx="175" cy="27" r="12" fill="#FDCB9E" />
-            <!-- Hair -->
             <path d="M163 26 C163 16, 187 16, 187 25 C183 21, 170 21, 165 27 Z" fill="#1E293B" />
-            <!-- Happy Eye & Shine -->
             <circle cx="180" cy="26.5" r="1.7" fill="#10231E" />
             <circle cx="180.6" cy="25.9" r="0.55" fill="#FFFFFF" />
-            <!-- Cheek & Smile -->
             <circle cx="178" cy="30.5" r="2" fill="#FDA4AF" opacity="0.75" />
             <path d="M180 31.5 Q182.5 33.5 184.5 31" fill="none" stroke="#9A3412" stroke-width="1.4" stroke-linecap="round" />
 
-            <!-- Arm Holding Flagpole -->
             <path d="M172 45 Q164 49 157 48" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" />
             <path d="M172 45 Q164 49 157 48" fill="none" stroke="#078866" stroke-width="1.3" stroke-linecap="round" />
             <circle cx="157" cy="48" r="3" fill="#FDCB9E" />
@@ -111,76 +98,60 @@
       </div>
     </div>
 
-    <!-- 3D ROLE SWITCHER TABS -->
-    <div class="role-tabs-card glass-3d-card anim-3d-rise">
-      <div class="role-tabs-wrap">
-        <button type="button" class="role-tab-btn active" id="tab-patient-btn" onclick="LoginPage.switchRoleTab('patient')">
-          <span class="tab-icon">👤</span> Patient Login
-        </button>
-        <button type="button" class="role-tab-btn" id="tab-staff-btn" onclick="LoginPage.switchRoleTab('staff')">
-          <span class="tab-icon">🛡️</span> Staff / Admin
-        </button>
-      </div>
-    </div>
-
-    <!-- VIEW A: PATIENT AUTH SECTION (LOGIN & SIGN UP - NO OTP) -->
+    <!-- PATIENT LOGIN & CUSTOMER SIGN UP ONLY -->
     <div id="patient-auth-wrapper">
       
-      <!-- SUB-TABS: LOGIN vs SIGN UP (PATIENT ONLY) -->
+      <!-- SUB-TABS: LOGIN vs SIGN UP (CUSTOMERS ONLY) -->
       <div class="patient-subtabs-wrap glass-3d-card anim-3d-rise">
         <button type="button" class="subtab-btn active" id="subtab-patient-login" onclick="LoginPage.switchPatientMode('login')">
-          Login
+          Patient Login
         </button>
         <button type="button" class="subtab-btn" id="subtab-patient-signup" onclick="LoginPage.switchPatientMode('signup')">
-          Sign Up (New User)
+          Customer Sign Up
         </button>
       </div>
 
-      <!-- STEP 1: PATIENT LOGIN VIEW -->
+      <!-- STEP 1: UNIFIED PATIENT LOGIN VIEW -->
       <section id="view-patient-login" class="auth-card glass-3d-card anim-3d-flip">
         <div class="card-head">
           <h3>Patient Login</h3>
-          <p>Enter your mobile number and password</p>
+          <p>Enter your registered mobile number &amp; password</p>
         </div>
 
         <div class="form-group">
           <label for="mobile-number-input">Mobile Number</label>
-          <div class="phone-input-wrap input-3d-box">
-            <span class="country-code">🇮🇳 +91</span>
+          <div class="staff-input-wrap input-3d-box">
             <input 
-              type="tel" 
+              type="text" 
               id="mobile-number-input" 
-              placeholder="Enter 10-digit mobile" 
-              maxlength="10" 
-              autocomplete="tel" 
-              inputmode="numeric"
-              pattern="[0-9]*"
-              oninput="LoginPage.validateMobileInput(this)"
+              placeholder="Enter 10-digit mobile number" 
+              autocomplete="username" 
+              oninput="LoginPage.handleUnifiedIdInput(this)"
             >
           </div>
         </div>
 
         <div class="form-group">
-          <label for="patient-password-input">Enter Password</label>
+          <label for="patient-password-input">Password</label>
           <div class="staff-input-wrap input-3d-box">
             <input 
               type="password" 
               id="patient-password-input" 
               placeholder="Enter Password" 
               autocomplete="current-password"
-              onkeydown="if(event.key==='Enter') LoginPage.handlePatientLogin()"
+              onkeydown="if(event.key==='Enter') LoginPage.handleUnifiedLogin()"
             >
             <button type="button" class="pwd-eye-btn" aria-label="Show password" onclick="LoginPage.togglePasswordVisibility('patient-password-input', this)">👁️</button>
           </div>
           <span class="input-hint" id="patient-login-error" style="display: none;">Invalid Mobile Number or Password.</span>
         </div>
 
-        <button type="button" class="login-action-btn btn-3d-glow" id="patient-login-btn" onclick="LoginPage.handlePatientLogin()">
+        <button type="button" class="login-action-btn btn-3d-glow" id="patient-login-btn" onclick="LoginPage.handleUnifiedLogin()">
           <span>Login ➔</span>
         </button>
 
         <div class="auth-switch-prompt">
-          Don't have an account? 
+          New customer? 
           <button type="button" class="switch-link-btn" onclick="LoginPage.switchPatientMode('signup')">Sign Up Now</button>
         </div>
 
@@ -188,20 +159,32 @@
         <div class="auth-trust-features">
           <div class="trust-feat">
             <span>🛡️</span>
-            <small>Lifetime Session (Never Logs Out)</small>
+            <small>One-Time Lifetime Login</small>
           </div>
           <div class="trust-feat">
             <span>🛒</span>
-            <small>Permanent Isolated Cart</small>
+            <small>Permanent Saved Cart</small>
           </div>
         </div>
       </section>
 
-      <!-- STEP 2: PATIENT SIGN UP VIEW -->
+      <!-- STEP 2: CUSTOMER SIGN UP VIEW (PATIENTS ONLY) -->
       <section id="view-patient-signup" class="auth-card glass-3d-card anim-3d-flip" style="display: none;">
         <div class="card-head">
-          <h3>Create Patient Account</h3>
-          <p>Sign up once to access lab reports &amp; doorstep bookings</p>
+          <h3>Customer Sign Up</h3>
+          <p>Create your account once for lifetime access</p>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-name-input">Full Name *</label>
+          <div class="staff-input-wrap input-3d-box">
+            <input 
+              type="text" 
+              id="signup-name-input" 
+              placeholder="Enter your full name" 
+              autocomplete="name"
+            >
+          </div>
         </div>
 
         <div class="form-group">
@@ -222,12 +205,12 @@
         </div>
 
         <div class="form-group">
-          <label for="signup-password-input">Create New Password *</label>
+          <label for="signup-password-input">Create Password *</label>
           <div class="staff-input-wrap input-3d-box">
             <input 
               type="password" 
               id="signup-password-input" 
-              placeholder="Create new password (min 4 chars)" 
+              placeholder="Create password (min 4 chars)" 
               autocomplete="new-password"
               oninput="LoginPage.checkPasswordMatch()"
             >
@@ -241,7 +224,7 @@
             <input 
               type="password" 
               id="signup-confirm-input" 
-              placeholder="Confirm new password" 
+              placeholder="Confirm password" 
               autocomplete="new-password"
               oninput="LoginPage.checkPasswordMatch()"
               onkeydown="if(event.key==='Enter') LoginPage.handlePatientSignup()"
@@ -264,50 +247,39 @@
 
     </div>
 
-    <!-- VIEW B: CLEAN STAFF & ADMIN LOGIN ONLY (NO SIGN UP) -->
-    <section id="view-staff-step" class="auth-card glass-3d-card anim-3d-flip" style="display: none;">
-      <div class="card-head">
-        <h3>Staff & Admin Login</h3>
-      </div>
-
-      <div class="form-group">
-        <label for="staff-id-input">Enter ID</label>
-        <div class="staff-input-wrap input-3d-box">
-          <input 
-            type="text" 
-            id="staff-id-input" 
-            placeholder="Enter ID" 
-            autocomplete="username"
-          >
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="staff-password-input">Enter Password</label>
-        <div class="staff-input-wrap input-3d-box">
-          <input 
-            type="password" 
-            id="staff-password-input" 
-            placeholder="Enter Password" 
-            autocomplete="current-password"
-            onkeydown="if(event.key==='Enter') LoginPage.handleStaffLogin()"
-          >
-          <button type="button" class="pwd-eye-btn" aria-label="Show password" onclick="LoginPage.togglePasswordVisibility('staff-password-input', this)">👁️</button>
-        </div>
-        <span class="input-hint" id="staff-error-hint" style="display: none;">Invalid Staff ID or Password.</span>
-      </div>
-
-      <button type="button" class="login-action-btn btn-3d-glow" id="staff-login-btn" onclick="LoginPage.handleStaffLogin()">
-        <span>Login ➔</span>
-      </button>
-    </section>
-
     <!-- Bottom Safety Guarantee Note -->
     <div class="login-footer-guarantee">
       <span>🛡️ 100% Secure • NABL Accredited Diagnostic Center • Chennai</span>
     </div>
 
   </main>
+
+  <!-- =========================================================
+       SCDTECH WORKSPACE CONFIRMATION POPUP (LAB DESK vs HOME COLLECTION)
+       ========================================================= -->
+  <div id="tech-mode-choice-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(3,63,51,0.68); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); align-items:center; justify-content:center; padding:18px;">
+    <div class="glass-3d-card anim-3d-flip" style="width:100%; max-width:400px; background:rgba(255,255,255,0.95); padding:24px 20px; text-align:center;">
+      <div style="display:inline-block; font-size:10px; font-weight:900; color:#047857; background:#ECFDF5; border:1px solid #A7F3D0; padding:4px 12px; border-radius:20px; margin-bottom:8px;">
+        ✓ TECHNICIAN VERIFIED
+      </div>
+      <h3 style="font-size:18px; font-weight:900; color:#10231E; margin-bottom:4px;">Choose Duty Workspace</h3>
+      <p id="tech-choice-subtitle" style="font-size:12px; color:#536E66; margin-bottom:18px;">Where would you like to login right now?</p>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <button type="button" onclick="LoginPage.confirmTechDestination('lab')" style="padding:18px 10px; border-radius:16px; border:2px solid #0F172A; background:#FFFFFF; cursor:pointer; text-align:center; box-shadow:0 8px 18px rgba(15,23,42,0.08);">
+          <span style="font-size:28px; display:block; margin-bottom:6px;">🔬</span>
+          <strong style="font-size:13.5px; color:#0F172A; display:block;">Lab Desk</strong>
+          <span style="font-size:10.5px; color:#64748B;">Walk-in &amp; Billing</span>
+        </button>
+
+        <button type="button" onclick="LoginPage.confirmTechDestination('home')" style="padding:18px 10px; border-radius:16px; border:2px solid #078866; background:#ECFDF5; cursor:pointer; text-align:center; box-shadow:0 8px 18px rgba(7,136,102,0.16);">
+          <span style="font-size:28px; display:block; margin-bottom:6px;">🛵</span>
+          <strong style="font-size:13.5px; color:#045D49; display:block;">Home Collection</strong>
+          <span style="font-size:10.5px; color:#078866;">Doorstep Pickups</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Core JavaScript Scripts -->
   <script src="assets/js/config.js?v=6.0.0"></script>
@@ -316,6 +288,6 @@
   <script src="assets/js/offline-db.js?v=6.0.0"></script>
   <script src="assets/js/offline-sync.js?v=6.0.0"></script>
   <script src="assets/js/auth.js?v=6.0.0"></script>
-  <script src="assets/js/login.js?v=6.0.0"></script>
+  <script src="assets/js/login.js?v=7.0.0"></script>
 </body>
 </html>
