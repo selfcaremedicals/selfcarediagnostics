@@ -1,8 +1,8 @@
 /* file: assets/css/technician.css */
 /**
- * Selfcare Diagnostics - Minimal Lab Desk & Operations Styling v5.3.0
+ * Selfcare Diagnostics - Minimal Lab Desk & Operations Styling v5.8.0
  * Clean Flat Minimal UI (Zero solid black fills; bold tactile outline boxes)
- * & Strictly Monochrome A4 Laboratory Invoice (Color only in Brand Logo).
+ * & Compact 1-Page Monochrome A4 Laboratory Invoice (Auto Page-2 only for 12+ tests).
  */
 
 :root {
@@ -910,7 +910,7 @@ body.tech-body-bg {
 }
 
 /* =========================================================
-   7. MINIMAL MODALS & POPUPS (ZERO 3D / BLUR)
+   7. MINIMAL MODALS & POPUPS
    ========================================================= */
 .sia-modal-overlay {
   display: none;
@@ -1025,7 +1025,7 @@ body.tech-body-bg {
   position: relative;
   overflow: hidden;
   border: 1px solid #D1D5DB;
-  padding: 24px 28px;
+  padding: 20px 24px;
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: #111827;
@@ -1040,14 +1040,14 @@ body.tech-body-bg {
 
 .inv-footer-block {
   width: 100%;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .inv-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1.5px solid #111827;
 }
 
@@ -1058,7 +1058,7 @@ body.tech-body-bg {
 }
 
 .inv-main-logo {
-  height: 46px;
+  height: 42px;
   width: auto;
   object-fit: contain;
 }
@@ -1072,28 +1072,28 @@ body.tech-body-bg {
   background: #FFFFFF;
   color: #111827;
   border: 1.5px solid #111827;
-  padding: 5px 12px;
+  padding: 4px 11px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.3px;
 }
 
 .inv-branch-meta {
   text-align: right;
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 10.5px;
+  line-height: 1.4;
   color: #374151;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .inv-title-banner {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 12px 0 10px 0;
+  margin: 10px 0 8px 0;
 }
 
 .inv-title-left {
@@ -1102,7 +1102,7 @@ body.tech-body-bg {
 }
 
 .inv-title-left h2 {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: #111827;
@@ -1112,7 +1112,7 @@ body.tech-body-bg {
 
 .inv-title-left p {
   margin: 2px 0 0 0;
-  font-size: 11px;
+  font-size: 10.5px;
   color: #4B5563;
   font-weight: 500;
 }
@@ -1121,30 +1121,30 @@ body.tech-body-bg {
   background: #FFFFFF;
   border: 1.5px solid #111827;
   border-radius: 4px;
-  padding: 6px 14px;
+  padding: 5px 12px;
   display: flex;
-  gap: 16px;
-  font-size: 11px;
+  gap: 14px;
+  font-size: 10.5px;
 }
 
 .badge-col span {
   display: block;
   color: #4B5563;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 500;
 }
 
 .badge-col strong {
   color: #111827;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
 }
 
 .inv-info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 9px;
+  margin-bottom: 10px;
 }
 
 .inv-info-box {
@@ -1156,8 +1156,8 @@ body.tech-body-bg {
 
 .box-header-strip {
   background: #FFFFFF;
-  padding: 5px 10px;
-  font-size: 11px;
+  padding: 4px 9px;
+  font-size: 10.5px;
   font-weight: 800;
   color: #111827;
   border-bottom: 1.5px solid #111827;
@@ -1165,22 +1165,22 @@ body.tech-body-bg {
 
 .box-details-table {
   width: 100%;
-  padding: 6px 10px;
-  font-size: 11px;
+  padding: 5px 9px;
+  font-size: 10.5px;
 }
 
 .box-details-table tr td {
-  padding: 2px 0;
+  padding: 1.5px 0;
 }
 
 .box-details-table tr td:first-child {
   color: #4B5563;
-  width: 90px;
+  width: 86px;
   font-weight: 500;
 }
 
 .box-details-table tr td:nth-child(2) {
-  width: 12px;
+  width: 10px;
   color: #4B5563;
 }
 
@@ -1192,8 +1192,8 @@ body.tech-body-bg {
 .inv-items-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 12px;
-  font-size: 11.5px;
+  margin-bottom: 10px;
+  font-size: 11px;
   border: 1.5px solid #111827;
 }
 
@@ -1205,7 +1205,7 @@ body.tech-body-bg {
 }
 
 .inv-items-table thead th {
-  padding: 7px 10px;
+  padding: 6px 9px;
   font-weight: 800;
   letter-spacing: 0.3px;
   text-align: left;
@@ -1214,12 +1214,12 @@ body.tech-body-bg {
 
 .inv-items-table thead th:first-child {
   text-align: center;
-  width: 36px;
+  width: 34px;
 }
 
 .inv-items-table thead th:last-child {
   text-align: right;
-  width: 100px;
+  width: 96px;
 }
 
 .inv-items-table tbody tr {
@@ -1228,7 +1228,7 @@ body.tech-body-bg {
 }
 
 .inv-items-table tbody td {
-  padding: 8px 10px;
+  padding: 6px 9px;
   color: #111827;
   vertical-align: middle;
   word-break: break-word;
@@ -1243,45 +1243,45 @@ body.tech-body-bg {
 .inv-bottom-section {
   display: grid;
   grid-template-columns: 1.15fr 1fr;
-  gap: 14px;
+  gap: 12px;
   align-items: flex-start;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .inv-note-box {
   background: #FFFFFF;
   border: 1px solid #D1D5DB;
   border-radius: 4px;
-  padding: 9px 12px;
+  padding: 8px 10px;
 }
 
 .inv-note-title {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   color: #111827;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .inv-note-box ul {
   margin: 0;
-  padding-left: 16px;
-  font-size: 9.8px;
+  padding-left: 15px;
+  font-size: 9.5px;
   color: #374151;
-  line-height: 1.4;
+  line-height: 1.38;
 }
 
 .inv-totals-box {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  font-size: 11.5px;
+  gap: 2.5px;
+  font-size: 11px;
 }
 
 .inv-tot-row {
   display: flex;
   justify-content: space-between;
   color: #374151;
-  padding: 2px 0;
+  padding: 1.5px 0;
 }
 
 .inv-tot-row strong {
@@ -1293,17 +1293,17 @@ body.tech-body-bg {
   color: #111827 !important;
   border: 2px solid #111827 !important;
   border-radius: 4px;
-  padding: 7px 12px;
+  padding: 6px 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
 .inv-grand-pill span:last-child {
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -1311,13 +1311,13 @@ body.tech-body-bg {
   border: 1.5px solid #111827;
   background: #FFFFFF;
   border-radius: 4px;
-  padding: 6px 14px;
+  padding: 5px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 10.5px;
   color: #111827;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .pay-status-tag {
@@ -1325,9 +1325,9 @@ body.tech-body-bg {
   color: #111827;
   border: 1.5px solid #111827;
   font-weight: 800;
-  padding: 1px 8px;
+  padding: 1px 7px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: 9.5px;
   letter-spacing: 0.4px;
 }
 
@@ -1335,24 +1335,24 @@ body.tech-body-bg {
   background: #FFFFFF;
   border: 1.5px solid #111827;
   border-radius: 4px;
-  padding: 7px 12px;
+  padding: 6px 10px;
   text-align: center;
-  font-size: 11px;
+  font-size: 10.5px;
   color: #111827;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .inv-footer-address-card {
   background: #FFFFFF;
   border: 1px solid #D1D5DB;
   border-radius: 4px;
-  padding: 8px 12px;
+  padding: 7px 10px;
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .inv-footer-brand-name {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   color: #111827;
   letter-spacing: 0.5px;
@@ -1360,14 +1360,14 @@ body.tech-body-bg {
 }
 
 .inv-footer-addr-line {
-  font-size: 10px;
+  font-size: 9.5px;
   color: #374151;
   font-weight: 500;
   margin-bottom: 2px;
 }
 
 .inv-footer-contact-line {
-  font-size: 10px;
+  font-size: 9.5px;
   color: #374151;
 }
 
@@ -1375,7 +1375,7 @@ body.tech-body-bg {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 2px;
 }
 
@@ -1388,9 +1388,9 @@ body.tech-body-bg {
 .inv-footer-pill {
   background: #FFFFFF;
   border: 1.5px solid #111827;
-  padding: 4px 14px;
+  padding: 3.5px 12px;
   border-radius: 4px;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   color: #111827;
 }
@@ -1557,21 +1557,21 @@ body.tech-body-bg {
 }
 
 /* =========================================================
-   11. SINGLE-PAGE EXACT A4 DIRECT PRINT RULES
+   11. COMPACT 1-PAGE A4 DIRECT PRINT RULES (AUTO PAGE-2 ONLY FOR MANY TESTS)
    ========================================================= */
 @page {
   size: A4 portrait;
-  margin: 0;
+  margin: 8mm;
 }
 
 @media print {
   html, body {
-    width: 210mm !important;
-    height: 297mm !important;
+    width: 100% !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #FFFFFF !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   .no-print,
@@ -1580,36 +1580,36 @@ body.tech-body-bg {
   }
 
   .sia-modal-overlay {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 210mm !important;
-    height: 297mm !important;
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
     padding: 0 !important;
     margin: 0 !important;
     background: #FFFFFF !important;
   }
 
   .receipt-modal-wrap {
-    width: 210mm !important;
-    max-width: 210mm !important;
-    height: 297mm !important;
-    max-height: 297mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
     padding: 0 !important;
     margin: 0 !important;
     background: #FFFFFF !important;
     border: none !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   #printable-receipt-card,
   #printable-report-sheet {
-    width: 210mm !important;
-    max-width: 210mm !important;
-    height: 297mm !important;
-    min-height: 297mm !important;
-    max-height: 297mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 278mm !important;
+    height: auto !important;
+    max-height: none !important;
     margin: 0 !important;
-    padding: 14mm 14mm !important;
+    padding: 6mm 8mm !important;
     border: none !important;
     border-radius: 0 !important;
     box-sizing: border-box !important;
@@ -1621,15 +1621,63 @@ body.tech-body-bg {
     print-color-adjust: exact !important;
   }
 
+  .inv-header-row {
+    padding-bottom: 6px !important;
+  }
+
+  .inv-main-logo {
+    height: 36px !important;
+  }
+
+  .inv-title-banner {
+    margin: 8px 0 6px 0 !important;
+  }
+
+  .inv-title-left h2 {
+    font-size: 15px !important;
+  }
+
   .inv-info-grid {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 10px !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .box-details-table tr td {
+    padding: 1.5px 0 !important;
+    font-size: 10.5px !important;
+  }
+
+  .inv-items-table {
+    margin-bottom: 8px !important;
+    font-size: 10.5px !important;
+  }
+
+  .inv-items-table thead th {
+    padding: 5px 8px !important;
+  }
+
+  .inv-items-table tbody td {
+    padding: 5px 8px !important;
+  }
+
+  .inv-items-table tr,
+  .inv-bottom-section,
+  .inv-pay-strip,
+  .inv-footer-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .inv-bottom-section {
     display: grid !important;
     grid-template-columns: 1.15fr 1fr !important;
-    gap: 12px !important;
+    gap: 10px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .inv-footer-block {
+    margin-top: 6px !important;
   }
 }
