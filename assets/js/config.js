@@ -1,18 +1,21 @@
 /* file: assets/js/config.js */
 /**
- * Selfcare Diagnostics - Frontend Configuration (config.js) v8.2.0
+ * Selfcare Diagnostics - Frontend Configuration (config.js) v8.2.1
  * Defines API endpoints, versioning, database configuration, cache settings,
  * Razorpay Live Gateway, and Cashfree Production Gateway status constants.
  */
 
 const Config = {
-  APP_VERSION: '8.2.0',
-  CACHE_VERSION: 'selfcare-cache-v8.2.0',
+  APP_VERSION: '8.2.1',
+  CACHE_VERSION: 'selfcare-cache-v8.2.1',
 
   // Razorpay Live Key ID
   RAZORPAY_KEY_ID: 'rzp_live_Tq9S3sQhh5B3hW',
+
+  // Cloudflare Pages Functions API Gateway (Primary)
+  API_GATEWAY_URL: '/api/gateway',
   
-  // Google Apps Script Live Web App Deployment URL
+  // Google Apps Script Live Web App Deployment URL (Legacy Fallback)
   GAS_WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzM1alicIkwFVzwULAFpJwELalGwCFFOJhjnw9JGqimPz48Lt7V8llx1k6Jebv9icQBnQ/exec', 
   
   SPREADSHEET_ID: '1lswBf5iPcPnt8OGA6ZfCE1tcJyqqxTaP1e2u9UwwHOw',

@@ -1,19 +1,18 @@
 /* file: assets/js/admin.js */
 /**
- * Selfcare Diagnostics - Master Admin Operating System Engine v8.7.0
+ * Selfcare Diagnostics - Master Admin Operating System v9.0.0
  * Features:
- * - Live Bi-directional Google Sheets sync for 500+ Tests & Packages.
- * - Auto-sanitization of TestID & PackageID to prevent IndexedDB keyPath crashes.
- * - Persistent Report Upload with Base64 FileReader (Fixes expired blob: URLs).
- * - Direct WhatsApp wa.me link compliance.
- * - Instant zero-lag cache restore + background cloud fetch.
+ * - Zero-Trash Clean Architecture.
+ * - Live Customer Directory showing Login ID, Password, Bookings Count & Spend.
+ * - Complete Bookings Ledger with MRP, Customer Price, B2B Lab Cost & Net Profit.
+ * - Unified Technician & Captain Credential Engine (Works on both technician.html & home-collection.html).
  */
 
 const AdminApp = {
   currentAssignBookingId: null,
   editingTestId: null,
   editingPackageId: null,
-  currentFinancialPeriod: 'month',
+  currentFinancialPeriod: 'all',
   currentChartPeriod: '7days',
   currentPackageMappingId: null,
 
@@ -21,25 +20,28 @@ const AdminApp = {
     this.seedDefaultDataIfEmpty();
     this.initCurrentDateLabel();
 
-    // 1. Instant 0ms cache render
+    // Instant cache render
     this.renderHomeRevenueKPIs();
     this.renderTests();
     this.renderPackages();
     this.renderBookingsTable();
+    this.renderCustomersTable();
+    this.renderTechnicians();
 
-    // 2. Live Cloud Fetch from Google Sheets for Bookings, Tests & Packages
+    // Cloud Sync from Google Sheets
     await Promise.all([
       this.loadAllBookings(),
+      this.loadAllCustomers(),
       this.loadAllTests(),
-      this.loadAllPackages()
+      this.loadAllPackages(),
+      this.loadAllTechnicians()
     ]);
 
-    // 3. Re-render UI with fresh 500+ Tests and Packages from Sheets
     this.renderHomeRevenueKPIs();
     this.renderRevenueChart(this.currentChartPeriod);
     this.renderFinancialLedger();
     this.renderBookingsTable();
-    this.renderHomeCollectionsTable();
+    this.renderCustomersTable();
     this.renderTechnicians();
     this.renderTests();
     this.renderPackages();
@@ -47,45 +49,240 @@ const AdminApp = {
     this.populateReportBookingSelect();
     this.initPackageMappingEngine();
     this.populateSocialItemSelect();
-    this.renderCustomersTable();
-    this.renderCouponsTable();
-    this.renderInventoryTable();
-    this.renderAuditLogsTable();
   },
 
   initCurrentDateLabel() {
     const el = document.getElementById('home-current-date');
     if (el) {
       el.textContent = new Date().toLocaleDateString('en-IN', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
+        weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
       });
     }
   },
 
+  seedDefaultDataIfEmpty() {
+    if (!localStorage.getItem('selfcare_technicians')) {
+      const initialTechs = [
+        {
+          id: 'TechlabDesk',
+          captainId: 'TechlabDesk',
+          name: 'Mohamed Adamkani',
+          phone: '7010174890',
+          mobile: '7010174890',
+          zone: 'Vettuvankeni, ECR & OMR (10 km)',
+          pass: 'Admin@123',
+          password: 'Admin@123',
+          upiId: '',
+          status: 'Active',
+          active: true
+        }
+      ];
+      this.syncDualStaffStorage(initialTechs);
+    }
+  },
+
+  /**
+   * Synchronizes Technician / Captain records across both keys so
+   * Technician Lab Desk (technician.html) & Home Collection App (home-collection.html)
+   * share the exact same ID, Password, Location & Details.
+   */
+  syncDualStaffStorage(staffList) {
+    const normalized = (staffList || []).map(t => ({
+      id: String(t.id || t.captainId || '').trim(),
+      captainId: String(t.id || t.captainId || '').trim(),
+      name: String(t.name || t.captainName || '').trim(),
+      phone: String(t.phone || t.mobile || '').trim(),
+      mobile: String(t.phone || t.mobile || '').trim(),
+      zone: String(t.zone || 'Vettuvankeni, ECR & OMR').trim(),
+      pass: String(t.pass || t.password || '').trim(),
+      password: String(t.pass || t.password || '').trim(),
+      upiId: String(t.upiId || '').trim(),
+      status: t.status || 'Active',
+      active: (t.status || 'Active') === 'Active'
+    }));
+    localStorage.setItem('selfcare_technicians', JSON.stringify(normalized));
+    localStorage.setItem('selfcare_admin_captains', JSON.stringify(normalized));
+  },
+
   /* =========================================================
-     LIVE TESTS & PACKAGES CLOUD SYNC ENGINE
+     CLOUD DATA LOADERS (BOOKINGS, CUSTOMERS, STAFF, CATALOG)
      ========================================================= */
+  async loadAllBookings() {
+    let allBookings = [];
+
+    if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
+      try {
+        const res = await Api.request('getAllBookings', {}, false);
+        const list = res?.bookings || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          allBookings = list;
+        }
+      } catch (err) {}
+    }
+
+    try {
+      const sources = [
+        'selfcare_bookings_db',
+        'selfcare_recent_bookings',
+        'selfcare_user_bookings',
+        'selfcare_pending_sync'
+      ];
+      const mergedMap = new Map();
+      allBookings.forEach(b => {
+        const id = b.bookingId || b.id;
+        if (id) mergedMap.set(id, b);
+      });
+
+      sources.forEach(key => {
+        const arr = JSON.parse(localStorage.getItem(key) || '[]');
+        if (Array.isArray(arr)) {
+          arr.forEach(b => {
+            const id = b.bookingId || b.id;
+            if (id && !mergedMap.has(id)) {
+              mergedMap.set(id, {
+                ...b,
+                id: id,
+                bookingId: id,
+                patientName: b.patientName || 'Customer',
+                patientPhone: b.patientPhone || '-',
+                location: b.address || b.location || 'Chennai',
+                mode: b.collectionType === 'lab' ? 'Lab Walk-in' : 'Home Collection',
+                slot: `${b.collectionDate || 'Today'} (${b.timeSlot || 'Slot'})`,
+                totalAmount: Number(b.finalAmount || b.totalAmount || 0),
+                paymentStatus: b.paymentStatus || b.paymentMode || 'CONFIRMED',
+                techStatus: b.assignedTechName ? `Assigned to ${b.assignedTechName}` : (b.techStatus || 'Unassigned'),
+                date: b.createdAt || b.updatedAt || b.collectionDate || new Date().toISOString()
+              });
+            }
+          });
+        }
+      });
+
+      allBookings = Array.from(mergedMap.values());
+      localStorage.setItem('selfcare_bookings_db', JSON.stringify(allBookings));
+    } catch (e) {}
+
+    return allBookings;
+  },
+
+  async loadAllCustomers() {
+    let cloudCustomers = [];
+    if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
+      try {
+        const res = await Api.request('getAllCustomers', {}, false);
+        const list = res?.customers || res?.users || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list)) cloudCustomers = list;
+      } catch (e) {}
+    }
+
+    const custMap = new Map();
+
+    // 1. Merge from Backend Customers / Users sheet
+    cloudCustomers.forEach(u => {
+      const phone = String(u.phone || u.mobile || u.userId || '').replace(/\D/g, '').slice(-10);
+      const key = phone || u.email || u.userId;
+      if (!key) return;
+      custMap.set(key, {
+        customerId: u.userId || u.customerId || `CUST${phone.slice(-4) || '01'}`,
+        name: u.name || u.fullName || 'Customer',
+        phone: phone || u.userId || '-',
+        password: u.password || u.pass || '—',
+        address: u.address || u.city || 'Chennai',
+        lastActive: u.lastLogin || u.updatedAt || u.createdAt || 'Active'
+      });
+    });
+
+    // 2. Merge from Local User Auth & Registered Users Storage
+    try {
+      const localUsers = JSON.parse(localStorage.getItem('selfcare_users_db') || localStorage.getItem('selfcare_registered_users') || '[]');
+      if (Array.isArray(localUsers)) {
+        localUsers.forEach(u => {
+          const phone = String(u.phone || u.mobile || '').replace(/\D/g, '').slice(-10);
+          if (!phone) return;
+          const prev = custMap.get(phone) || {};
+          custMap.set(phone, {
+            customerId: u.userId || prev.customerId || `CUST${phone.slice(-4)}`,
+            name: u.name || prev.name || 'Customer',
+            phone,
+            password: u.password || u.pass || prev.password || '—',
+            address: u.address || prev.address || 'Chennai',
+            lastActive: u.lastLogin || prev.lastActive || 'Active'
+          });
+        });
+      }
+
+      const activeUserRaw = localStorage.getItem('selfcare_active_user');
+      if (activeUserRaw) {
+        const au = JSON.parse(activeUserRaw);
+        const phone = String(au.phone || au.mobile || '').replace(/\D/g, '').slice(-10);
+        if (phone) {
+          const prev = custMap.get(phone) || {};
+          custMap.set(phone, {
+            customerId: au.userId || prev.customerId || `CUST${phone.slice(-4)}`,
+            name: au.name || prev.name || 'Customer',
+            phone,
+            password: au.password || prev.password || '—',
+            address: au.address || prev.address || 'Chennai',
+            lastActive: 'Online Now'
+          });
+        }
+      }
+    } catch (e) {}
+
+    // 3. Cross-reference Bookings to attach Customer booking counts & any guest bookers
+    const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    bookings.forEach(b => {
+      const phone = String(b.patientPhone || '').replace(/\D/g, '').slice(-10);
+      if (!phone) return;
+      if (!custMap.has(phone)) {
+        custMap.set(phone, {
+          customerId: b.userId || `CUST${phone.slice(-4)}`,
+          name: b.patientName || 'Customer',
+          phone,
+          password: b.userPassword || 'OTP / Guest',
+          address: b.address || b.location || 'Chennai',
+          lastActive: (b.date || '').slice(0, 10)
+        });
+      }
+    });
+
+    const list = Array.from(custMap.values());
+    localStorage.setItem('selfcare_admin_customers_cache', JSON.stringify(list));
+    return list;
+  },
+
+  async syncCustomersFromCloud() {
+    this.showToast('Syncing customer logins & bookings...');
+    await Promise.all([this.loadAllCustomers(), this.loadAllBookings()]);
+    this.renderCustomersTable();
+    this.renderHomeRevenueKPIs();
+    this.showToast('Customer IDs & Passwords updated ✓');
+  },
+
+  async loadAllTechnicians() {
+    if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
+      try {
+        const res = await Api.request('getTechnicians', {}, false);
+        const list = res?.technicians || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          this.syncDualStaffStorage(list);
+        }
+      } catch (e) {}
+    }
+  },
+
   async loadAllTests() {
     let cloudTests = null;
     if (navigator.onLine && typeof Api !== 'undefined') {
       try {
-        if (typeof Api.request === 'function') {
-          cloudTests = await Api.request('getAdminTests', {}, false).catch(() => null);
+        cloudTests = await Api.request('getAdminTests', {}, false).catch(() => null);
+        if (!Array.isArray(cloudTests) || cloudTests.length === 0) {
+          cloudTests = await Api.getTests?.();
         }
-        if (!cloudTests || !Array.isArray(cloudTests) || cloudTests.length === 0) {
-          if (typeof Api.getTests === 'function') {
-            cloudTests = await Api.getTests();
-          }
-        }
-      } catch (err) {
-        console.warn('[Admin] Cloud tests fetch deferred:', err);
-      }
+      } catch (err) {}
     }
 
-    if (cloudTests && Array.isArray(cloudTests) && cloudTests.length > 0) {
+    if (Array.isArray(cloudTests) && cloudTests.length > 0) {
       const sanitized = cloudTests.map((t, idx) => {
         const tid = String(t.TestID || t.TestCode || t.id || ('T' + String(idx + 1).padStart(4, '0'))).trim();
         return {
@@ -102,38 +299,23 @@ const AdminApp = {
           Status: t.Status || 'Active'
         };
       });
-
       localStorage.setItem('selfcare_tests_admin_db', JSON.stringify(sanitized));
       this.syncPublicTestsCache(sanitized);
-
-      if (typeof OfflineDB !== 'undefined' && OfflineDB.putAll) {
-        await OfflineDB.putAll('tests', sanitized, true);
-        await OfflineDB.setMetadata('testsLastSync', new Date().toISOString());
-      }
-      return sanitized;
     }
-
-    return JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]');
   },
 
   async loadAllPackages() {
     let cloudPkgs = null;
     if (navigator.onLine && typeof Api !== 'undefined') {
       try {
-        if (typeof Api.request === 'function') {
-          cloudPkgs = await Api.request('getAdminPackages', {}, false).catch(() => null);
+        cloudPkgs = await Api.request('getAdminPackages', {}, false).catch(() => null);
+        if (!Array.isArray(cloudPkgs) || cloudPkgs.length === 0) {
+          cloudPkgs = await Api.getPackages?.();
         }
-        if (!cloudPkgs || !Array.isArray(cloudPkgs) || cloudPkgs.length === 0) {
-          if (typeof Api.getPackages === 'function') {
-            cloudPkgs = await Api.getPackages();
-          }
-        }
-      } catch (err) {
-        console.warn('[Admin] Cloud packages fetch deferred:', err);
-      }
+      } catch (err) {}
     }
 
-    if (cloudPkgs && Array.isArray(cloudPkgs) && cloudPkgs.length > 0) {
+    if (Array.isArray(cloudPkgs) && cloudPkgs.length > 0) {
       const sanitized = cloudPkgs.map((p, idx) => {
         const pid = String(p.PackageID || p.PackageCode || p.id || ('PKG' + String(idx + 1).padStart(3, '0'))).trim();
         return {
@@ -150,77 +332,61 @@ const AdminApp = {
           Featured: String(p.Featured || 'FALSE').toUpperCase()
         };
       });
-
       localStorage.setItem('selfcare_packages_admin_db', JSON.stringify(sanitized));
       this.syncPublicPackagesCache(sanitized);
-
-      if (typeof OfflineDB !== 'undefined' && OfflineDB.putAll) {
-        await OfflineDB.putAll('packages', sanitized, true);
-        await OfflineDB.setMetadata('packagesLastSync', new Date().toISOString());
-      }
-      return sanitized;
     }
-
-    return JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
   },
 
   /* =========================================================
-     DRAWER NAVIGATION & TAB SWITCHING
+     FINANCIAL CALCULATOR HELPER (MRP, B2B & NET PROFIT)
      ========================================================= */
-  toggleDrawer() {
-    const drawer = document.getElementById('admin-drawer');
-    const overlay = document.getElementById('admin-drawer-overlay');
-    const isOpen = drawer.classList.contains('open');
+  computeBookingFinancials(b, adminTests, adminPackages) {
+    const rev = Number(b.totalAmount || b.finalAmount || 0);
+    let orderMrp = Number(b.totalMrp || b.mrp || 0);
+    let orderB2b = Number(b.b2bCost || 0);
 
-    if (isOpen) {
-      this.closeDrawer();
-    } else {
-      drawer.classList.add('open');
-      overlay.classList.add('active');
+    let items = b.items;
+    if (typeof items === 'string') {
+      try { items = JSON.parse(items); } catch (e) { items = []; }
     }
-  },
+    if (!Array.isArray(items)) items = [];
 
-  closeDrawer() {
-    const drawer = document.getElementById('admin-drawer');
-    const overlay = document.getElementById('admin-drawer-overlay');
-    if (drawer) drawer.classList.remove('open');
-    if (overlay) overlay.classList.remove('active');
-  },
+    if (orderMrp === 0 || orderB2b === 0) {
+      let calcMrp = 0, calcB2b = 0;
+      items.forEach(item => {
+        const name = (item.name || item.TestName || item.PackageName || '').toLowerCase();
+        const t = adminTests.find(x => x.TestName.toLowerCase() === name || x.TestID === item.id);
+        const p = adminPackages.find(x => x.PackageName.toLowerCase() === name || x.PackageID === item.id);
 
-  switchTab(tabId) {
-    document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-
-    const targetTab = document.getElementById(tabId);
-    const targetNav = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
-
-    if (targetTab) targetTab.classList.add('active');
-    if (targetNav) targetNav.classList.add('active');
-
-    if (tabId === 'tab-home') {
-      this.renderHomeRevenueKPIs();
-      this.renderRevenueChart(this.currentChartPeriod);
-    } else if (tabId === 'tab-finance') {
-      this.renderFinancialLedger();
-    } else if (tabId === 'tab-bookings') {
-      this.renderBookingsTable();
-    } else if (tabId === 'tab-tests') {
-      this.renderTests();
-    } else if (tabId === 'tab-packages') {
-      this.renderPackages();
-    } else if (tabId === 'tab-package-mapping') {
-      this.initPackageMappingEngine();
+        if (t) {
+          calcMrp += Number(t.MRP || 0);
+          calcB2b += Number(t.B2BCost || Math.round(t.OfferPrice * 0.35));
+        } else if (p) {
+          calcMrp += Number(p.MRP || 0);
+          calcB2b += Number(p.B2BCost || Math.round(p.OfferPrice * 0.35));
+        } else {
+          const itemPrice = Number(item.price || 0);
+          calcMrp += Number(item.mrp || Math.round(itemPrice * 1.4));
+          calcB2b += Math.round(itemPrice * 0.35);
+        }
+      });
+      if (orderMrp === 0) orderMrp = calcMrp;
+      if (orderB2b === 0) orderB2b = calcB2b;
     }
 
-    this.closeDrawer();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (orderMrp < rev) orderMrp = Math.round(rev * 1.4);
+    if (orderB2b === 0 && rev > 0) orderB2b = Math.round(rev * 0.35);
+
+    const netProfit = Math.max(0, rev - orderB2b);
+    return { mrp: orderMrp, revenue: rev, b2b: orderB2b, profit: netProfit, itemCount: items.length || 1 };
   },
 
   /* =========================================================
-     HOME REVENUE KPIS & SVG REVENUE CHART
+     DASHBOARD KPIs & SVG CHART
      ========================================================= */
   renderHomeRevenueKPIs() {
     const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    const customers = JSON.parse(localStorage.getItem('selfcare_admin_customers_cache') || '[]');
     const adminTests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]');
     const adminPackages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
 
@@ -228,94 +394,63 @@ const AdminApp = {
     const todayStr = now.toISOString().slice(0, 10);
     const curYear = now.getFullYear();
     const curMonth = now.getMonth();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+    let allMrp = 0, allRev = 0, allB2b = 0;
     let todayRev = 0, todayMrp = 0, todayOrders = 0;
-    let weekRev = 0, weekOrders = 0;
-    let monthRev = 0, monthMrp = 0, monthB2b = 0, monthOrders = 0;
+    let monthRev = 0, monthB2b = 0;
     let pendingPayments = 0, pendingOrders = 0;
 
     bookings.forEach(b => {
       const bDate = new Date(b.date || Date.now());
-      const bDateStr = bDate.toISOString().slice(0, 10);
-      const rev = Number(b.totalAmount || b.finalAmount || 0);
+      const bDateStr = isNaN(bDate.getTime()) ? todayStr : bDate.toISOString().slice(0, 10);
+      const fin = this.computeBookingFinancials(b, adminTests, adminPackages);
 
-      let orderMrp = 0, orderB2b = 0;
-      let items = b.items;
-      if (typeof items === 'string') {
-        try { items = JSON.parse(items); } catch(e) { items = []; }
-      }
-      if (!Array.isArray(items)) items = [];
-
-      items.forEach(item => {
-        const name = (item.name || item.TestName || item.PackageName || '').toLowerCase();
-        const t = adminTests.find(x => x.TestName.toLowerCase() === name || x.TestID === item.id);
-        const p = adminPackages.find(x => x.PackageName.toLowerCase() === name || x.PackageID === item.id);
-
-        if (t) {
-          orderMrp += Number(t.MRP || 0);
-          orderB2b += Number(t.B2BCost || Math.round(t.OfferPrice * 0.36));
-        } else if (p) {
-          orderMrp += Number(p.MRP || 0);
-          orderB2b += Number(p.B2BCost || Math.round(p.OfferPrice * 0.35));
-        } else {
-          orderMrp += Number(item.price || 0) * 1.5;
-          orderB2b += Math.round(Number(item.price || 0) * 0.36);
-        }
-      });
-
-      if (orderMrp < rev) orderMrp = Math.round(rev * 1.45);
-      if (orderB2b === 0) orderB2b = Math.round(rev * 0.35);
+      allMrp += fin.mrp;
+      allRev += fin.revenue;
+      allB2b += fin.b2b;
 
       if (bDateStr === todayStr) {
-        todayRev += rev;
-        todayMrp += orderMrp;
+        todayRev += fin.revenue;
+        todayMrp += fin.mrp;
         todayOrders++;
       }
 
-      if (bDate >= sevenDaysAgo) {
-        weekRev += rev;
-        weekOrders++;
+      if (!isNaN(bDate.getTime()) && bDate.getFullYear() === curYear && bDate.getMonth() === curMonth) {
+        monthRev += fin.revenue;
+        monthB2b += fin.b2b;
       }
 
-      if (bDate.getFullYear() === curYear && bDate.getMonth() === curMonth) {
-        monthRev += rev;
-        monthMrp += orderMrp;
-        monthB2b += orderB2b;
-        monthOrders++;
-      }
-
-      if (String(b.paymentStatus || '').toUpperCase() === 'PENDING') {
-        pendingPayments += rev;
+      if (String(b.paymentStatus || '').toUpperCase().includes('PENDING')) {
+        pendingPayments += fin.revenue;
         pendingOrders++;
       }
     });
 
+    const allProfit = Math.max(0, allRev - allB2b);
     const monthProfit = Math.max(0, monthRev - monthB2b);
-    const profitMargin = monthRev > 0 ? ((monthProfit / monthRev) * 100).toFixed(1) : 0;
-    const todaySavings = Math.max(0, todayMrp - todayRev);
+    const margin = allRev > 0 ? ((allProfit / allRev) * 100).toFixed(1) : 0;
 
-    this.safeSetText('kpi-today-revenue', `₹${todayRev.toLocaleString('en-IN')}`);
-    this.safeSetText('kpi-today-orders-count', `${todayOrders} Orders Today`);
-    this.safeSetText('kpi-week-revenue', `₹${weekRev.toLocaleString('en-IN')}`);
-    this.safeSetText('kpi-week-orders-count', `${weekOrders} Orders (7 Days)`);
+    this.safeSetText('kpi-total-bookings-count', bookings.length.toLocaleString('en-IN'));
+    this.safeSetText('kpi-today-orders-count', `${todayOrders} Bookings Today`);
+    this.safeSetText('kpi-total-customers-count', customers.length.toLocaleString('en-IN'));
+    this.safeSetText('kpi-all-mrp', `₹${allMrp.toLocaleString('en-IN')}`);
+    this.safeSetText('kpi-today-mrp-sub', `Today MRP: ₹${todayMrp.toLocaleString('en-IN')}`);
+    this.safeSetText('kpi-all-revenue', `₹${allRev.toLocaleString('en-IN')}`);
+    this.safeSetText('kpi-today-revenue', `Today: ₹${todayRev.toLocaleString('en-IN')}`);
+    this.safeSetText('kpi-all-b2b', `₹${allB2b.toLocaleString('en-IN')}`);
+    this.safeSetText('kpi-month-b2b', `This Month: ₹${monthB2b.toLocaleString('en-IN')}`);
+    this.safeSetText('kpi-all-profit', `₹${allProfit.toLocaleString('en-IN')}`);
+    this.safeSetText('kpi-profit-margin', `Net Margin: ${margin}%`);
     this.safeSetText('kpi-month-revenue', `₹${monthRev.toLocaleString('en-IN')}`);
-    this.safeSetText('kpi-month-orders-count', `${monthOrders} Orders This Month`);
-    this.safeSetText('kpi-today-mrp', `₹${todayMrp.toLocaleString('en-IN')}`);
-    this.safeSetText('kpi-today-discount-savings', `Customer Savings: ₹${todaySavings.toLocaleString('en-IN')}`);
-    this.safeSetText('kpi-month-mrp', `₹${monthMrp.toLocaleString('en-IN')}`);
-    this.safeSetText('kpi-month-b2b', `₹${monthB2b.toLocaleString('en-IN')}`);
-    this.safeSetText('kpi-month-profit', `₹${monthProfit.toLocaleString('en-IN')}`);
-    this.safeSetText('kpi-profit-margin', `Actual Margin: ${profitMargin}%`);
+    this.safeSetText('kpi-month-profit', `Month Profit: ₹${monthProfit.toLocaleString('en-IN')}`);
     this.safeSetText('kpi-pending-payments', `₹${pendingPayments.toLocaleString('en-IN')}`);
-    this.safeSetText('kpi-pending-orders-count', `${pendingOrders} Uncollected Orders`);
+    this.safeSetText('kpi-pending-orders-count', `${pendingOrders} Uncollected`);
   },
 
   renderRevenueChart(period) {
     this.currentChartPeriod = period;
     ['today', '7days', '30days'].forEach(p => {
-      const btn = document.getElementById(`chart-tab-${p}`);
-      if (btn) btn.classList.toggle('active', p === period);
+      document.getElementById(`chart-tab-${p}`)?.classList.toggle('active', p === period);
     });
 
     const container = document.getElementById('revenue-svg-chart-container');
@@ -336,10 +471,8 @@ const AdminApp = {
     } else if (period === '7days') {
       for (let i = 6; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-        const dayStr = d.toLocaleDateString('en-IN', { weekday: 'short' });
+        labels.push(d.toLocaleDateString('en-IN', { weekday: 'short' }));
         const iso = d.toISOString().slice(0, 10);
-        labels.push(dayStr);
-
         const sum = bookings
           .filter(b => (b.date || '').slice(0, 10) === iso)
           .reduce((acc, cur) => acc + Number(cur.totalAmount || cur.finalAmount || 0), 0);
@@ -359,21 +492,19 @@ const AdminApp = {
     const barWidth = 45;
     const spacing = svgWidth / labels.length;
 
-    let barsSvg = '';
-    labels.forEach((label, i) => {
+    const barsSvg = labels.map((label, i) => {
       const val = dataPoints[i];
       const barHeight = Math.max(12, (val / maxVal) * 140);
       const x = (i * spacing) + (spacing / 2) - (barWidth / 2);
       const y = svgHeight - 40 - barHeight;
-
-      barsSvg += `
-        <g class="chart-group">
+      return `
+        <g>
           <rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="8" fill="url(#revGrad)" />
           <text x="${x + barWidth / 2}" y="${y - 8}" text-anchor="middle" fill="#045D49" font-size="11" font-weight="800">₹${val.toLocaleString('en-IN')}</text>
           <text x="${x + barWidth / 2}" y="${svgHeight - 15}" text-anchor="middle" fill="#64748B" font-size="11" font-weight="700">${label}</text>
         </g>
       `;
-    });
+    }).join('');
 
     container.innerHTML = `
       <svg viewBox="0 0 ${svgWidth} ${svgHeight}" width="100%" height="100%">
@@ -389,214 +520,14 @@ const AdminApp = {
     `;
   },
 
-  seedDefaultDataIfEmpty() {
-    if (!localStorage.getItem('selfcare_technicians')) {
-      const initialTechs = [
-        { id: "SCDTECH001", name: "Ramesh Phlebotomist", phone: "9840123456", zone: "T. Nagar, Kodambakkam", pass: "tech@123", status: "Active" },
-        { id: "SCDTECH002", name: "Suresh Phlebotomist", phone: "9840987654", zone: "Anna Nagar, Kilpauk", pass: "tech@123", status: "Active" }
-      ];
-      localStorage.setItem('selfcare_technicians', JSON.stringify(initialTechs));
-    }
-  },
-
-  syncPublicTestsCache(adminTests) {
-    const publicTests = adminTests.map(t => {
-      const { B2BCost, ...publicFields } = t;
-      return publicFields;
-    });
-    localStorage.setItem('cache_tests', JSON.stringify(publicTests));
-    localStorage.setItem('selfcare_tests_db', JSON.stringify(publicTests));
-  },
-
-  syncPublicPackagesCache(adminPackages) {
-    const publicPackages = adminPackages.map(p => {
-      const { B2BCost, ...publicFields } = p;
-      return publicFields;
-    });
-    localStorage.setItem('cache_packages', JSON.stringify(publicPackages));
-    localStorage.setItem('selfcare_packages_db', JSON.stringify(publicPackages));
-  },
-
   /* =========================================================
-     1. BOOKINGS & LOGISTICS PIPELINE
+     FINANCIAL LEDGER (MRP vs CUSTOMER PRICE vs B2B vs PROFIT)
      ========================================================= */
-  async loadAllBookings() {
-    let allBookings = [];
-
-    if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
-      try {
-        const cloudBookings = await Api.request('getAllBookings', {}, false);
-        if (Array.isArray(cloudBookings) && cloudBookings.length > 0) {
-          allBookings = cloudBookings;
-        }
-      } catch (err) {
-        console.warn('[Admin] Cloud bookings fetch deferred:', err);
-      }
-    }
-
-    try {
-      const cartRecents = JSON.parse(localStorage.getItem('selfcare_recent_bookings') || '[]');
-      const adminStored = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-
-      const mergedMap = new Map();
-      allBookings.forEach(b => mergedMap.set(b.bookingId || b.id, b));
-      adminStored.forEach(b => mergedMap.set(b.bookingId || b.id, b));
-      cartRecents.forEach(b => {
-        const id = b.bookingId || b.id;
-        if (!mergedMap.has(id)) {
-          mergedMap.set(id, {
-            id: id,
-            bookingId: id,
-            patientName: b.patientName || 'Customer',
-            patientPhone: b.patientPhone || '-',
-            location: b.address || 'Chennai',
-            zone: 'Kodambakkam Hub',
-            mode: b.collectionType === 'lab' ? 'Direct Lab Walk-in' : 'Home Sample Pickup',
-            slot: `${b.collectionDate || 'Today'} (${b.timeSlot || 'Window'})`,
-            totalAmount: Number(b.finalAmount || 0),
-            paymentStatus: b.paymentStatus || 'CONFIRMED',
-            techStatus: b.bookingStatus === 'CONFIRMED' ? 'Unassigned' : (b.bookingStatus || 'Unassigned'),
-            reportStatus: 'Pending',
-            items: b.items || [],
-            date: b.updatedAt || new Date().toISOString()
-          });
-        }
-      });
-
-      allBookings = Array.from(mergedMap.values());
-      localStorage.setItem('selfcare_bookings_db', JSON.stringify(allBookings));
-    } catch (e) {
-      console.error('Error merging bookings:', e);
-    }
-
-    return allBookings;
-  },
-
-  renderBookingsTable(filteredList = null) {
-    const tableBody = document.getElementById('bookings-table-body');
-    if (!tableBody) return;
-
-    const bookings = filteredList || JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-
-    if (bookings.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:#64748B;">No bookings recorded.</td></tr>`;
-      return;
-    }
-
-    tableBody.innerHTML = bookings.map(b => {
-      const bId = b.id || b.bookingId;
-      const statusText = b.techStatus || 'Unassigned';
-      let statusClass = 'status-pending';
-      if (statusText.includes('Broadcasted')) statusClass = 'status-broadcast';
-      if (statusText.includes('Assigned to')) statusClass = 'status-assigned';
-
-      return `
-        <tr>
-          <td><strong>${bId}</strong></td>
-          <td>
-            <strong>${b.patientName}</strong><br>
-            <span style="font-size:11px; color:#536E66;">${b.patientPhone}</span>
-          </td>
-          <td>${b.location || b.address || 'Chennai'}</td>
-          <td><span style="font-size:11.5px; font-weight:700;">${b.slot || b.timeSlot}</span></td>
-          <td>
-            <strong style="color:#078866; font-size:13.5px;">₹${b.totalAmount || b.finalAmount || 0}</strong><br>
-            <span style="font-size:10px; color:#64748B;">${b.paymentStatus || 'Confirmed'}</span>
-          </td>
-          <td><span class="status-pill ${statusClass}">${statusText}</span></td>
-          <td>
-            ${b.reportUrl ? `<a href="${b.reportUrl}" target="_blank" style="color:#078866; font-weight:800; text-decoration:none;">📄 View PDF</a>` : `<span style="color:#94A3B8; font-size:11px;">Pending</span>`}
-          </td>
-          <td>
-            <button class="btn-emerald-solid" style="padding:6px 12px; font-size:11px;" onclick="AdminApp.openAssignModal('${bId}')">
-              📍 Assign Phlebo
-            </button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-  },
-
-  filterBookingsByStatus(statusKey) {
-    document.querySelectorAll('.status-filter-scroll .filter-pill').forEach(b => b.classList.remove('active'));
-    if (event && event.target) event.target.classList.add('active');
-
-    const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-    const todayStr = new Date().toISOString().slice(0, 10);
-
-    let filtered = bookings;
-    if (statusKey === 'today') {
-      filtered = bookings.filter(b => (b.date || '').slice(0, 10) === todayStr);
-    } else if (statusKey === 'pending') {
-      filtered = bookings.filter(b => (b.techStatus || '').includes('Unassigned'));
-    } else if (statusKey === 'payment_pending') {
-      filtered = bookings.filter(b => String(b.paymentStatus || '').toUpperCase() === 'PENDING');
-    } else if (statusKey === 'completed') {
-      filtered = bookings.filter(b => (b.techStatus || '').toUpperCase() === 'COMPLETED' || b.reportUrl);
-    }
-
-    this.renderBookingsTable(filtered);
-  },
-
-  filterBookings() {
-    const query = (document.getElementById('booking-search-input').value || '').toLowerCase();
-    const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-    const filtered = bookings.filter(b => {
-      const str = `${b.id} ${b.bookingId} ${b.patientName} ${b.patientPhone}`.toLowerCase();
-      return str.includes(query);
-    });
-    this.renderBookingsTable(filtered);
-  },
-
-  calculateDeliveryRate() {
-    const dist = parseFloat(document.getElementById('calc-distance-input').value) || 0;
-    const visitType = document.getElementById('calc-visit-type').value;
-    const resultEl = document.getElementById('calc-fee-result');
-    const explEl = document.getElementById('calc-fee-explanation');
-
-    let fee = 0;
-    if (dist <= 5.0) {
-      fee = visitType === 'single' ? 100 : 150;
-      explEl.textContent = `Within 5 km radius flat rate applied (₹${fee}).`;
-    } else {
-      const perKm = visitType === 'single' ? 20 : 30;
-      fee = Math.round(dist * perKm);
-      explEl.textContent = `Tier 2 rate applied: ${dist} km × ₹${perKm}/km.`;
-    }
-
-    resultEl.textContent = `₹${fee}`;
-  },
-
-  renderHomeCollectionsTable() {
-    const tbody = document.getElementById('home-collections-table-body');
-    if (!tbody) return;
-
-    const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-    const homePickups = bookings.filter(b => (b.mode || '').includes('Home') || (b.collectionType || '') === 'home');
-
-    if (homePickups.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:16px; color:#64748B;">No home sample collections pending.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = homePickups.map(b => `
-      <tr>
-        <td><strong>${b.id || b.bookingId}</strong></td>
-        <td>${b.patientName}</td>
-        <td>${b.location || b.address || 'Chennai'}</td>
-        <td><span class="status-pill status-assigned">3.2 km</span></td>
-        <td><strong>₹100</strong></td>
-        <td>${b.assignedTechName || b.techStatus || 'Unassigned'}</td>
-        <td><span class="status-pill status-assigned">Confirmed</span></td>
-      </tr>
-    `).join('');
-  },
-
   setFinancialPeriod(period) {
     this.currentFinancialPeriod = period;
-    document.getElementById('btn-period-month').classList.toggle('active', period === 'month');
-    document.getElementById('btn-period-all').classList.toggle('active', period === 'all');
-    document.getElementById('fin-profit-period-label').textContent = period === 'month' ? '(This Month)' : '(All Time)';
+    document.getElementById('btn-period-month')?.classList.toggle('active', period === 'month');
+    document.getElementById('btn-period-all')?.classList.toggle('active', period === 'all');
+    this.safeSetText('fin-profit-period-label', period === 'month' ? '(This Month)' : '(All Time)');
     this.renderFinancialLedger();
   },
 
@@ -606,69 +537,30 @@ const AdminApp = {
     const adminPackages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
 
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-
-    let totalMrp = 0;
-    let totalRevenue = 0;
-    let totalB2bCost = 0;
-
+    let totalMrp = 0, totalRevenue = 0, totalB2bCost = 0;
     const ledgerRows = [];
 
     bookings.forEach(b => {
       const bookingDate = new Date(b.date || Date.now());
       if (this.currentFinancialPeriod === 'month') {
-        if (bookingDate.getFullYear() !== currentYear || bookingDate.getMonth() !== currentMonth) {
-          return;
-        }
+        if (bookingDate.getFullYear() !== now.getFullYear() || bookingDate.getMonth() !== now.getMonth()) return;
       }
 
-      let orderMrp = 0;
-      let orderRevenue = Number(b.totalAmount || b.finalAmount || 0);
-      let orderB2b = 0;
-
-      let items = b.items;
-      if (typeof items === 'string') {
-        try { items = JSON.parse(items); } catch(e) { items = []; }
-      }
-      if (!Array.isArray(items)) items = [];
-
-      items.forEach(item => {
-        const itemName = (item.name || item.TestName || item.PackageName || '').toLowerCase();
-        const matchedTest = adminTests.find(t => t.TestName.toLowerCase() === itemName || t.TestID === item.id);
-        const matchedPkg = adminPackages.find(p => p.PackageName.toLowerCase() === itemName || p.PackageID === item.id);
-
-        if (matchedTest) {
-          orderMrp += Number(matchedTest.MRP || 0);
-          orderB2b += Number(matchedTest.B2BCost || Math.round(matchedTest.OfferPrice * 0.38));
-        } else if (matchedPkg) {
-          orderMrp += Number(matchedPkg.MRP || 0);
-          orderB2b += Number(matchedPkg.B2BCost || Math.round(matchedPkg.OfferPrice * 0.35));
-        } else {
-          orderMrp += Number(item.price || 0) * 1.5;
-          orderB2b += Math.round(Number(item.price || 0) * 0.36);
-        }
-      });
-
-      if (orderMrp < orderRevenue) orderMrp = Math.round(orderRevenue * 1.4);
-      if (orderB2b === 0) orderB2b = Math.round(orderRevenue * 0.35);
-
-      const netProfit = Math.max(0, orderRevenue - orderB2b);
-
-      totalMrp += orderMrp;
-      totalRevenue += orderRevenue;
-      totalB2bCost += orderB2b;
+      const fin = this.computeBookingFinancials(b, adminTests, adminPackages);
+      totalMrp += fin.mrp;
+      totalRevenue += fin.revenue;
+      totalB2bCost += fin.b2b;
 
       ledgerRows.push({
         id: b.id || b.bookingId,
-        date: bookingDate.toLocaleDateString('en-GB'),
-        patient: b.patientName,
-        itemCount: `${items.length || 1} Items`,
-        mrp: orderMrp,
-        revenue: orderRevenue,
-        b2b: orderB2b,
-        profit: netProfit,
-        status: b.techStatus || 'Confirmed'
+        date: isNaN(bookingDate.getTime()) ? 'Today' : bookingDate.toLocaleDateString('en-GB'),
+        patient: b.patientName || 'Customer',
+        itemCount: `${fin.itemCount} Items`,
+        mrp: fin.mrp,
+        revenue: fin.revenue,
+        b2b: fin.b2b,
+        profit: fin.profit,
+        status: b.techStatus || b.bookingStatus || 'Confirmed'
       });
     });
 
@@ -679,13 +571,13 @@ const AdminApp = {
     this.safeSetText('fin-total-revenue', `₹${totalRevenue.toLocaleString('en-IN')}`);
     this.safeSetText('fin-total-b2b', `₹${totalB2bCost.toLocaleString('en-IN')}`);
     this.safeSetText('fin-actual-profit', `₹${actualProfit.toLocaleString('en-IN')}`);
-    this.safeSetText('fin-margin-percentage', `Profit Margin: ${profitMargin}% of Revenue`);
+    this.safeSetText('fin-margin-percentage', `Profit Margin: ${profitMargin}%`);
 
     const tbody = document.getElementById('finance-ledger-table-body');
     if (!tbody) return;
 
     if (ledgerRows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:20px; color:#64748B;">No financial records found for this period.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:20px; color:#64748B;">No financial records found.</td></tr>`;
       return;
     }
 
@@ -704,6 +596,148 @@ const AdminApp = {
     `).join('');
   },
 
+  /* =========================================================
+     ALL BOOKINGS TABLE (WITH MRP, B2B & PROFIT PER ROW)
+     ========================================================= */
+  renderBookingsTable(filteredList = null) {
+    const tableBody = document.getElementById('bookings-table-body');
+    if (!tableBody) return;
+
+    const allBookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    const adminTests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]');
+    const adminPackages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
+    const bookings = filteredList || allBookings;
+
+    this.safeSetText('bookings-total-badge', bookings.length);
+
+    if (bookings.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:#64748B;">No bookings found.</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = bookings.map(b => {
+      const bId = b.id || b.bookingId;
+      const fin = this.computeBookingFinancials(b, adminTests, adminPackages);
+      const statusText = b.techStatus || 'Unassigned';
+      let statusClass = 'status-pending';
+      if (statusText.includes('Broadcasted')) statusClass = 'status-broadcast';
+      if (statusText.includes('Assigned')) statusClass = 'status-assigned';
+
+      return `
+        <tr>
+          <td><strong>${bId}</strong></td>
+          <td>
+            <strong>${b.patientName || 'Customer'}</strong><br>
+            <span style="font-size:11px; color:#536E66;">${b.patientPhone || '-'}</span>
+          </td>
+          <td>
+            <span style="font-size:11.5px;">${b.location || b.address || 'Chennai'}</span><br>
+            <span class="status-pill status-broadcast" style="margin-top:3px;">${b.mode || 'Home Collection'}</span>
+          </td>
+          <td><span style="font-size:11.5px; font-weight:700;">${b.slot || b.timeSlot || 'Scheduled'}</span></td>
+          <td>
+            <div style="font-size:11px; line-height:1.45;">
+              <span class="strikethrough">MRP: ₹${fin.mrp}</span> • <strong class="green-text">Price: ₹${fin.revenue}</strong><br>
+              <span class="b2b-cell-text">B2B: ₹${fin.b2b}</span> • <strong style="color:#045D49;">Profit: +₹${fin.profit}</strong>
+            </div>
+          </td>
+          <td><span style="font-size:11px; font-weight:800;">${b.paymentStatus || b.paymentMode || 'Confirmed'}</span></td>
+          <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+          <td>
+            ${b.reportUrl ? `<a href="${b.reportUrl}" target="_blank" style="color:#078866; font-weight:800; text-decoration:none;">📄 View PDF</a>` : `<span style="color:#94A3B8; font-size:11px;">Pending</span>`}
+          </td>
+          <td>
+            <button class="btn-emerald-solid" style="padding:6px 10px; font-size:11px;" onclick="AdminApp.openAssignModal('${bId}')">
+              📍 Assign
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  filterBookingsByStatus(statusKey, btnEl) {
+    document.querySelectorAll('.status-filter-scroll .filter-pill').forEach(b => b.classList.remove('active'));
+    if (btnEl) btnEl.classList.add('active');
+
+    const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    let filtered = bookings;
+    if (statusKey === 'home') {
+      filtered = bookings.filter(b => (b.mode || '').toLowerCase().includes('home') || b.collectionType === 'home');
+    } else if (statusKey === 'today') {
+      filtered = bookings.filter(b => (b.date || '').slice(0, 10) === todayStr);
+    } else if (statusKey === 'pending') {
+      filtered = bookings.filter(b => (b.techStatus || '').includes('Unassigned'));
+    } else if (statusKey === 'payment_pending') {
+      filtered = bookings.filter(b => String(b.paymentStatus || '').toUpperCase().includes('PENDING') || String(b.paymentStatus || '').toUpperCase().includes('CASH'));
+    } else if (statusKey === 'completed') {
+      filtered = bookings.filter(b => (b.techStatus || '').toUpperCase() === 'COMPLETED' || b.reportUrl);
+    }
+
+    this.renderBookingsTable(filtered);
+  },
+
+  filterBookings() {
+    const query = (document.getElementById('booking-search-input')?.value || '').toLowerCase();
+    const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    const filtered = bookings.filter(b => `${b.id} ${b.bookingId} ${b.patientName} ${b.patientPhone}`.toLowerCase().includes(query));
+    this.renderBookingsTable(filtered);
+  },
+
+  /* =========================================================
+     CUSTOMERS DIRECTORY (ID, PASSWORD & BOOKING COUNT)
+     ========================================================= */
+  renderCustomersTable(query = '') {
+    const tbody = document.getElementById('customers-table-body');
+    if (!tbody) return;
+
+    const customers = JSON.parse(localStorage.getItem('selfcare_admin_customers_cache') || '[]');
+    const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+
+    const enriched = customers.map(c => {
+      const phoneClean = String(c.phone || '').replace(/\D/g, '').slice(-10);
+      const userBookings = bookings.filter(b => String(b.patientPhone || '').replace(/\D/g, '').slice(-10) === phoneClean);
+      const totalSpent = userBookings.reduce((sum, b) => sum + Number(b.totalAmount || b.finalAmount || 0), 0);
+      return {
+        ...c,
+        bookingCount: userBookings.length,
+        totalSpent
+      };
+    }).filter(c => {
+      if (!query) return true;
+      return `${c.customerId} ${c.name} ${c.phone} ${c.address}`.toLowerCase().includes(query.toLowerCase());
+    });
+
+    this.safeSetText('customers-total-badge', enriched.length);
+
+    if (enriched.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:#64748B;">No customer logins recorded yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = enriched.map(c => `
+      <tr>
+        <td><code>${c.customerId}</code></td>
+        <td><strong>${c.name}</strong></td>
+        <td><strong>${c.phone}</strong></td>
+        <td><code style="background:#FEF3C7; color:#92400E; padding:3px 8px; border-radius:6px; font-weight:800;">${c.password}</code></td>
+        <td>${c.address}</td>
+        <td><span class="status-pill status-assigned">${c.bookingCount} Bookings</span></td>
+        <td><strong class="green-text">₹${c.totalSpent.toLocaleString('en-IN')}</strong></td>
+        <td><span style="font-size:11px; color:#64748B;">${c.lastActive}</span></td>
+      </tr>
+    `).join('');
+  },
+
+  filterCustomers(val) {
+    this.renderCustomersTable(val);
+  },
+
+  /* =========================================================
+     UNIFIED TECHNICIAN & CAPTAIN MANAGEMENT
+     ========================================================= */
   openAssignModal(bookingId) {
     this.currentAssignBookingId = bookingId;
     const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
@@ -712,12 +746,12 @@ const AdminApp = {
 
     document.getElementById('assign-booking-details').innerHTML = `
       <strong>Booking ID: ${b.id || b.bookingId}</strong> | Patient: <strong>${b.patientName}</strong> (${b.patientPhone})<br>
-      📍 Address: ${b.location || b.address} | Slot: ${b.slot || b.timeSlot}
+      📍 Address: ${b.location || b.address}
     `;
 
     const techs = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
     const select = document.getElementById('modal-select-particular-tech');
-    select.innerHTML = techs.map(t => `<option value="${t.id}">${t.name} (${t.zone}) - [${t.status}]</option>`).join('');
+    select.innerHTML = techs.map(t => `<option value="${t.id}">${t.name} [ID: ${t.id}] - ${t.zone}</option>`).join('');
 
     this.toggleAssignMode('particular');
     document.querySelector('input[name="assign_type"][value="particular"]').checked = true;
@@ -725,16 +759,8 @@ const AdminApp = {
   },
 
   toggleAssignMode(mode) {
-    const particularWrap = document.getElementById('particular-tech-select-wrap');
-    const broadcastNotice = document.getElementById('nearby-broadcast-notice');
-
-    if (mode === 'particular') {
-      particularWrap.style.display = 'block';
-      broadcastNotice.style.display = 'none';
-    } else {
-      particularWrap.style.display = 'none';
-      broadcastNotice.style.display = 'flex';
-    }
+    document.getElementById('particular-tech-select-wrap').style.display = mode === 'particular' ? 'block' : 'none';
+    document.getElementById('nearby-broadcast-notice').style.display = mode === 'particular' ? 'none' : 'flex';
   },
 
   async executeTechnicianAssignment() {
@@ -744,7 +770,6 @@ const AdminApp = {
     if (idx === -1) return;
 
     let payload = {};
-
     if (mode === 'particular') {
       const techId = document.getElementById('modal-select-particular-tech').value;
       const techs = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
@@ -753,24 +778,23 @@ const AdminApp = {
       bookings[idx].techStatus = `Assigned to ${tech ? tech.name : techId}`;
       bookings[idx].assignedTechId = techId;
       bookings[idx].assignedTechName = tech ? tech.name : techId;
-      payload = { bookingId: this.currentAssignBookingId, type: 'particular', techId: techId, techName: tech?.name };
-      this.showToast(`Booking assigned to ${tech?.name}`);
+      payload = { bookingId: this.currentAssignBookingId, type: 'particular', techId, techName: tech?.name };
+      this.showToast(`Assigned to ${tech?.name}`);
     } else {
-      bookings[idx].techStatus = `Broadcasted to All Nearby Technicians 📡`;
-      bookings[idx].assignedTechId = 'BROADCAST_ALL';
-      bookings[idx].assignedTechName = 'Nearby Fleet';
-      payload = { bookingId: this.currentAssignBookingId, type: 'broadcast', zone: bookings[idx].zone || 'All' };
-      this.showToast('Order broadcasted to all on-duty phlebotomists!');
+      bookings[idx].techStatus = `Broadcasted to All Captains 📡`;
+      bookings[idx].assignedTechId = '';
+      bookings[idx].assignedTechName = 'All Captains';
+      payload = { bookingId: this.currentAssignBookingId, type: 'broadcast' };
+      this.showToast('Broadcasted to all active Captains!');
     }
 
     if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
-      Api.request('assignTechnician', payload, false).catch(err => console.warn('Assign sync deferred:', err));
+      Api.request('assignTechnician', payload, false).catch(() => {});
     }
 
     localStorage.setItem('selfcare_bookings_db', JSON.stringify(bookings));
     this.closeModal('assign-tech-modal');
     this.renderBookingsTable();
-    this.renderHomeRevenueKPIs();
   },
 
   renderTechnicians() {
@@ -779,18 +803,21 @@ const AdminApp = {
 
     const techs = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
     if (techs.length === 0) {
-      container.innerHTML = '<p style="font-size:12px; color:#64748B;">No technicians created yet.</p>';
+      container.innerHTML = '<p style="font-size:12px; color:#64748B;">No Technician / Captain IDs created yet.</p>';
       return;
     }
 
     container.innerHTML = techs.map((t, idx) => `
-      <div class="tech-row-item">
+      <div class="tech-row-item" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border:1px solid #E2E8F0; border-radius:12px; margin-bottom:10px; background:#FFFFFF;">
         <div>
-          <strong>${t.name} <span class="status-pill status-assigned" style="font-size:9.5px;">${t.status}</span></strong>
-          <span>ID: <code>${t.id}</code> | Contact: ${t.phone}</span><br>
-          <span style="color:#078866; font-weight:700;">📍 Coverage: ${t.zone}</span>
+          <strong>${t.name} <span class="status-pill status-assigned" style="font-size:9.5px;">${t.status}</span></strong><br>
+          <span style="font-size:11.5px;">ID: <code>${t.id}</code> • Pass: <code style="background:#FEF3C7; padding:1px 5px; border-radius:4px;">${t.pass}</code> • 📱 ${t.phone}</span><br>
+          <span style="color:#078866; font-weight:700; font-size:11.5px;">📍 Location: ${t.zone} ${t.upiId ? `• UPI: ${t.upiId}` : ''}</span>
         </div>
-        <button class="btn-cancel" style="padding:4px 10px; font-size:11px; color:#DC2626;" onclick="AdminApp.deleteTechnician(${idx})">Delete ✕</button>
+        <div style="display:flex; gap:6px;">
+          <button class="btn-cancel" style="padding:5px 10px; font-size:11px;" onclick="AdminApp.openEditTechModal(${idx})">Edit</button>
+          <button class="btn-cancel" style="padding:5px 10px; font-size:11px; color:#DC2626;" onclick="AdminApp.deleteTechnician(${idx})">Del</button>
+        </div>
       </div>
     `).join('');
   },
@@ -798,47 +825,105 @@ const AdminApp = {
   handleCreateTechnician(e) {
     e.preventDefault();
     const id = document.getElementById('tech-id-input').value.trim();
+    const pass = document.getElementById('tech-pass-input').value.trim();
     const name = document.getElementById('tech-name-input').value.trim();
     const phone = document.getElementById('tech-phone-input').value.trim();
     const zone = document.getElementById('tech-zone-input').value.trim();
-    const pass = document.getElementById('tech-pass-input').value.trim();
+    const upiId = document.getElementById('tech-upi-input').value.trim();
     const status = document.getElementById('tech-status-select').value;
 
     let techs = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
     if (techs.some(t => t.id.toLowerCase() === id.toLowerCase())) {
-      alert('Technician ID already exists! Please use a unique ID.');
+      alert('This ID already exists! Use a unique Technician/Captain ID.');
       return;
     }
 
-    const techObj = { id, name, phone, zone, pass, status };
-    techs.push(techObj);
-    localStorage.setItem('selfcare_technicians', JSON.stringify(techs));
+    const staffObj = { id, captainId: id, name, phone, mobile: phone, zone, pass, password: pass, upiId, status, active: status === 'Active' };
+    techs.push(staffObj);
+    this.syncDualStaffStorage(techs);
 
     if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
-      Api.request('saveTechnician', techObj, false).catch(err => console.warn('Tech sync deferred:', err));
+      Api.request('saveTechnician', staffObj, false).catch(() => {});
     }
 
     document.getElementById('tech-create-form').reset();
-    this.showToast(`Technician ${name} (${id}) registered!`);
+    this.showToast(`Created ID "${id}" for both Technician Desk & Home Collection!`);
     this.renderTechnicians();
   },
 
+  openEditTechModal(idx) {
+    const techs = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
+    const t = techs[idx];
+    if (!t) return;
+    document.getElementById('edit-tech-index').value = idx;
+    document.getElementById('edit-tech-id').value = t.id;
+    document.getElementById('edit-tech-pass').value = t.pass || t.password || '';
+    document.getElementById('edit-tech-name').value = t.name;
+    document.getElementById('edit-tech-phone').value = t.phone;
+    document.getElementById('edit-tech-zone').value = t.zone;
+    document.getElementById('edit-tech-upi').value = t.upiId || '';
+    document.getElementById('edit-tech-status').value = t.status || 'Active';
+    document.getElementById('edit-tech-modal').style.display = 'flex';
+  },
+
+  saveEditedTechnician(e) {
+    e.preventDefault();
+    const idx = Number(document.getElementById('edit-tech-index').value);
+    let techs = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
+    if (!techs[idx]) return;
+
+    const updated = {
+      ...techs[idx],
+      pass: document.getElementById('edit-tech-pass').value.trim(),
+      password: document.getElementById('edit-tech-pass').value.trim(),
+      name: document.getElementById('edit-tech-name').value.trim(),
+      phone: document.getElementById('edit-tech-phone').value.trim(),
+      mobile: document.getElementById('edit-tech-phone').value.trim(),
+      zone: document.getElementById('edit-tech-zone').value.trim(),
+      upiId: document.getElementById('edit-tech-upi').value.trim(),
+      status: document.getElementById('edit-tech-status').value,
+      active: document.getElementById('edit-tech-status').value === 'Active'
+    };
+
+    techs[idx] = updated;
+    this.syncDualStaffStorage(techs);
+
+    if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
+      Api.request('saveTechnician', updated, false).catch(() => {});
+    }
+
+    this.closeModal('edit-tech-modal');
+    this.renderTechnicians();
+    this.showToast(`Updated ${updated.name} (${updated.id}) ✓`);
+  },
+
   deleteTechnician(idx) {
-    if (!confirm('Remove this technician?')) return;
+    if (!confirm('Remove this Technician / Captain ID?')) return;
     let techs = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
     const removed = techs.splice(idx, 1);
-    localStorage.setItem('selfcare_technicians', JSON.stringify(techs));
+    this.syncDualStaffStorage(techs);
 
     if (removed[0] && navigator.onLine && typeof Api !== 'undefined' && Api.request) {
       Api.request('deleteTechnician', { id: removed[0].id }, false).catch(() => {});
     }
-
     this.renderTechnicians();
   },
 
   /* =========================================================
-     5. TESTS FULL CRUD (LIVE SHEETS SYNC)
+     CATALOG, PACKAGES, MAPPING, REPORTS & BANNERS
      ========================================================= */
+  syncPublicTestsCache(adminTests) {
+    const publicTests = adminTests.map(({ B2BCost, ...rest }) => rest);
+    localStorage.setItem('cache_tests', JSON.stringify(publicTests));
+    localStorage.setItem('selfcare_tests_db', JSON.stringify(publicTests));
+  },
+
+  syncPublicPackagesCache(adminPackages) {
+    const publicPackages = adminPackages.map(({ B2BCost, ...rest }) => rest);
+    localStorage.setItem('cache_packages', JSON.stringify(publicPackages));
+    localStorage.setItem('selfcare_packages_db', JSON.stringify(publicPackages));
+  },
+
   renderTests() {
     const tbody = document.getElementById('tests-table-body');
     if (!tbody) return;
@@ -847,15 +932,11 @@ const AdminApp = {
     const query = (document.getElementById('test-search-filter')?.value || '').toLowerCase();
     const cat = document.getElementById('test-category-filter')?.value || '';
 
-    if (query) {
-      tests = tests.filter(t => (t.TestName + t.TestCode + t.TestID).toLowerCase().includes(query));
-    }
-    if (cat) {
-      tests = tests.filter(t => t.Category === cat);
-    }
+    if (query) tests = tests.filter(t => (t.TestName + t.TestCode + t.TestID).toLowerCase().includes(query));
+    if (cat) tests = tests.filter(t => t.Category === cat);
 
     if (tests.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:20px; color:#64748B;">No diagnostic tests found. Tap "Sync with Google Sheets" to fetch.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:20px; color:#64748B;">No tests found.</td></tr>`;
       return;
     }
 
@@ -916,14 +997,12 @@ const AdminApp = {
       document.getElementById('t-WhyDone').value = t.WhyDone || '';
       document.getElementById('t-SearchKeywords').value = t.SearchKeywords || '';
     }
-
     modal.style.display = 'flex';
   },
 
-  async saveTestRecord(e) {
+  saveTestRecord(e) {
     e.preventDefault();
     let tests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]');
-
     const record = {
       TestID: document.getElementById('t-TestID').value.trim(),
       TestCode: document.getElementById('t-TestCode').value.trim(),
@@ -939,8 +1018,7 @@ const AdminApp = {
       B2BCost: Number(document.getElementById('t-B2BCost').value),
       Status: document.getElementById('t-Status').value,
       WhyDone: document.getElementById('t-WhyDone').value.trim(),
-      SearchKeywords: document.getElementById('t-SearchKeywords').value.trim(),
-      UpdatedAt: new Date().toISOString()
+      SearchKeywords: document.getElementById('t-SearchKeywords').value.trim()
     };
 
     if (this.editingTestId) {
@@ -952,55 +1030,36 @@ const AdminApp = {
 
     localStorage.setItem('selfcare_tests_admin_db', JSON.stringify(tests));
     this.syncPublicTestsCache(tests);
-
-    if (typeof OfflineDB !== 'undefined' && OfflineDB.putAll) {
-      OfflineDB.putAll('tests', tests, true);
-    }
-
     if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
-      Api.request('saveTest', record, false).catch(err => console.warn('Test backend write deferred:', err));
+      Api.request('saveTest', record, false).catch(() => {});
     }
 
     this.closeModal('test-edit-modal');
     this.renderTests();
-    this.showToast(`Test "${record.TestName}" saved live!`);
+    this.showToast(`Test "${record.TestName}" saved!`);
   },
 
   deleteTest(testId) {
     if (!confirm(`Delete test ${testId}?`)) return;
-    let tests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]');
-    tests = tests.filter(t => t.TestID !== testId);
+    let tests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]').filter(t => t.TestID !== testId);
     localStorage.setItem('selfcare_tests_admin_db', JSON.stringify(tests));
     this.syncPublicTestsCache(tests);
-
-    if (typeof OfflineDB !== 'undefined' && OfflineDB.putAll) {
-      OfflineDB.putAll('tests', tests, true);
-    }
-
     if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
       Api.request('deleteTest', { testId }, false).catch(() => {});
     }
-
     this.renderTests();
-    this.showToast(`Test ${testId} removed.`);
   },
 
-  /* =========================================================
-     6. HEALTH PACKAGES CRUD (LIVE SHEETS SYNC)
-     ========================================================= */
   renderPackages() {
     const tbody = document.getElementById('packages-table-body');
     if (!tbody) return;
 
     let packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
     const query = (document.getElementById('package-search-filter')?.value || '').toLowerCase();
-
-    if (query) {
-      packages = packages.filter(p => (p.PackageName + p.PackageCode + p.PackageID).toLowerCase().includes(query));
-    }
+    if (query) packages = packages.filter(p => (p.PackageName + p.PackageCode + p.PackageID).toLowerCase().includes(query));
 
     if (packages.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:20px; color:#64748B;">No health packages found. Tap "Sync with Google Sheets" to fetch.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:20px; color:#64748B;">No packages found.</td></tr>`;
       return;
     }
 
@@ -1034,7 +1093,7 @@ const AdminApp = {
 
     if (action === 'add') {
       this.editingPackageId = null;
-      document.getElementById('package-modal-title').innerText = '+ Add New Health Checkup Package';
+      document.getElementById('package-modal-title').innerText = '+ Add New Health Package';
       document.getElementById('p-PackageID').value = 'PKG_' + Date.now().toString().slice(-4);
       document.getElementById('p-PackageID').readOnly = false;
     } else {
@@ -1062,14 +1121,12 @@ const AdminApp = {
       document.getElementById('p-Status').value = p.Status || 'Active';
       document.getElementById('p-Featured').value = p.Featured || 'FALSE';
     }
-
     modal.style.display = 'flex';
   },
 
-  async savePackageRecord(e) {
+  savePackageRecord(e) {
     e.preventDefault();
     let packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
-
     const record = {
       PackageID: document.getElementById('p-PackageID').value.trim(),
       PackageCode: document.getElementById('p-PackageCode').value.trim(),
@@ -1098,50 +1155,32 @@ const AdminApp = {
 
     localStorage.setItem('selfcare_packages_admin_db', JSON.stringify(packages));
     this.syncPublicPackagesCache(packages);
-
-    if (typeof OfflineDB !== 'undefined' && OfflineDB.putAll) {
-      OfflineDB.putAll('packages', packages, true);
-    }
-
     if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
-      Api.request('savePackage', record, false).catch(err => console.warn('Package sync deferred:', err));
+      Api.request('savePackage', record, false).catch(() => {});
     }
 
     this.closeModal('package-edit-modal');
     this.renderPackages();
-    this.showToast(`Package "${record.PackageName}" saved live!`);
+    this.showToast(`Package "${record.PackageName}" saved!`);
   },
 
   deletePackage(packageId) {
     if (!confirm(`Delete package ${packageId}?`)) return;
-    let packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
-    packages = packages.filter(p => p.PackageID !== packageId);
+    let packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]').filter(p => p.PackageID !== packageId);
     localStorage.setItem('selfcare_packages_admin_db', JSON.stringify(packages));
     this.syncPublicPackagesCache(packages);
-
-    if (typeof OfflineDB !== 'undefined' && OfflineDB.putAll) {
-      OfflineDB.putAll('packages', packages, true);
-    }
-
     if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
       Api.request('deletePackage', { packageId }, false).catch(() => {});
     }
-
     this.renderPackages();
-    this.showToast(`Package ${packageId} removed.`);
   },
 
-  /* =========================================================
-     6B. PACKAGE-TEST MAPPING ENGINE
-     ========================================================= */
   initPackageMappingEngine() {
     const select = document.getElementById('map-target-package-select');
     if (!select) return;
-
     const packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
     select.innerHTML = '<option value="">-- Choose Health Package --</option>' +
       packages.map(p => `<option value="${p.PackageID}">${p.PackageName} (${p.PackageID})</option>`).join('');
-
     if (packages.length > 0 && !this.currentPackageMappingId) {
       this.currentPackageMappingId = packages[0].PackageID;
       select.value = packages[0].PackageID;
@@ -1152,39 +1191,31 @@ const AdminApp = {
   handlePackageMappingSelection(pkgId) {
     this.currentPackageMappingId = pkgId;
     if (!pkgId) return;
-
     const packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
     const tests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]');
     const pkg = packages.find(p => p.PackageID === pkgId);
     if (!pkg) return;
 
     const bundledIds = (pkg.TestIDs || '').split(',').map(s => s.trim()).filter(Boolean);
-
     const availContainer = document.getElementById('map-available-tests-list');
     if (availContainer) {
-      availContainer.innerHTML = tests
-        .filter(t => !bundledIds.includes(t.TestID))
-        .map(t => `
-          <label class="mapping-item">
-            <input type="checkbox" value="${t.TestID}" class="map-avail-chk">
-            <span><strong>${t.TestCode}</strong> - ${t.TestName} (₹${t.OfferPrice})</span>
-          </label>
-        `).join('');
+      availContainer.innerHTML = tests.filter(t => !bundledIds.includes(t.TestID)).map(t => `
+        <label class="mapping-item">
+          <input type="checkbox" value="${t.TestID}" class="map-avail-chk">
+          <span><strong>${t.TestCode}</strong> - ${t.TestName} (₹${t.OfferPrice})</span>
+        </label>
+      `).join('');
     }
 
     const bundledContainer = document.getElementById('map-bundled-tests-list');
     let totalMrp = 0, totalB2b = 0;
-
     if (bundledContainer) {
       bundledContainer.innerHTML = bundledIds.map(tid => {
         const match = tests.find(t => t.TestID === tid);
-        if (match) {
-          totalMrp += Number(match.MRP || 0);
-          totalB2b += Number(match.B2BCost || 0);
-        }
+        if (match) { totalMrp += Number(match.MRP || 0); totalB2b += Number(match.B2BCost || 0); }
         return `
           <div class="mapping-item" style="justify-content:space-between;">
-            <span><strong>${tid}</strong>: ${match ? match.TestName : 'Test item'}</span>
+            <span><strong>${tid}</strong>: ${match ? match.TestName : 'Test'}</span>
             <button class="btn-cancel" style="padding:2px 8px; font-size:10px; color:#DC2626;" onclick="AdminApp.removeSingleTestFromPackage('${tid}')">✕</button>
           </div>
         `;
@@ -1193,73 +1224,54 @@ const AdminApp = {
 
     const summaryEl = document.getElementById('map-selection-summary');
     if (summaryEl) {
-      summaryEl.innerHTML = `
-        <span>Tests: <strong>${bundledIds.length}</strong></span> | 
-        <span>Total MRP: <strong>₹${totalMrp}</strong></span> | 
-        <span>Outsourced B2B: <strong>₹${totalB2b}</strong></span>
-      `;
+      summaryEl.innerHTML = `<span>Tests: <strong>${bundledIds.length}</strong></span> | <span>Total MRP: <strong>₹${totalMrp}</strong></span> | <span>B2B Cost: <strong>₹${totalB2b}</strong></span>`;
     }
   },
 
   addSelectedTestsToPackage() {
     if (!this.currentPackageMappingId) return;
-    const chks = document.querySelectorAll('.map-avail-chk:checked');
-    const newIds = Array.from(chks).map(c => c.value);
-
+    const newIds = Array.from(document.querySelectorAll('.map-avail-chk:checked')).map(c => c.value);
     let packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
     const idx = packages.findIndex(p => p.PackageID === this.currentPackageMappingId);
     if (idx === -1) return;
-
-    let existing = (packages[idx].TestIDs || '').split(',').map(s => s.trim()).filter(Boolean);
+    const existing = (packages[idx].TestIDs || '').split(',').map(s => s.trim()).filter(Boolean);
     packages[idx].TestIDs = Array.from(new Set([...existing, ...newIds])).join(', ');
-
     localStorage.setItem('selfcare_packages_admin_db', JSON.stringify(packages));
     this.handlePackageMappingSelection(this.currentPackageMappingId);
-    this.showToast('Tests added to package!');
   },
 
   removeSingleTestFromPackage(testId) {
     let packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
     const idx = packages.findIndex(p => p.PackageID === this.currentPackageMappingId);
     if (idx === -1) return;
-
-    let existing = (packages[idx].TestIDs || '').split(',').map(s => s.trim()).filter(Boolean);
-    packages[idx].TestIDs = existing.filter(id => id !== testId).join(', ');
-
+    packages[idx].TestIDs = (packages[idx].TestIDs || '').split(',').map(s => s.trim()).filter(id => id && id !== testId).join(', ');
     localStorage.setItem('selfcare_packages_admin_db', JSON.stringify(packages));
     this.handlePackageMappingSelection(this.currentPackageMappingId);
   },
 
   removeAllTestsFromPackage() {
-    if (!confirm('Remove all mapped tests from this package?')) return;
     let packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
     const idx = packages.findIndex(p => p.PackageID === this.currentPackageMappingId);
     if (idx === -1) return;
-
     packages[idx].TestIDs = '';
     localStorage.setItem('selfcare_packages_admin_db', JSON.stringify(packages));
     this.handlePackageMappingSelection(this.currentPackageMappingId);
   },
 
   savePackageTestMapping() {
-    let packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
+    const packages = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
     const pkg = packages.find(p => p.PackageID === this.currentPackageMappingId);
     if (!pkg) return;
-
     this.syncPublicPackagesCache(packages);
     if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
       Api.request('savePackage', pkg, false).catch(() => {});
     }
-    this.showToast(`Mapping for "${pkg.PackageName}" synchronized!`);
+    this.showToast(`Mapping saved for ${pkg.PackageName}!`);
   },
 
-  /* =========================================================
-     7. REPORT UPLOAD HUB (PERSISTENT BASE64 / LINK STORAGE)
-     ========================================================= */
   populateReportBookingSelect() {
     const select = document.getElementById('report-booking-select');
     if (!select) return;
-
     const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
     select.innerHTML = '<option value="">-- Choose Booking ID --</option>' +
       bookings.map(b => `<option value="${b.id || b.bookingId}">${b.id || b.bookingId} - ${b.patientName}</option>`).join('');
@@ -1272,18 +1284,16 @@ const AdminApp = {
       document.getElementById('report-patient-info').value = `${b.patientName} (${b.patientPhone})`;
       const cleanName = (b.patientName || 'PATIENT').toUpperCase().replace(/[^A-Z]/g, '');
       document.getElementById('report-naming-tag').textContent = `${b.id || b.bookingId}_${cleanName}.pdf`;
-    } else {
-      document.getElementById('report-patient-info').value = '';
     }
   },
 
   previewReportFile(input) {
     if (input.files && input.files[0]) {
-      document.getElementById('upload-file-label').innerHTML = `Selected File: <strong>${input.files[0].name}</strong> (${(input.files[0].size/1024).toFixed(1)} KB)`;
+      document.getElementById('upload-file-label').innerHTML = `Selected: <strong>${input.files[0].name}</strong>`;
     }
   },
 
-  async readFileAsDataUrl(file) {
+  readFileAsDataUrl(file) {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
@@ -1300,137 +1310,74 @@ const AdminApp = {
     const doctor = document.getElementById('report-doctor-input').value.trim();
     const clinicalStatus = document.getElementById('report-status-input').value;
 
-    if (!bookingId) {
-      alert('Please select a Booking ID');
-      return;
-    }
-
     let reportUrl = directLink || '';
-
-    // PERSISTENT STORAGE: Read local file as persistent Data URL to prevent tab close expiration
     if (fileInput.files && fileInput.files[0]) {
       const base64Report = await this.readFileAsDataUrl(fileInput.files[0]);
-      if (base64Report) {
-        reportUrl = base64Report;
-      }
+      if (base64Report) reportUrl = base64Report;
     }
-
-    if (!reportUrl) {
-      reportUrl = 'assets/reports/sample_nabl_report.pdf';
-    }
+    if (!reportUrl) return;
 
     let bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
     const idx = bookings.findIndex(b => (b.id === bookingId || b.bookingId === bookingId));
-
     if (idx !== -1) {
       bookings[idx].reportUrl = reportUrl;
       bookings[idx].reportStatus = 'Report Ready';
-      bookings[idx].doctor = doctor;
-      bookings[idx].clinicalStatus = clinicalStatus;
       localStorage.setItem('selfcare_bookings_db', JSON.stringify(bookings));
-
-      try {
-        const custBookings = JSON.parse(localStorage.getItem('selfcare_recent_bookings') || '[]');
-        const cIdx = custBookings.findIndex(b => b.bookingId === bookingId);
-        if (cIdx !== -1) {
-          custBookings[cIdx].reportUrl = reportUrl;
-          custBookings[cIdx].currentStage = 5;
-          custBookings[cIdx].bookingStatus = 'COMPLETED';
-          localStorage.setItem('selfcare_recent_bookings', JSON.stringify(custBookings));
-        }
-      } catch(err) {}
-
       if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
         Api.request('uploadReport', { bookingId, reportUrl, doctor, clinicalStatus }, false).catch(() => {});
       }
-
       this.showToast(`Report for ${bookingId} published!`);
       document.getElementById('report-upload-form').reset();
       this.renderBookingsTable();
     }
   },
 
-  /* =========================================================
-     8. APP CAROUSEL & SOCIAL OUTREACH
-     ========================================================= */
   renderCarousel() {
     const container = document.getElementById('carousel-cards-list');
     if (!container) return;
-
     const banners = JSON.parse(localStorage.getItem('selfcare_carousel_db') || '[]');
     if (banners.length === 0) {
-      container.innerHTML = '<p style="color:#64748B;">No banners created yet.</p>';
+      container.innerHTML = '<p style="color:#64748B;">No banners added yet.</p>';
       return;
     }
-
     container.innerHTML = banners.map((b, idx) => `
       <div class="banner-admin-card">
         <img src="${b.image}" alt="Banner" class="banner-preview-img" onerror="this.src='assets/images/logo.png'">
         <div class="banner-card-info">
           <h4>${b.title}</h4>
           <p>${b.subtitle || ''}</p>
-          <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
             <span class="status-pill status-assigned">${b.status}</span>
-            <div>
-              <button class="btn-cancel" style="padding:4px 8px; font-size:11px;" onclick="AdminApp.editCarouselBanner(${idx})">Edit</button>
-              <button class="btn-cancel" style="padding:4px 8px; font-size:11px; color:#DC2626;" onclick="AdminApp.deleteCarouselBanner(${idx})">Del</button>
-            </div>
+            <button class="btn-cancel" style="padding:4px 8px; font-size:11px; color:#DC2626;" onclick="AdminApp.deleteCarouselBanner(${idx})">Del</button>
           </div>
         </div>
       </div>
     `).join('');
   },
 
-  openCarouselModal(action) {
-    const modal = document.getElementById('carousel-edit-modal');
+  openCarouselModal() {
     document.getElementById('carousel-form').reset();
-    document.getElementById('banner-id-input').value = action === 'add' ? '' : 'edit';
-    modal.style.display = 'flex';
+    document.getElementById('carousel-edit-modal').style.display = 'flex';
   },
 
   saveCarouselBanner(e) {
     e.preventDefault();
-    const idVal = document.getElementById('banner-id-input').value;
-    const title = document.getElementById('banner-title-input').value.trim();
-    const subtitle = document.getElementById('banner-subtitle-input').value.trim();
-    const image = document.getElementById('banner-img-input').value.trim();
-    const link = document.getElementById('banner-link-input').value.trim();
-    const status = document.getElementById('banner-status-input').value;
-
-    let banners = JSON.parse(localStorage.getItem('selfcare_carousel_db') || '[]');
-    if (idVal && !isNaN(Number(idVal))) {
-      banners[Number(idVal)] = { title, subtitle, image, link, status };
-    } else {
-      banners.push({ id: 'BAN_' + Date.now(), title, subtitle, image, link, status });
-    }
-
+    const banners = JSON.parse(localStorage.getItem('selfcare_carousel_db') || '[]');
+    banners.push({
+      id: 'BAN_' + Date.now(),
+      title: document.getElementById('banner-title-input').value.trim(),
+      subtitle: document.getElementById('banner-subtitle-input').value.trim(),
+      image: document.getElementById('banner-img-input').value.trim(),
+      link: document.getElementById('banner-link-input').value.trim(),
+      status: document.getElementById('banner-status-input').value
+    });
     localStorage.setItem('selfcare_carousel_db', JSON.stringify(banners));
-    if (navigator.onLine && typeof Api !== 'undefined' && Api.request) {
-      Api.request('saveCarousel', banners, false).catch(() => {});
-    }
-
     this.closeModal('carousel-edit-modal');
     this.renderCarousel();
-    this.showToast('Carousel banners updated live!');
-  },
-
-  editCarouselBanner(idx) {
-    const banners = JSON.parse(localStorage.getItem('selfcare_carousel_db') || '[]');
-    const b = banners[idx];
-    if (!b) return;
-
-    this.openCarouselModal('edit');
-    document.getElementById('banner-id-input').value = idx;
-    document.getElementById('banner-title-input').value = b.title || '';
-    document.getElementById('banner-subtitle-input').value = b.subtitle || '';
-    document.getElementById('banner-img-input').value = b.image || '';
-    document.getElementById('banner-link-input').value = b.link || '';
-    document.getElementById('banner-status-input').value = b.status || 'Active';
   },
 
   deleteCarouselBanner(idx) {
-    if (!confirm('Delete this banner?')) return;
-    let banners = JSON.parse(localStorage.getItem('selfcare_carousel_db') || '[]');
+    const banners = JSON.parse(localStorage.getItem('selfcare_carousel_db') || '[]');
     banners.splice(idx, 1);
     localStorage.setItem('selfcare_carousel_db', JSON.stringify(banners));
     this.renderCarousel();
@@ -1439,11 +1386,9 @@ const AdminApp = {
   populateSocialItemSelect() {
     const select = document.getElementById('social-share-item-select');
     if (!select) return;
-
     const tests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]');
     const pkgs = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
-
-    let html = '<option value="">-- Choose Diagnostic Offering --</option>';
+    let html = '<option value="">-- Choose Test / Package --</option>';
     pkgs.forEach(p => html += `<option value="pkg_${p.PackageID}">[Package] ${p.PackageName} (₹${p.OfferPrice})</option>`);
     tests.forEach(t => html += `<option value="test_${t.TestID}">[Test] ${t.TestName} (₹${t.OfferPrice})</option>`);
     select.innerHTML = html;
@@ -1451,265 +1396,99 @@ const AdminApp = {
 
   prepareSocialSharePreview() {
     const val = document.getElementById('social-share-item-select').value;
-    const msgBox = document.getElementById('social-share-msg');
-    const previewBox = document.getElementById('social-preview-box');
-
     if (!val) return;
-
     const [type, id] = val.split('_');
-    let item = null;
-    if (type === 'pkg') {
-      item = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]').find(x => x.PackageID === id);
-    } else {
-      item = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]').find(x => x.TestID === id);
-    }
-
+    const item = type === 'pkg'
+      ? JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]').find(x => x.PackageID === id)
+      : JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]').find(x => x.TestID === id);
     if (!item) return;
 
     const title = item.TestName || item.PackageName;
-    const price = item.OfferPrice;
-    const mrp = item.MRP;
-    const discount = Math.round(((mrp - price) / mrp) * 100);
-
-    const message = `🌟 Selfcare Diagnostics - Special Offer!\n\nGet ${title} at just ₹${price} (MRP: ₹${mrp}, ${discount}% OFF).\nIncludes free doorstep sample pickup in Chennai!\n\nBook instantly: https://selfcarediagnostics.com?ref=${id}`;
-    msgBox.value = message;
-    previewBox.innerHTML = message.replace(/\n/g, '<br>');
+    const msg = `🌟 Selfcare Diagnostics - Special Offer!\n\nGet ${title} at just ₹${item.OfferPrice} (MRP: ₹${item.MRP}).\nBook home sample pickup: https://selfcarediagnostics.in?ref=${id}`;
+    document.getElementById('social-share-msg').value = msg;
+    document.getElementById('social-preview-box').innerHTML = msg.replace(/\n/g, '<br>');
   },
 
   shareOnWhatsApp() {
     const text = encodeURIComponent(document.getElementById('social-share-msg').value);
-    // WhatsApp Direct Link Compliance (Prevents browser unknown scheme issues)
     window.open(`https://wa.me/917010174890?text=${text}`, '_blank');
   },
 
   shareOnFacebook() {
-    const url = encodeURIComponent('https://selfcarediagnostics.com');
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://selfcarediagnostics.in')}`, '_blank');
   },
 
   copyInstagramCaption() {
-    const text = document.getElementById('social-share-msg').value;
-    navigator.clipboard.writeText(text + "\n\n#SelfcareDiagnostics #HealthCheckup #ChennaiHealth #BloodTest #Wellness");
-    this.showToast('Formatted caption & hashtags copied to clipboard for Instagram post!');
+    navigator.clipboard.writeText(document.getElementById('social-share-msg').value);
+    this.showToast('Caption copied to clipboard!');
   },
 
   /* =========================================================
-     9. CUSTOMERS, COUPONS, INVENTORY & AUDIT LOGS
+     NAVIGATION, GLOBAL SEARCH & HELPERS
      ========================================================= */
-  renderCustomersTable() {
-    const tbody = document.getElementById('customers-table-body');
-    if (!tbody) return;
-
-    const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-    const customerMap = new Map();
-
-    bookings.forEach(b => {
-      const phone = b.patientPhone || '9840000000';
-      if (!customerMap.has(phone)) {
-        customerMap.set(phone, {
-          name: b.patientName || 'Customer',
-          phone: phone,
-          location: b.location || 'Chennai',
-          totalBookings: 1,
-          lifetimeSpent: Number(b.totalAmount || b.finalAmount || 0),
-          lastBooking: (b.date || '').slice(0, 10),
-          reportsCount: b.reportUrl ? 1 : 0
-        });
-      } else {
-        const cur = customerMap.get(phone);
-        cur.totalBookings++;
-        cur.lifetimeSpent += Number(b.totalAmount || b.finalAmount || 0);
-        if (b.reportUrl) cur.reportsCount++;
-      }
-    });
-
-    const list = Array.from(customerMap.values());
-    if (list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:18px; color:#64748B;">No patient records registered yet.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = list.map(c => `
-      <tr>
-        <td><strong>${c.name}</strong></td>
-        <td><code>${c.phone}</code></td>
-        <td>${c.location}</td>
-        <td>${c.totalBookings}</td>
-        <td><strong class="green-text">₹${c.lifetimeSpent.toLocaleString('en-IN')}</strong></td>
-        <td>${c.lastBooking}</td>
-        <td><span class="status-pill status-assigned">${c.reportsCount} Ready</span></td>
-        <td><button class="btn-cancel" style="padding:4px 8px; font-size:11px;">View Profile</button></td>
-      </tr>
-    `).join('');
+  toggleDrawer() {
+    document.getElementById('admin-drawer')?.classList.toggle('open');
+    document.getElementById('admin-drawer-overlay')?.classList.toggle('active');
   },
 
-  renderCouponsTable() {
-    const tbody = document.getElementById('coupons-table-body');
-    if (!tbody) return;
-
-    const coupons = [
-      { code: 'WELLNESS50', type: 'Flat Amount', val: '₹50', min: '₹499', max: '₹50', status: 'Active' },
-      { code: 'HEALTH20', type: 'Percentage', val: '20%', min: '₹999', max: '₹300', status: 'Active' },
-      { code: 'FIRSTCARE', type: 'Flat Amount', val: '₹100', min: '₹799', max: '₹100', status: 'Active' }
-    ];
-
-    tbody.innerHTML = coupons.map(c => `
-      <tr>
-        <td><strong>${c.code}</strong></td>
-        <td>${c.type}</td>
-        <td><strong class="green-text">${c.val}</strong></td>
-        <td>${c.min}</td>
-        <td>${c.max}</td>
-        <td><span class="status-pill status-assigned">${c.status}</span></td>
-        <td><button class="btn-cancel" style="padding:4px 8px; font-size:10px;">Edit</button></td>
-      </tr>
-    `).join('');
+  closeDrawer() {
+    document.getElementById('admin-drawer')?.classList.remove('open');
+    document.getElementById('admin-drawer-overlay')?.classList.remove('active');
   },
 
-  renderInventoryTable() {
-    const tbody = document.getElementById('inventory-table-body');
-    if (!tbody) return;
+  switchTab(tabId) {
+    document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId)?.classList.add('active');
+    document.querySelector(`.nav-item[data-tab="${tabId}"]`)?.classList.add('active');
 
-    const stock = [
-      { item: 'EDTA Blood Vials (Purple Top)', cat: 'Phlebotomy', qty: 420, min: 100, unit: 'Tubes', status: 'In Stock' },
-      { item: 'Serum Separator Vials (Gold Top)', cat: 'Phlebotomy', qty: 350, min: 100, unit: 'Tubes', status: 'In Stock' },
-      { item: 'Sterile Syringes (5ml)', cat: 'Consumables', qty: 85, min: 100, unit: 'Units', status: 'Low Stock' },
-      { item: 'Lipid Enzymatic Reagents', cat: 'Biochemistry', qty: 14, min: 5, unit: 'Kits', status: 'In Stock' }
-    ];
+    if (tabId === 'tab-home') { this.renderHomeRevenueKPIs(); this.renderRevenueChart(this.currentChartPeriod); }
+    if (tabId === 'tab-finance') this.renderFinancialLedger();
+    if (tabId === 'tab-bookings') this.renderBookingsTable();
+    if (tabId === 'tab-customers') this.renderCustomersTable();
+    if (tabId === 'tab-technicians') this.renderTechnicians();
 
-    tbody.innerHTML = stock.map(s => `
-      <tr>
-        <td><strong>${s.item}</strong></td>
-        <td>${s.cat}</td>
-        <td><strong>${s.qty}</strong></td>
-        <td>${s.min}</td>
-        <td>${s.unit}</td>
-        <td><span class="status-pill ${s.qty < s.min ? 'status-pending' : 'status-assigned'}">${s.status}</span></td>
-      </tr>
-    `).join('');
-  },
-
-  renderAuditLogsTable() {
-    const tbody = document.getElementById('audit-logs-table-body');
-    if (!tbody) return;
-
-    const logs = [
-      { time: 'Today, 09:30 AM', user: 'admin@selfcare', mod: 'Bookings', act: 'Assigned Phlebotomist to SCDBOOK000001', id: 'SCDBOOK000001' },
-      { time: 'Yesterday, 04:15 PM', user: 'admin@selfcare', mod: 'Reports', act: 'Published PDF Lab Report', id: 'SCDBOOK000002' },
-      { time: '28 Sep, 02:00 PM', user: 'admin@selfcare', mod: 'Tests', act: 'Price update for Lipid Profile Comprehensive', id: 'SCDT0012' }
-    ];
-
-    tbody.innerHTML = logs.map(l => `
-      <tr>
-        <td>${l.time}</td>
-        <td><strong>${l.user}</strong></td>
-        <td><span class="status-pill status-assigned">${l.mod}</span></td>
-        <td>${l.act}</td>
-        <td><code>${l.id}</code></td>
-      </tr>
-    `).join('');
+    this.closeDrawer();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
   handleGlobalSearch(query) {
     const q = (query || '').trim().toLowerCase();
     const dropdown = document.getElementById('global-search-results-dropdown');
     const clearBtn = document.getElementById('btn-clear-search');
-
-    if (!q) {
-      dropdown.style.display = 'none';
-      clearBtn.style.display = 'none';
-      return;
-    }
-
+    if (!q) { dropdown.style.display = 'none'; clearBtn.style.display = 'none'; return; }
     clearBtn.style.display = 'block';
 
     const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-    const tests = JSON.parse(localStorage.getItem('selfcare_tests_admin_db') || '[]');
-    const pkgs = JSON.parse(localStorage.getItem('selfcare_packages_admin_db') || '[]');
+    const customers = JSON.parse(localStorage.getItem('selfcare_admin_customers_cache') || '[]');
     const techs = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
 
-    const matchedBookings = bookings.filter(b => (b.id + b.bookingId + b.patientName + b.patientPhone).toLowerCase().includes(q));
-    const matchedTests = tests.filter(t => (t.TestName + t.TestCode + t.TestID).toLowerCase().includes(q));
-    const matchedPkgs = pkgs.filter(p => (p.PackageName + p.PackageCode).toLowerCase().includes(q));
-    const matchedTechs = techs.filter(t => (t.name + t.id + t.zone).toLowerCase().includes(q));
+    const mBookings = bookings.filter(b => `${b.id} ${b.bookingId} ${b.patientName} ${b.patientPhone}`.toLowerCase().includes(q));
+    const mCust = customers.filter(c => `${c.name} ${c.phone} ${c.customerId}`.toLowerCase().includes(q));
+    const mTechs = techs.filter(t => `${t.name} ${t.id} ${t.zone}`.toLowerCase().includes(q));
 
     let html = '';
-
-    if (matchedBookings.length > 0) {
-      html += `<div class="search-result-group-title">Bookings (${matchedBookings.length})</div>`;
-      matchedBookings.slice(0, 3).forEach(b => {
-        html += `
-          <div class="search-result-row" onclick="AdminApp.switchTab('tab-bookings')">
-            <div>
-              <strong>${b.id || b.bookingId}</strong> - ${b.patientName}<br>
-              <small>Slot: ${b.slot || b.timeSlot} | ₹${b.totalAmount}</small>
-            </div>
-            <span class="status-pill status-assigned">${b.techStatus || 'Confirmed'}</span>
-          </div>
-        `;
-      });
+    if (mBookings.length) {
+      html += `<div class="search-result-group-title">Bookings (${mBookings.length})</div>` +
+        mBookings.slice(0, 3).map(b => `<div class="search-result-row" onclick="AdminApp.switchTab('tab-bookings')"><strong>${b.id || b.bookingId} - ${b.patientName}</strong><small>₹${b.totalAmount || 0}</small></div>`).join('');
+    }
+    if (mCust.length) {
+      html += `<div class="search-result-group-title">Customers (${mCust.length})</div>` +
+        mCust.slice(0, 3).map(c => `<div class="search-result-row" onclick="AdminApp.switchTab('tab-customers')"><strong>${c.name} (${c.phone})</strong><small>Pass: ${c.password}</small></div>`).join('');
+    }
+    if (mTechs.length) {
+      html += `<div class="search-result-group-title">Technicians / Captains (${mTechs.length})</div>` +
+        mTechs.slice(0, 3).map(t => `<div class="search-result-row" onclick="AdminApp.switchTab('tab-technicians')"><strong>${t.name} [${t.id}]</strong><small>${t.zone}</small></div>`).join('');
     }
 
-    if (matchedTests.length > 0) {
-      html += `<div class="search-result-group-title">Tests (${matchedTests.length})</div>`;
-      matchedTests.slice(0, 3).forEach(t => {
-        html += `
-          <div class="search-result-row" onclick="AdminApp.switchTab('tab-tests')">
-            <div>
-              <strong>${t.TestCode}</strong> - ${t.TestName}<br>
-              <small>${t.Category} | MRP: ₹${t.MRP}</small>
-            </div>
-            <strong class="green-text">₹${t.OfferPrice}</strong>
-          </div>
-        `;
-      });
-    }
-
-    if (matchedPkgs.length > 0) {
-      html += `<div class="search-result-group-title">Packages (${matchedPkgs.length})</div>`;
-      matchedPkgs.slice(0, 3).forEach(p => {
-        html += `
-          <div class="search-result-row" onclick="AdminApp.switchTab('tab-packages')">
-            <div>
-              <strong>${p.PackageName}</strong><br>
-              <small>${p.Parameters}</small>
-            </div>
-            <strong class="green-text">₹${p.OfferPrice}</strong>
-          </div>
-        `;
-      });
-    }
-
-    if (matchedTechs.length > 0) {
-      html += `<div class="search-result-group-title">Technicians (${matchedTechs.length})</div>`;
-      matchedTechs.slice(0, 3).forEach(t => {
-        html += `
-          <div class="search-result-row" onclick="AdminApp.switchTab('tab-technicians')">
-            <div>
-              <strong>${t.name}</strong> (<code>${t.id}</code>)<br>
-              <small>Coverage: ${t.zone}</small>
-            </div>
-            <span class="status-pill status-assigned">${t.status}</span>
-          </div>
-        `;
-      });
-    }
-
-    if (!html) {
-      html = `<div style="padding:16px; text-align:center; font-size:12px; color:#64748B;">No matches found for "${query}"</div>`;
-    }
-
-    dropdown.innerHTML = html;
+    dropdown.innerHTML = html || `<div style="padding:14px; text-align:center; font-size:12px; color:#64748B;">No matches found</div>`;
     dropdown.style.display = 'block';
   },
 
   clearGlobalSearch() {
-    const input = document.getElementById('admin-global-search-input');
-    if (input) input.value = '';
-    const dropdown = document.getElementById('global-search-results-dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    const clearBtn = document.getElementById('btn-clear-search');
-    if (clearBtn) clearBtn.style.display = 'none';
+    document.getElementById('admin-global-search-input').value = '';
+    document.getElementById('global-search-results-dropdown').style.display = 'none';
+    document.getElementById('btn-clear-search').style.display = 'none';
   },
 
   safeSetText(id, text) {
@@ -1724,10 +1503,7 @@ const AdminApp = {
     toast.className = 'admin-toast';
     toast.textContent = message;
     container.appendChild(toast);
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 250);
-    }, 3200);
+    setTimeout(() => toast.remove(), 3200);
   },
 
   closeModal(id) {
@@ -1736,20 +1512,22 @@ const AdminApp = {
   },
 
   async forceSyncCloud() {
-    this.showToast('Syncing all 500+ tests and packages from Sheets...');
+    this.showToast('Syncing Bookings, Customers, Staff & Catalog...');
     await Promise.all([
       this.loadAllBookings(),
+      this.loadAllCustomers(),
+      this.loadAllTechnicians(),
       this.loadAllTests(),
       this.loadAllPackages()
     ]);
     this.renderHomeRevenueKPIs();
     this.renderFinancialLedger();
     this.renderBookingsTable();
+    this.renderCustomersTable();
+    this.renderTechnicians();
     this.renderTests();
     this.renderPackages();
-    this.initPackageMappingEngine();
-    this.populateSocialItemSelect();
-    this.showToast('Sheets Synchronization Complete ✓');
+    this.showToast('All Data Synchronized ✓');
   },
 
   logout() {

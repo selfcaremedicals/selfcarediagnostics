@@ -1,12 +1,9 @@
 /* file: assets/js/auth.js */
 /**
- * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.8.0
+ * Selfcare Diagnostics - Instant Zero-Lag Permanent Auth Engine v3.9.0
  * Features:
- * - Preserves Salutation & Date of Birth (DOB) in permanent profile vault
- * - Loop-Proof Universal Route Guard: Prevents infinite redirect bouncing
- * - Deep-Link Preservation: Preserves target redirect (?bookingId=...) and returns post-login
- * - Full VIP Membership & Expiry mapping across logins and reloads
- * - 0ms Synchronous local-first lifetime session verification
+ * - Routes unauthenticated users to index.html (Single Unified Login Portal)
+ * - Supports SCDADMIN, SCDTECH, and Lifetime Patient Sessions
  */
 
 const Auth = {
@@ -15,9 +12,6 @@ const Auth = {
   TOKEN_KEY: 'selfcare_auth_token',
   ROLE_KEY: 'selfcare_user_role',
 
-  /**
-   * Universal Route Guard (Runs immediately on file load)
-   */
   checkRouteGuard() {
     try {
       if (typeof window === 'undefined') return;
@@ -25,29 +19,32 @@ const Auth = {
       const currentPath = window.location.pathname.toLowerCase();
       const currentUrl = window.location.href;
 
-      // 1. Login page-la iruntha entha redirect-um seiya koodathu (Loop Prevention)
-      if (currentPath.endsWith('login.html') || currentPath.includes('/login')) {
+      if (
+        currentPath.endsWith('index.html') ||
+        currentPath.endsWith('/') ||
+        currentPath.endsWith('login.html')
+      ) {
         return;
       }
 
       const activeUser = localStorage.getItem(this.ACTIVE_USER_KEY);
-      const activeTech = localStorage.getItem('selfcare_active_tech') || localStorage.getItem('selfcare_active_technician');
+      const activeTech =
+        localStorage.getItem('selfcare_active_tech') ||
+        localStorage.getItem('selfcare_active_technician') ||
+        localStorage.getItem('selfcare_captain_session');
       const token = localStorage.getItem(this.TOKEN_KEY);
 
-      // Session verification
       const isLogged = Boolean(activeUser && token) || Boolean(activeTech) || this.isLoggedIn();
 
-      // 2. Yaarume login pannala na mattum thaan login page-ku anuppanum
       if (!isLogged) {
         const target = encodeURIComponent(currentUrl);
-        window.location.replace(`login.html?redirect=${target}`);
+        window.location.replace(`index.html?redirect=${target}`);
         return;
       }
 
-      // 3. Technician.html-la login irunthu active_tech illana auto-seed seithu loop-ai thadukkum
       if (currentPath.includes('technician.html') && !activeTech) {
         const techName = activeUser || 'Mohamed Adamkani';
-        const defaultTech = { id: 'TechlabDesk', name: techName, zone: 'Vettuvankeni Lab' };
+        const defaultTech = { id: 'SCDTECH001', name: techName, zone: 'Vettuvankeni Lab' };
         localStorage.setItem('selfcare_active_tech', JSON.stringify(defaultTech));
       }
     } catch (e) {
@@ -128,7 +125,6 @@ const Auth = {
 
     const memStatus = userData.membership || existingProfile.membership || 'Regular';
     const memExpiry = userData.membershipExpiry || userData.vipExpiry || existingProfile.membershipExpiry || existingProfile.vipExpiry || '';
-
     const isVipValid = memStatus === 'Membership' && (!memExpiry || new Date(memExpiry) > new Date());
 
     const permanentUser = {
@@ -161,24 +157,18 @@ const Auth = {
       localStorage.setItem(`selfcare_profile_${cleanMobile}`, serialized);
       localStorage.setItem(this.TOKEN_KEY, userData.token || existingProfile.token || `PERMANENT_NABL_TOKEN_${cleanMobile}`);
       localStorage.setItem(this.ROLE_KEY, permanentUser.role);
-
       localStorage.setItem('selfcare_permanent_user', serialized);
       localStorage.setItem('selfcare_user_session', serialized);
 
       if (isVipValid) {
         localStorage.setItem('selfcare_is_vip_member', 'true');
-        const memObj = {
+        localStorage.setItem(`selfcare_membership_${cleanMobile}`, JSON.stringify({
           status: 'Membership',
           plan: 'CarePass 1 Year VIP',
           expiryDate: memExpiry
-        };
-        localStorage.setItem(`selfcare_membership_${cleanMobile}`, JSON.stringify(memObj));
+        }));
       } else {
         localStorage.removeItem('selfcare_is_vip_member');
-      }
-
-      if (typeof OfflineDB !== 'undefined' && OfflineDB.setMetadata) {
-        OfflineDB.setMetadata('user_session', permanentUser);
       }
 
       if (typeof App !== 'undefined' && App.refreshVipBadges) {
@@ -187,7 +177,6 @@ const Auth = {
 
       return true;
     } catch (e) {
-      console.error('[Auth] Error saving permanent session:', e);
       return false;
     }
   },
@@ -196,79 +185,12 @@ const Auth = {
     return this.savePermanentSession(sessionData);
   },
 
-  async verifyOtpAndLogin(mobile, otp) {
-    try {
-      const cleanMobile = String(mobile).replace(/\D/g, '').slice(-10);
-
-      if (!cleanMobile || cleanMobile.length !== 10) {
-        return { success: false, message: 'Please enter a valid 10-digit mobile number' };
-      }
-
-      const cleanOtp = String(otp).trim();
-      if (!cleanOtp) {
-        return { success: false, message: 'Please enter the OTP' };
-      }
-
-      if (cleanOtp.length < 4) {
-        return { success: false, message: 'Please enter the complete 4-digit OTP' };
-      }
-
-      let serverUser = null;
-
-      if (navigator.onLine && typeof Api !== 'undefined') {
-        try {
-          if (typeof Api.verifyOtp === 'function') {
-            serverUser = await Api.verifyOtp(cleanMobile, cleanOtp);
-          } else if (typeof Api.request === 'function') {
-            serverUser = await Api.request('verifyOtp', { mobile: cleanMobile, otp: cleanOtp }, false);
-          }
-        } catch (netErr) {
-          const errText = netErr.message || '';
-          if (errText.includes('Invalid OTP') || errText.includes('OTP')) {
-            return { success: false, message: errText };
-          }
-          console.warn('[Auth] Network issue during verify, falling back to local verification:', netErr);
-        }
-      }
-
-      if (!serverUser && cleanOtp !== '1234') {
-        return { success: false, message: 'Invalid OTP entered. Please try again.' };
-      }
-
-      const userData = {
-        userId: (serverUser && (serverUser.userId || serverUser.UserID)) ? (serverUser.userId || serverUser.UserID) : `SCD_${cleanMobile}`,
-        mobile: cleanMobile,
-        salutation: (serverUser && (serverUser.salutation || serverUser.Salutation)) ? (serverUser.salutation || serverUser.Salutation) : 'Mr.',
-        name: (serverUser && (serverUser.name || serverUser.Name)) ? (serverUser.name || serverUser.Name) : 'Valued Customer',
-        dob: (serverUser && (serverUser.dob || serverUser.DOB)) ? (serverUser.dob || serverUser.DOB) : '',
-        age: (serverUser && (serverUser.age || serverUser.Age)) ? String(serverUser.age || serverUser.Age) : '',
-        gender: (serverUser && (serverUser.gender || serverUser.Gender)) ? (serverUser.gender || serverUser.Gender) : 'Male',
-        bloodGroup: (serverUser && (serverUser.bloodGroup || serverUser.BloodGroup)) ? (serverUser.bloodGroup || serverUser.BloodGroup) : 'O+',
-        email: (serverUser && (serverUser.email || serverUser.Email)) ? (serverUser.email || serverUser.Email) : '',
-        address: (serverUser && (serverUser.address || serverUser.Address)) ? (serverUser.address || serverUser.Address) : '',
-        location: (serverUser && (serverUser.location || serverUser.Location)) ? (serverUser.location || serverUser.Location) : '',
-        membership: (serverUser && serverUser.membership) ? serverUser.membership : 'Regular',
-        membershipExpiry: (serverUser && (serverUser.membershipExpiry || serverUser.vipExpiry)) ? (serverUser.membershipExpiry || serverUser.vipExpiry) : '',
-        token: (serverUser && serverUser.token) ? serverUser.token : `PERMANENT_NABL_TOKEN_${cleanMobile}`,
-        role: (serverUser && serverUser.role) ? serverUser.role : 'patient'
-      };
-
-      this.savePermanentSession(userData);
-      return { success: true, user: userData };
-
-    } catch (err) {
-      console.error('[Auth] OTP verification error:', err);
-      return { success: false, message: err.message || 'Verification error occurred' };
-    }
-  },
-
   updateProfile(updatedFields) {
     const current = this.getUser() || {};
-    const merged = { ...current, ...updatedFields };
-    return this.savePermanentSession(merged);
+    return this.savePermanentSession({ ...current, ...updatedFields });
   },
 
-  requireAuth(redirectUrl = 'login.html') {
+  requireAuth(redirectUrl = 'index.html') {
     if (!this.isLoggedIn()) {
       const target = encodeURIComponent(window.location.href);
       window.location.replace(`${redirectUrl}?redirect=${target}`);
@@ -282,9 +204,7 @@ const Auth = {
       const activeMobile = localStorage.getItem(this.ACTIVE_USER_KEY);
       if (activeMobile) {
         const activeCart = localStorage.getItem('selfcare_cart');
-        if (activeCart) {
-          localStorage.setItem(`selfcare_cart_${activeMobile}`, activeCart);
-        }
+        if (activeCart) localStorage.setItem(`selfcare_cart_${activeMobile}`, activeCart);
       }
 
       localStorage.removeItem(this.ACTIVE_USER_KEY);
@@ -293,6 +213,8 @@ const Auth = {
       localStorage.removeItem(this.ROLE_KEY);
       localStorage.removeItem('selfcare_active_tech');
       localStorage.removeItem('selfcare_active_technician');
+      localStorage.removeItem('selfcare_captain_session');
+      localStorage.removeItem('selfcare_tech_workspace');
       localStorage.removeItem('selfcare_is_vip_member');
       localStorage.removeItem('selfcare_permanent_user');
       localStorage.removeItem('selfcare_user_session');
@@ -304,15 +226,12 @@ const Auth = {
         Utils.showToast('Logged out successfully', 'info');
       }
       setTimeout(() => {
-        window.location.replace('login.html?logout=true');
+        window.location.replace('index.html?logout=true');
       }, 350);
-    } catch (e) {
-      console.error('Logout error:', e);
-    }
+    } catch (e) {}
   }
 };
 
-// Immediate Safe Route Guard
 Auth.checkRouteGuard();
 
 if (typeof window !== 'undefined') window.Auth = Auth;

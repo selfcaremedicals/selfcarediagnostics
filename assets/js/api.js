@@ -1,7 +1,8 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - API Gateway v6.7.0 (Password Auth & Salutation Edition)
+ * Selfcare Diagnostics - API Gateway v6.7.1 (Cloudflare Pages Gateway Edition)
  * Updates:
+ * - Routed API calls through Config.API_GATEWAY_URL (/api/gateway) with GAS fallback
  * - Added patientRegister & patientLogin endpoints for password-based patient auth
  * - Added updateReport & getBookingReport endpoints for diagnostic laboratory findings
  * - High-speed In-Memory TTL Response Caching for Instant UI updates
@@ -97,12 +98,17 @@ const Api = {
           throw new Error('No internet connection. Operating in offline mode.');
         }
 
-        const baseUrl = (typeof Config !== 'undefined' && Config.GAS_WEB_APP_URL) ? Config.GAS_WEB_APP_URL : '';
+        const baseUrl = (typeof Config !== 'undefined' && (Config.API_GATEWAY_URL || Config.GAS_WEB_APP_URL))
+          ? (Config.API_GATEWAY_URL || Config.GAS_WEB_APP_URL)
+          : '';
         if (!baseUrl) {
-          throw new Error('GAS_WEB_APP_URL is not configured in config.js');
+          throw new Error('API_GATEWAY_URL is not configured in config.js');
         }
 
-        const url = new URL(baseUrl);
+        const origin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null')
+          ? window.location.origin
+          : 'https://selfcarediagnostics.in';
+        const url = new URL(baseUrl, origin);
         url.searchParams.append('action', action);
 
         const payloadData = {
@@ -113,7 +119,7 @@ const Api = {
         const options = {
           method: 'POST',
           headers: {
-            'Content-Type': 'text/plain;charset=utf-8',
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify(payloadData)
         };

@@ -1,15 +1,17 @@
 /* file: assets/js/technician.js */
 /**
- * Selfcare Diagnostics - Master Lab Walk-in Desk Engine v5.3.0
+ * Selfcare Diagnostics - Master Lab Walk-in Desk Engine v5.9.0
  * Features:
- * 1. Minimalist UI without 3D effects or solid black background fills (bold border press boxes).
- * 2. Monochrome A4 Vector PDF Invoice without black fills (bold black outlines; only Brand Logo retains color).
- * 3. PDF Filenames automatically include Customer Name + Invoice Number (`CustomerName_InvoiceNo.pdf`).
- * 4. Automatic WhatsApp Dispatch upon Bill Completion (Meta Cloud API + automatic Web Share / WhatsApp fallback).
- * 5. Direct Print PDF action triggering immediate native Print Dialog (`window.print()`).
+ * 1. Direct Razorpay Payment Link Flow (GPay, PhonePe, Paytm, Cards, EMI) — opens Razorpay directly without visiting bookings.html.
+ * 2. Automatic Bill Close on Payment Confirmation + Auto-Send Official Invoice PDF to Customer WhatsApp.
+ * 3. Single-Trigger Family Members Selection Popup (Never opens twice for the same mobile lookup).
+ * 4. Compact 1-Page A4 Vector PDF & Print Layout (Auto-paginates cleanly to Page 2 only when 12+ tests are billed).
+ * 5. Automated Google Drive Cloud Archiving for Receipts.
  */
 
 const TechnicianApp = {
+  RECEIPT_DRIVE_FOLDER_ID: '1wBorw9PqZIPhCO0cTJ6n2ecx-sYtbOEA',
+
   currentTech: null,
   catalogueList: [],
   isSyncingCatalogue: false,
@@ -26,12 +28,18 @@ const TechnicianApp = {
   activeViewingReport: null,
   activeEditingBookingId: null,
 
-  // 5-Minute Payment Link State
+  // Family Picker Single-Trigger State
+  lookupMembersList: [],
+  familyPopupShownForMobile: '',
+
+  // 5-Minute Direct Razorpay Payment Link State
   activePaymentLinkId: null,
+  activePaymentShortUrl: '',
   linkExpiryTimestamp: null,
   linkCountdownTimer: null,
   linkPollingInterval: null,
   pendingBookingData: null,
+  isFinalizingOnlineBill: false,
 
   doctorList: [
     'Self / Walk-In',
@@ -45,7 +53,8 @@ const TechnicianApp = {
   ],
 
   async init() {
-    this.checkSessionAndAuth();
+    if (!this.checkSessionAndAuth()) return;
+    this.injectFamilyPickerModal();
     this.initHistoryDateFilter();
     this.loadDoctorDirectory();
     this.loadPreviousBills();
@@ -61,14 +70,49 @@ const TechnicianApp = {
   },
 
   /* =========================================================
-     1. BRANCH-LOCKED STAFF AUTHENTICATION & BACKEND DETAILS
+     1. SESSION-PROTECTED STAFF AUTHENTICATION
      ========================================================= */
   checkSessionAndAuth() {
-    let rawTech = localStorage.getItem('selfcare_active_tech') || localStorage.getItem('selfcare_active_technician');
-    let parsed = null;
-    if (rawTech) {
-      try { parsed = JSON.parse(rawTech); } catch (e) { parsed = null; }
+    let rawTech =
+      localStorage.getItem('selfcare_active_tech') ||
+      localStorage.getItem('selfcare_active_technician') ||
+      localStorage.getItem('selfcare_captain_session');
+
+    if (!rawTech) {
+      window.location.replace('index.html');
+      return false;
     }
+
+    let parsed = null;
+    try { parsed = JSON.parse(rawTech); } catch (e) { parsed = null; }
+
+    const staffIdCandidate = parsed?.staffId || parsed?.id || parsed?.captainId || parsed?.UserID || '';
+    if (!staffIdCandidate) {
+      window.location.replace('index.html');
+      return false;
+    }
+
+    try {
+      const listA = JSON.parse(localStorage.getItem('selfcare_technicians') || '[]');
+      const listB = JSON.parse(localStorage.getItem('selfcare_admin_captains') || '[]');
+      const unifiedRoster = [...listA, ...listB];
+      if (unifiedRoster.length > 0) {
+        const matchedAdminRecord = unifiedRoster.find(
+          s => String(s.id || s.captainId || '').toLowerCase() === String(staffIdCandidate).toLowerCase()
+        );
+        if (matchedAdminRecord) {
+          parsed = {
+            ...parsed,
+            id: matchedAdminRecord.id || matchedAdminRecord.captainId,
+            staffId: matchedAdminRecord.id || matchedAdminRecord.captainId,
+            name: matchedAdminRecord.name || parsed?.name,
+            technicianName: matchedAdminRecord.name || parsed?.technicianName,
+            zone: matchedAdminRecord.zone || parsed?.zone,
+            branchPhone: matchedAdminRecord.phone || matchedAdminRecord.mobile || parsed?.branchPhone
+          };
+        }
+      }
+    } catch (e) {}
 
     let prof = {};
     try {
@@ -124,71 +168,84 @@ const TechnicianApp = {
       'Verified';
 
     this.currentTech = {
-      id: parsed?.id || parsed?.staffId || parsed?.UserID || 'TechlabDesk',
-      staffId: parsed?.staffId || parsed?.id || parsed?.UserID || 'TechlabDesk',
+      id: staffIdCandidate,
+      staffId: staffIdCandidate,
       name: resolvedName,
       technicianName: resolvedName,
       branchId: parsed?.branchId || resolvedBranch.toUpperCase().replace(/\s+/g, '_'),
       branch: resolvedBranch,
       branchName: resolvedBranch,
-      zone: resolvedBranch,
+      zone: parsed?.zone || resolvedBranch,
       branchAddress,
       branchPhone,
       branchGstin
     };
 
     localStorage.setItem('selfcare_active_tech', JSON.stringify(this.currentTech));
+    localStorage.setItem('selfcare_captain_session', JSON.stringify({
+      id: this.currentTech.id,
+      name: this.currentTech.name,
+      mobile: String(branchPhone).replace(/\D/g, '').slice(-10),
+      zone: this.currentTech.zone
+    }));
 
     const nameEl = document.getElementById('tech-display-name');
     const branchEl = document.getElementById('tech-display-branch');
     if (nameEl) nameEl.textContent = this.currentTech.name;
     if (branchEl) branchEl.textContent = this.currentTech.branchName;
 
-    if (navigator.onLine && typeof Api !== 'undefined' && this.currentTech.staffId) {
-      Api.request('getStaffProfile', { staffId: this.currentTech.staffId })
-        .then(res => {
-          const st = res?.data || res?.staff || res?.user;
-          if (st && (st.Name || st.TechnicianName || st.BranchName)) {
-            this.currentTech.name = st.TechnicianName || st.Name || this.currentTech.name;
-            this.currentTech.technicianName = this.currentTech.name;
-            if (st.BranchName) {
-              this.currentTech.branchName = st.BranchName.toLowerCase().includes('branch')
-                ? st.BranchName
-                : `${st.BranchName} Branch`;
-              this.currentTech.branch = this.currentTech.branchName;
-              this.currentTech.zone = this.currentTech.branchName;
-            }
-            if (st.BranchId) this.currentTech.branchId = st.BranchId;
-            if (st.BranchAddress) this.currentTech.branchAddress = st.BranchAddress;
-            if (st.BranchPhone) this.currentTech.branchPhone = st.BranchPhone;
-            if (st.BranchGSTIN) this.currentTech.branchGstin = st.BranchGSTIN;
-
-            localStorage.setItem('selfcare_active_tech', JSON.stringify(this.currentTech));
-            if (nameEl) nameEl.textContent = this.currentTech.name;
-            if (branchEl) branchEl.textContent = this.currentTech.branchName;
-          }
-        })
-        .catch(() => {});
-    }
+    return true;
   },
 
   logout() {
     if (confirm('Are you sure you want to log out from Operations Desk?')) {
       localStorage.removeItem('selfcare_active_tech');
       localStorage.removeItem('selfcare_active_technician');
+      localStorage.removeItem('selfcare_captain_session');
+      localStorage.removeItem('selfcare_tech_workspace');
       localStorage.removeItem('selfcare_active_user');
+      localStorage.removeItem('selfcare_user_role');
       localStorage.removeItem('selfcare_auth_token');
       localStorage.removeItem('selfcare_customer_profile');
-      window.location.replace('login.html?logout=true');
+      window.location.replace('index.html?logout=true');
     }
   },
 
   /* =========================================================
-     2. DOB TO AGE AUTO-CALCULATION
+     2. DOB NORMALIZER & DOB-TO-AGE AUTO-CALCULATION
      ========================================================= */
+  normalizeDobForDateInput(rawDob) {
+    if (!rawDob) return '';
+    const s = String(rawDob).trim();
+    if (!s || s === 'undefined' || s === 'null') return '';
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      return s.slice(0, 10);
+    }
+
+    const dmy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+    if (dmy) {
+      const dd = dmy[1].padStart(2, '0');
+      const mm = dmy[2].padStart(2, '0');
+      const yyyy = dmy[3];
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const d = String(parsed.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    return '';
+  },
+
   calculateAgeFromDob(dobString) {
-    if (!dobString) return '';
-    const dob = new Date(dobString);
+    const normalized = this.normalizeDobForDateInput(dobString);
+    if (!normalized) return '';
+    const dob = new Date(normalized);
     if (isNaN(dob.getTime())) return '';
     const today = new Date();
     let age = today.getFullYear() - dob.getFullYear();
@@ -200,7 +257,12 @@ const TechnicianApp = {
   },
 
   handleDobChange(dobVal) {
-    const age = this.calculateAgeFromDob(dobVal);
+    const normalized = this.normalizeDobForDateInput(dobVal);
+    const dobInput = document.getElementById('cust-dob-input');
+    if (dobInput && normalized && dobInput.value !== normalized) {
+      dobInput.value = normalized;
+    }
+    const age = this.calculateAgeFromDob(normalized || dobVal);
     const ageInput = document.getElementById('cust-age-input');
     if (ageInput && age !== '') {
       ageInput.value = age;
@@ -620,40 +682,54 @@ const TechnicianApp = {
   },
 
   /* =========================================================
-     6. CUSTOMER AUTOFILL & VIP MEMBERSHIP DETECTION
+     6. SINGLE-TRIGGER CUSTOMER + FAMILY MEMBERS POPUP
      ========================================================= */
-  async handleCustomerMobileLookup(val) {
-    const mobile = String(val).replace(/\D/g, '').slice(0, 10);
-    if (mobile.length !== 10) return;
+  injectFamilyPickerModal() {
+    if (document.getElementById('family-member-picker-modal')) return;
+    const modalHtml = `
+      <div id="family-member-picker-modal" class="sia-modal-overlay no-print-section" style="display: none; z-index: 4500;">
+        <div class="sia-modal-content minimal-modal" style="max-width: 440px; padding: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E5E7EB; padding-bottom: 10px; margin-bottom: 12px;">
+            <div>
+              <h3 style="color: #111827; margin: 0; font-size: 15.5px;">Select Patient for Billing</h3>
+              <span id="fam-picker-subtitle" style="font-size: 11px; color: #6B7280;">Primary User & Family Members</span>
+            </div>
+            <button type="button" class="act-btn-close" onclick="TechnicianApp.closeModal('family-member-picker-modal')">✕</button>
+          </div>
 
-    let matchedUser = null;
-    try {
-      const raw = localStorage.getItem(`selfcare_profile_${mobile}`) || localStorage.getItem('selfcare_customer_profile');
-      if (raw) {
-        const u = JSON.parse(raw);
-        if (String(u.mobile || u.phone || '').includes(mobile)) matchedUser = u;
+          <div id="fam-picker-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;"></div>
+
+          <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #E5E7EB; text-align: right;">
+            <button type="button" class="btn-clear-cart" style="padding: 7px 14px; font-size: 11.5px;" onclick="TechnicianApp.closeModal('family-member-picker-modal')">
+              + Enter New Patient Manually
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  },
+
+  extractSalutationAndName(fullName, explicitSalutation = '') {
+    let raw = String(fullName || '').trim();
+    let sal = explicitSalutation || '';
+    const salMatch = raw.match(/^(Mr\.|Mrs\.|Ms\.|Master|Dr\.|Baby)\s+/i);
+    if (salMatch) {
+      if (!sal) {
+        const prefix = salMatch[1].toLowerCase();
+        if (prefix.startsWith('mrs')) sal = 'Mrs.';
+        else if (prefix.startsWith('ms')) sal = 'Ms.';
+        else if (prefix.startsWith('master')) sal = 'Master';
+        else if (prefix.startsWith('dr')) sal = 'Dr.';
+        else if (prefix.startsWith('baby')) sal = 'Baby';
+        else sal = 'Mr.';
       }
-    } catch (e) {}
-
-    if (navigator.onLine && typeof Api !== 'undefined') {
-      try {
-        const res = await Api.request('getProfile', { userId: mobile, mobile: mobile });
-        const userFromCloud = res?.data || res?.profile || res?.user;
-        if (userFromCloud && userFromCloud.Name) {
-          matchedUser = {
-            id: userFromCloud.UserID || `CUST_${mobile}`,
-            name: userFromCloud.Name,
-            salutation: userFromCloud.Salutation || 'Mr.',
-            email: userFromCloud.Email || '',
-            dob: userFromCloud.DOB || '',
-            age: userFromCloud.Age || '',
-            gender: userFromCloud.Gender || 'Male',
-            membership: userFromCloud.Membership || 'Regular'
-          };
-        }
-      } catch (err) {}
+      raw = raw.replace(salMatch[0], '').trim();
     }
+    return { salutation: sal || 'Mr.', cleanName: raw };
+  },
 
+  applySelectedPersonToForm(person, mobile) {
     const nameInput = document.getElementById('cust-name-input');
     const ageInput = document.getElementById('cust-age-input');
     const dobInput = document.getElementById('cust-dob-input');
@@ -662,45 +738,282 @@ const TechnicianApp = {
     const emailInput = document.getElementById('cust-email-input');
     const idTag = document.getElementById('disp-patient-id-tag');
 
-    if (matchedUser) {
-      if (nameInput) nameInput.value = matchedUser.name || matchedUser.FullName || '';
-      if (emailInput && matchedUser.email) emailInput.value = matchedUser.email;
-      if (genderSelect && matchedUser.gender) genderSelect.value = matchedUser.gender;
-      if (salutationSelect && matchedUser.salutation) salutationSelect.value = matchedUser.salutation;
-      
-      if (matchedUser.dob) {
-        if (dobInput) dobInput.value = matchedUser.dob;
-        this.handleDobChange(matchedUser.dob);
-      } else if (matchedUser.age && ageInput) {
-        ageInput.value = matchedUser.age;
+    const { salutation, cleanName } = this.extractSalutationAndName(
+      person.name || person.FullName || person.Name || '',
+      person.salutation || person.Salutation || ''
+    );
+
+    if (salutationSelect) {
+      let resolvedSal = salutation;
+      if (!person.salutation && person.gender) {
+        const g = String(person.gender).toLowerCase();
+        if (g === 'female' && resolvedSal === 'Mr.') resolvedSal = 'Ms.';
       }
+      salutationSelect.value = resolvedSal;
+    }
 
-      const memStatus = String(matchedUser.membership || matchedUser.Membership || '').trim().toUpperCase();
-      const isVip = (memStatus.includes('MEMBER') || memStatus.includes('VIP')) && !memStatus.includes('REGULAR');
-
-      if (isVip) {
-        this.activeMembership = { isMember: true, type: 'VIP', discountPercent: 10 };
-        if (idTag) {
-          idTag.className = 'id-tag-pill vip-member-badge';
-          idTag.innerHTML = `VIP MEMBER (${matchedUser.id || 'CUST_' + mobile.slice(-6)})`;
-        }
-        Utils.showToast('VIP Care Member detected! Flat 10% auto discount applied.', 'success');
-      } else {
-        this.activeMembership = null;
-        if (idTag) {
-          idTag.className = 'id-tag-pill';
-          idTag.textContent = `ID: ${matchedUser.id || 'CUST_' + mobile.slice(-6)}`;
-        }
+    if (nameInput) nameInput.value = cleanName;
+    if (emailInput) emailInput.value = person.email || person.Email || '';
+    if (genderSelect && (person.gender || person.Gender)) {
+      const gRaw = String(person.gender || person.Gender).trim();
+      const gNorm = gRaw.charAt(0).toUpperCase() + gRaw.slice(1).toLowerCase();
+      if (['Male', 'Female', 'Other'].includes(gNorm)) {
+        genderSelect.value = gNorm;
       }
+    }
 
-      this.renderInPageCart();
+    const rawDob = person.dob || person.DOB || person.dateOfBirth || '';
+    const normDob = this.normalizeDobForDateInput(rawDob);
+    if (dobInput) {
+      dobInput.value = normDob;
+    }
+
+    if (normDob) {
+      const calcAge = this.calculateAgeFromDob(normDob);
+      if (ageInput && calcAge !== '') ageInput.value = calcAge;
+    } else if ((person.age || person.Age) && ageInput) {
+      ageInput.value = person.age || person.Age;
+    }
+
+    const memStatus = String(person.membership || person.Membership || '').trim().toUpperCase();
+    const isVip = (memStatus.includes('MEMBER') || memStatus.includes('VIP')) && !memStatus.includes('REGULAR');
+
+    const badgeId = person.id || person.UserID || person.memberId || `SCD_CUST_${mobile.slice(-6)}`;
+    if (isVip) {
+      this.activeMembership = { isMember: true, type: 'VIP', discountPercent: 10 };
+      if (idTag) {
+        idTag.className = 'id-tag-pill vip-member-badge';
+        idTag.innerHTML = `VIP MEMBER (${badgeId})`;
+      }
     } else {
       this.activeMembership = null;
+      if (idTag) {
+        idTag.className = 'id-tag-pill';
+        idTag.textContent = `${person.relationLabel || 'ID'}: ${badgeId}`;
+      }
+    }
+
+    this.renderInPageCart();
+  },
+
+  selectFamilyMemberByIndex(idx) {
+    const person = this.lookupMembersList[idx];
+    const mobile = String(document.getElementById('cust-mobile-input')?.value || '').replace(/\D/g, '').slice(0, 10);
+    if (!person) return;
+
+    this.applySelectedPersonToForm(person, mobile);
+    this.closeModal('family-member-picker-modal');
+    Utils.showToast(`Selected: ${person.name} (${person.relationLabel || 'Patient'})`, 'success');
+  },
+
+  renderFamilyPickerList(mobile) {
+    this.injectFamilyPickerModal();
+    const listEl = document.getElementById('fam-picker-list');
+    const subEl = document.getElementById('fam-picker-subtitle');
+    if (!listEl) return;
+
+    if (subEl) {
+      subEl.textContent = `Mobile: +91 ${mobile} • ${this.lookupMembersList.length} Profiles Found`;
+    }
+
+    listEl.innerHTML = this.lookupMembersList.map((m, idx) => {
+      const dobDisp = this.normalizeDobForDateInput(m.dob || m.DOB || '');
+      const ageDisp = dobDisp ? `${this.calculateAgeFromDob(dobDisp)} Yrs` : (m.age ? `${m.age} Yrs` : '');
+      const roleTag = idx === 0 ? 'PRIMARY USER' : String(m.relation || m.relationLabel || 'FAMILY MEMBER').toUpperCase();
+
+      return `
+        <div onclick="TechnicianApp.selectFamilyMemberByIndex(${idx})"
+             style="padding: 11px 13px; border: 1.5px solid ${idx === 0 ? '#111827' : '#CBD5E1'}; border-radius: 8px; background: #FFFFFF; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
+              <strong style="font-size: 13px; color: #111827;">${Utils.escapeHtml(m.name || 'Member')}</strong>
+              <span style="font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: #F3F4F6; border: 1px solid #D1D5DB; color: #111827;">${Utils.escapeHtml(roleTag)}</span>
+            </div>
+            <div style="font-size: 11px; color: #4B5563;">
+              ${Utils.escapeHtml(m.gender || 'Male')} ${ageDisp ? `• ${ageDisp}` : ''} ${dobDisp ? `• DOB: ${dobDisp}` : ''}
+            </div>
+          </div>
+          <span style="font-size: 11.5px; font-weight: 800; color: #111827; border: 1.5px solid #111827; padding: 4px 10px; border-radius: 6px;">Select ➔</span>
+        </div>
+      `;
+    }).join('');
+  },
+
+  openFamilyMemberSelectModal(mobile, forceOpen = false) {
+    this.renderFamilyPickerList(mobile);
+    const modal = document.getElementById('family-member-picker-modal');
+    if (!modal) return;
+
+    if (!forceOpen && this.familyPopupShownForMobile === mobile) {
+      return;
+    }
+
+    this.familyPopupShownForMobile = mobile;
+    modal.style.display = 'flex';
+  },
+
+  collectLocalCustomerAndFamily(mobile) {
+    const members = [];
+    const seenKeys = new Set();
+
+    const pushUnique = (obj, defaultRel = 'Primary User') => {
+      if (!obj || !(obj.name || obj.FullName || obj.Name || obj.patientName)) return;
+      const rawName = obj.name || obj.FullName || obj.Name || obj.patientName;
+      const { cleanName, salutation } = this.extractSalutationAndName(rawName, obj.salutation || obj.Salutation || '');
+      const key = cleanName.toLowerCase();
+      if (!cleanName || seenKeys.has(key)) return;
+      seenKeys.add(key);
+
+      members.push({
+        id: obj.id || obj.UserID || obj.memberId || `SCD_${mobile.slice(-4)}_${members.length + 1}`,
+        name: cleanName,
+        salutation,
+        dob: this.normalizeDobForDateInput(obj.dob || obj.DOB || obj.dateOfBirth || ''),
+        age: obj.age || obj.Age || obj.patientAge || '',
+        gender: obj.gender || obj.Gender || obj.patientGender || 'Male',
+        email: obj.email || obj.Email || obj.patientEmail || '',
+        membership: obj.membership || obj.Membership || 'Regular',
+        relationLabel: obj.relation || obj.relationship || defaultRel
+      });
+    };
+
+    try {
+      const rawProf = localStorage.getItem(`selfcare_profile_${mobile}`);
+      if (rawProf) {
+        const p = JSON.parse(rawProf);
+        pushUnique(p, 'Primary User');
+        if (Array.isArray(p.familyMembers)) {
+          p.familyMembers.forEach(fm => pushUnique(fm, fm.relation || 'Family Member'));
+        }
+      }
+    } catch (e) {}
+
+    try {
+      const famRaw = localStorage.getItem(`selfcare_family_${mobile}`);
+      if (famRaw) {
+        const famArr = JSON.parse(famRaw);
+        if (Array.isArray(famArr)) {
+          famArr.forEach(fm => pushUnique(fm, fm.relation || 'Family Member'));
+        }
+      }
+    } catch (e) {}
+
+    try {
+      const bookings = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+      bookings.forEach(b => {
+        const bPhone = String(b.patientPhone || '').replace(/\D/g, '').slice(-10);
+        if (bPhone === mobile) {
+          pushUnique({
+            name: b.patientName,
+            salutation: b.salutation,
+            dob: b.dob,
+            age: b.patientAge,
+            gender: b.patientGender,
+            email: b.patientEmail
+          }, members.length === 0 ? 'Primary User' : 'Previous Patient');
+        }
+      });
+    } catch (e) {}
+
+    return members;
+  },
+
+  async handleCustomerMobileLookup(val) {
+    const mobile = String(val).replace(/\D/g, '').slice(0, 10);
+    if (mobile.length < 10) {
+      this.familyPopupShownForMobile = '';
+      return;
+    }
+
+    // STEP A: 0ms Instant Local Lookup
+    const localMembers = this.collectLocalCustomerAndFamily(mobile);
+    if (localMembers.length > 0) {
+      this.lookupMembersList = localMembers;
+      this.applySelectedPersonToForm(localMembers[0], mobile);
+      if (localMembers.length > 1) {
+        this.openFamilyMemberSelectModal(mobile, false);
+      }
+    } else {
+      this.activeMembership = null;
+      const idTag = document.getElementById('disp-patient-id-tag');
       if (idTag) {
         idTag.className = 'id-tag-pill';
         idTag.textContent = `ID: SCD_CUST_${mobile.slice(-6)}`;
       }
       this.renderInPageCart();
+    }
+
+    // STEP B: Parallel Live Cloud Sync
+    if (navigator.onLine && typeof Api !== 'undefined') {
+      try {
+        const [profRes, famRes] = await Promise.all([
+          Api.request('getProfile', { userId: mobile, mobile }).catch(() => null),
+          Api.request('getFamilyMembers', { userId: mobile, mobile }).catch(() => null)
+        ]);
+
+        const u = profRes?.data || profRes?.profile || profRes?.user;
+        const cloudMembers = [];
+        const seen = new Set();
+
+        const addCloudPerson = (obj, relLabel) => {
+          if (!obj) return;
+          const rawName = obj.Name || obj.name || obj.FullName || obj.memberName || '';
+          const { cleanName, salutation } = this.extractSalutationAndName(rawName, obj.Salutation || obj.salutation || '');
+          if (!cleanName || seen.has(cleanName.toLowerCase())) return;
+          seen.add(cleanName.toLowerCase());
+
+          cloudMembers.push({
+            id: obj.UserID || obj.MemberID || obj.id || `CUST_${mobile}`,
+            name: cleanName,
+            salutation,
+            dob: this.normalizeDobForDateInput(obj.DOB || obj.dob || obj.DateOfBirth || ''),
+            age: obj.Age || obj.age || '',
+            gender: obj.Gender || obj.gender || 'Male',
+            email: obj.Email || obj.email || '',
+            membership: obj.Membership || obj.membership || 'Regular',
+            relationLabel: obj.Relation || obj.relation || relLabel
+          });
+        };
+
+        if (u && (u.Name || u.name)) {
+          addCloudPerson(u, 'Primary User');
+        }
+
+        const famList = famRes?.members || famRes?.family || famRes?.data || (Array.isArray(famRes) ? famRes : []);
+        if (Array.isArray(famList)) {
+          famList.forEach(fm => addCloudPerson(fm, fm.Relation || fm.relation || 'Family Member'));
+        }
+
+        localMembers.forEach(lm => {
+          if (!seen.has(lm.name.toLowerCase())) {
+            seen.add(lm.name.toLowerCase());
+            cloudMembers.push(lm);
+          }
+        });
+
+        if (cloudMembers.length > 0) {
+          this.lookupMembersList = cloudMembers;
+
+          localStorage.setItem(`selfcare_profile_${mobile}`, JSON.stringify({
+            ...cloudMembers[0],
+            mobile,
+            familyMembers: cloudMembers.slice(1)
+          }));
+
+          const currentNameVal = String(document.getElementById('cust-name-input')?.value || '').trim();
+          if (!currentNameVal || currentNameVal.toLowerCase() === cloudMembers[0].name.toLowerCase()) {
+            this.applySelectedPersonToForm(cloudMembers[0], mobile);
+          }
+
+          if (cloudMembers.length > 1) {
+            if (this.familyPopupShownForMobile !== mobile) {
+              this.openFamilyMemberSelectModal(mobile, false);
+            } else {
+              this.renderFamilyPickerList(mobile);
+            }
+          }
+        }
+      } catch (err) {}
     }
   },
 
@@ -786,11 +1099,11 @@ const TechnicianApp = {
 
     if (submitBtn) {
       if (mode === 'LINK') {
-        submitBtn.textContent = 'Generate & Send WhatsApp Payment Link';
+        submitBtn.textContent = 'Send WhatsApp to Pay Bill';
       } else if (mode === 'UPI_QR') {
-        submitBtn.textContent = 'Verify Counter QR & Send Bill to WhatsApp';
+        submitBtn.textContent = 'Verify Counter QR & Generate Bill';
       } else {
-        submitBtn.textContent = 'Generate Bill & Send to WhatsApp';
+        submitBtn.textContent = 'Generate Bill';
       }
     }
   },
@@ -820,7 +1133,7 @@ const TechnicianApp = {
     const salutation = document.getElementById('cust-salutation-select').value;
     const name = document.getElementById('cust-name-input').value.trim();
     const age = document.getElementById('cust-age-input').value.trim();
-    const dob = document.getElementById('cust-dob-input').value.trim();
+    const dob = this.normalizeDobForDateInput(document.getElementById('cust-dob-input').value.trim());
     const gender = document.getElementById('cust-gender-select').value;
     const email = document.getElementById('cust-email-input').value.trim();
     const doctor = document.getElementById('cust-doctor-input').value.trim() || 'Self / Walk-In';
@@ -848,6 +1161,7 @@ const TechnicianApp = {
       doctor,
       referringDoctor: doctor,
       doctorName: doctor,
+      itemsSnapshot: [...this.inPageCart],
       finalAmount,
       totalMrp,
       subtotal,
@@ -856,7 +1170,7 @@ const TechnicianApp = {
       couponCode: this.appliedCoupon?.code || '',
       couponLabel: this.appliedCoupon?.label || '',
       isReferralDiscount: Boolean(this.appliedCoupon?.isReferral),
-      billedByTechId: this.currentTech?.staffId || 'TechlabDesk',
+      billedByTechId: this.currentTech?.staffId || 'SCDTECH001',
       billedByTechName: this.currentTech?.name || 'Mohamed Adamkani',
       technicianName: this.currentTech?.name || 'Mohamed Adamkani',
       branchId: this.currentTech?.branchId || 'VETTUVANKENI_BRANCH',
@@ -889,7 +1203,9 @@ const TechnicianApp = {
       return;
     }
 
-    this.initiateCustomerPaymentLink(this.pendingBookingData);
+    // WhatsApp Link Mode: Create Direct Razorpay Link & open Customer WhatsApp
+    this.isFinalizingOnlineBill = false;
+    this.initiateCustomerPaymentLink(this.pendingBookingData, true);
   },
 
   confirmCashAndGenerateBill() {
@@ -919,58 +1235,154 @@ const TechnicianApp = {
   },
 
   /* =========================================================
-     10. 5-MINUTE COUNTDOWN TIMER & PAYMENT LINK
+     10. DIRECT RAZORPAY PAYMENT LINK (GPAY / PHONEPE / CARD / EMI)
+         + AUTO-CLOSE BILL & AUTO-SEND INVOICE PDF ON WHATSAPP
      ========================================================= */
-  async initiateCustomerPaymentLink(data) {
-    if (this.activePaymentLinkId && this.linkExpiryTimestamp && Date.now() < this.linkExpiryTimestamp) {
-      Utils.showToast('Payment link is still active! Wait for the 5-minute timer to complete or check status.', 'info');
+  buildPaymentLinkWhatsAppMessage(data, payUrl) {
+    const branchName = data.branchName || this.currentTech?.branchName || 'Vettuvankeni Branch';
+    const branchAddress = data.branchAddress || this.currentTech?.branchAddress || 'Masjid Street, 4th Main Road, Vettuvankeni, ECR, Chennai - 600115';
+    const branchPhone = data.branchPhone || this.currentTech?.branchPhone || '+91 7010174890';
+    const testNames = (data.itemsSnapshot || this.inPageCart || []).map(i => i.name).join(', ') || 'Diagnostic Lab Tests';
+
+    return (
+      `*SELFCARE DIAGNOSTICS - LAB BILL PAYMENT*\n` +
+      `_(${branchName})_\n` +
+      `----------------------------------------\n` +
+      `*Booking ID:* ${data.bookingId}\n` +
+      `*Patient:* ${data.name} (${data.age} Yrs / ${data.gender})\n` +
+      `*Tests:* ${testNames}\n` +
+      `*Amount to Pay:* *Rs. ${data.finalAmount}*\n` +
+      `----------------------------------------\n` +
+      `*Tap Link to Pay Directly via Razorpay (GPay / PhonePe / Paytm / Card / EMI):*\n` +
+      `${payUrl}\n\n` +
+      `_Note: Valid for 5 minutes. Your official invoice PDF will be sent on WhatsApp right after payment._\n` +
+      `_${branchAddress}_\n` +
+      `_Helpline: ${branchPhone}_`
+    );
+  },
+
+  async initiateCustomerPaymentLink(data, openWhatsAppImmediately = true) {
+    const phone = String(data.mobile || '').replace(/\D/g, '').slice(-10);
+
+    if (this.activePaymentLinkId && this.activePaymentShortUrl && this.linkExpiryTimestamp && Date.now() < this.linkExpiryTimestamp) {
+      if (openWhatsAppImmediately) {
+        const msg = this.buildPaymentLinkWhatsAppMessage(data, this.activePaymentShortUrl);
+        window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+      }
       return;
     }
 
-    Utils.showToast('Creating 5-minute Razorpay Payment Link...', 'info');
+    Utils.showToast('Generating Direct Razorpay Link (GPay / PhonePe / Card / EMI)...', 'info');
 
     try {
       const res = await Api.request('createPaymentLink', {
         amount: data.finalAmount,
         bookingId: data.bookingId,
-        mobile: data.mobile,
+        mobile: phone,
         patientName: data.name,
         email: data.email,
+        upi_link: false, // Full Razorpay Hosted Page (GPay, PhonePe, Paytm, Cards, EMI, Netbanking)
+        methods: { upi: true, card: true, emi: true, netbanking: true, wallet: true },
         doctor: data.doctor,
-        referringDoctor: data.doctor,
-        doctorName: data.doctor,
         billedByTechName: data.billedByTechName,
-        technicianName: data.technicianName,
         branchId: data.branchId,
         branchName: data.branchName
       });
 
       const linkData = res?.data || res;
-      if (!linkData || !linkData.shortUrl) {
-        throw new Error(linkData?.message || 'Failed to create payment link');
+      const directRazorpayUrl = linkData?.shortUrl || linkData?.short_url || linkData?.paymentLinkUrl || '';
+      const paymentLinkId = linkData?.paymentLinkId || linkData?.id || '';
+
+      if (!directRazorpayUrl || !paymentLinkId) {
+        throw new Error(linkData?.message || 'Unable to generate Razorpay payment link. Check backend Razorpay keys.');
       }
 
-      this.activePaymentLinkId = linkData.paymentLinkId;
+      this.activePaymentLinkId = paymentLinkId;
+      this.activePaymentShortUrl = directRazorpayUrl;
       this.linkExpiryTimestamp = Date.now() + (5 * 60 * 1000);
 
-      const msg = `*SELFCARE DIAGNOSTICS - LAB BILL PAYMENT*\n` +
-        `----------------------------------------\n` +
-        `Dear *${data.name}*,\n` +
-        `Your lab test bill *#${data.bookingId}* has been generated for *₹${data.finalAmount}*.\n\n` +
-        `*Click to Pay via GPay / PhonePe / Card:*\n` +
-        `${linkData.shortUrl}\n\n` +
-        `*Note:* This payment link is valid for 5 minutes only.\n` +
-        `_Once payment is successful, your official invoice PDF will be issued immediately._`;
-
-      window.open(`https://wa.me/91${data.mobile}?text=${encodeURIComponent(msg)}`, '_blank');
-
+      const pollingBox = document.getElementById('link-polling-state');
       document.getElementById('link-waiting-state').style.display = 'none';
       document.getElementById('link-expired-state').style.display = 'none';
-      document.getElementById('link-polling-state').style.display = 'block';
+      pollingBox.style.display = 'block';
+
+      let manualSendWrap = document.getElementById('manual-wa-link-send-wrap');
+      if (!manualSendWrap) {
+        manualSendWrap = document.createElement('div');
+        manualSendWrap.id = 'manual-wa-link-send-wrap';
+        manualSendWrap.style.margin = '10px 0';
+        pollingBox.insertBefore(manualSendWrap, pollingBox.firstChild);
+      }
+
+      manualSendWrap.innerHTML = `
+        <div style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:11.5px; text-align:left;">
+          <div><strong>Customer:</strong> ${Utils.escapeHtml(data.name)} (+91 ${Utils.escapeHtml(phone)})</div>
+          <div><strong>Amount Payable:</strong> Rs. ${data.finalAmount} (GPay • PhonePe • Card • EMI)</div>
+          <div style="font-size:10.5px; color:#047857; margin-top:2px; word-break:break-all;"><strong>Direct Razorpay Link:</strong> ${Utils.escapeHtml(directRazorpayUrl)}</div>
+        </div>
+        <button type="button" class="primary-action-btn" style="width:100%; margin-bottom:8px;" onclick="TechnicianApp.sendPaymentLinkManuallyOnWhatsApp()">
+          📲 Resend Razorpay Link on WhatsApp (+91 ${Utils.escapeHtml(phone)})
+        </button>
+      `;
+
+      // Open Customer WhatsApp directly with Razorpay Link
+      if (openWhatsAppImmediately) {
+        const msg = this.buildPaymentLinkWhatsAppMessage(data, directRazorpayUrl);
+        window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+      }
 
       this.startLinkCountdownAndPolling();
     } catch (err) {
       Utils.showToast(`Error: ${err.message}`, 'error');
+    }
+  },
+
+  sendPaymentLinkManuallyOnWhatsApp() {
+    if (!this.pendingBookingData || !this.activePaymentShortUrl) {
+      Utils.showToast('Please click "Send WhatsApp to Pay Bill" first', 'error');
+      return;
+    }
+    const data = this.pendingBookingData;
+    const phone = String(data.mobile || '').replace(/\D/g, '').slice(-10);
+    const msg = this.buildPaymentLinkWhatsAppMessage(data, this.activePaymentShortUrl);
+    window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  },
+
+  async completeOnlinePaidBillAndSendInvoice(paymentId = '') {
+    if (this.isFinalizingOnlineBill || !this.pendingBookingData) return;
+    this.isFinalizingOnlineBill = true;
+
+    try {
+      this.clearLinkTimers();
+      Utils.showToast('Payment Received! Closing bill & sending invoice to customer WhatsApp...', 'success');
+
+      const bookingToFinalize = { ...this.pendingBookingData };
+      this.saveDoctorToDirectory(bookingToFinalize.doctor);
+
+      await this.finalizeAndStoreBooking({
+        ...bookingToFinalize,
+        cashTendered: 0,
+        changeReturned: 0,
+        paymentMode: 'ONLINE_RAZORPAY',
+        paymentStatus: 'PAID',
+        razorpayPaymentId: paymentId
+      });
+
+      // Reset payment link UI state
+      document.getElementById('link-waiting-state').style.display = 'block';
+      document.getElementById('link-polling-state').style.display = 'none';
+      document.getElementById('link-expired-state').style.display = 'none';
+      this.activePaymentLinkId = null;
+      this.activePaymentShortUrl = '';
+      this.linkExpiryTimestamp = null;
+      this.pendingBookingData = null;
+
+      // Automatically send Official Invoice PDF / WhatsApp message to Customer
+      setTimeout(() => {
+        this.shareInvoicePDFOnWhatsApp();
+      }, 600);
+    } finally {
+      this.isFinalizingOnlineBill = false;
     }
   },
 
@@ -995,31 +1407,17 @@ const TechnicianApp = {
     }, 1000);
 
     this.linkPollingInterval = setInterval(async () => {
-      if (!this.activePaymentLinkId) return;
+      if (!this.activePaymentLinkId || this.isFinalizingOnlineBill) return;
 
       try {
         const res = await Api.request('checkPaymentLinkStatus', {
-          paymentLinkId: this.activePaymentLinkId
+          paymentLinkId: this.activePaymentLinkId,
+          bookingId: this.pendingBookingData?.bookingId || ''
         });
         const statusData = res?.data || res;
 
         if (statusData && statusData.isPaid) {
-          this.clearLinkTimers();
-          Utils.showToast('Payment Received Online!', 'success');
-          this.saveDoctorToDirectory(this.pendingBookingData.doctor);
-
-          this.finalizeAndStoreBooking({
-            ...this.pendingBookingData,
-            paymentMode: 'ONLINE_LINK',
-            paymentStatus: 'PAID',
-            razorpayPaymentId: statusData.paymentId || ''
-          });
-
-          document.getElementById('link-waiting-state').style.display = 'block';
-          document.getElementById('link-polling-state').style.display = 'none';
-          document.getElementById('link-expired-state').style.display = 'none';
-          this.activePaymentLinkId = null;
-          this.linkExpiryTimestamp = null;
+          await this.completeOnlinePaidBillAndSendInvoice(statusData.paymentId || '');
         } else if (statusData && statusData.isExpired) {
           this.handlePaymentLinkExpired();
         }
@@ -1030,17 +1428,19 @@ const TechnicianApp = {
   handlePaymentLinkExpired() {
     this.clearLinkTimers();
     this.activePaymentLinkId = null;
+    this.activePaymentShortUrl = '';
     this.linkExpiryTimestamp = null;
 
     document.getElementById('link-polling-state').style.display = 'none';
     document.getElementById('link-expired-state').style.display = 'block';
-    Utils.showToast('Payment link has expired after 5 minutes. Please generate a new link.', 'error');
+    Utils.showToast('Payment link expired after 5 minutes. Generate a new link.', 'error');
   },
 
   regeneratePaymentLink() {
     if (this.pendingBookingData) {
       document.getElementById('link-expired-state').style.display = 'none';
-      this.initiateCustomerPaymentLink(this.pendingBookingData);
+      this.isFinalizingOnlineBill = false;
+      this.initiateCustomerPaymentLink(this.pendingBookingData, true);
     }
   },
 
@@ -1056,31 +1456,28 @@ const TechnicianApp = {
   },
 
   async manualCheckLinkPayment() {
-    if (!this.activePaymentLinkId) return;
-    Utils.showToast('Checking status with Razorpay...', 'info');
+    if (!this.activePaymentLinkId || this.isFinalizingOnlineBill) return;
+    Utils.showToast('Checking live status with Razorpay...', 'info');
 
-    const res = await Api.request('checkPaymentLinkStatus', { paymentLinkId: this.activePaymentLinkId });
-    const statusData = res?.data || res;
-
-    if (statusData && statusData.isPaid) {
-      this.clearLinkTimers();
-      Utils.showToast('Payment Verified!', 'success');
-      this.saveDoctorToDirectory(this.pendingBookingData.doctor);
-      this.finalizeAndStoreBooking({
-        ...this.pendingBookingData,
-        paymentMode: 'ONLINE_LINK',
-        paymentStatus: 'PAID',
-        razorpayPaymentId: statusData.paymentId || ''
+    try {
+      const res = await Api.request('checkPaymentLinkStatus', {
+        paymentLinkId: this.activePaymentLinkId,
+        bookingId: this.pendingBookingData?.bookingId || ''
       });
-      document.getElementById('link-waiting-state').style.display = 'block';
-      document.getElementById('link-polling-state').style.display = 'none';
-    } else {
-      Utils.showToast('Payment not yet completed by customer', 'info');
+      const statusData = res?.data || res;
+
+      if (statusData && statusData.isPaid) {
+        await this.completeOnlinePaidBillAndSendInvoice(statusData.paymentId || '');
+      } else {
+        Utils.showToast('Payment not yet completed by customer', 'info');
+      }
+    } catch (e) {
+      Utils.showToast('Unable to verify status right now. Retrying...', 'info');
     }
   },
 
   /* =========================================================
-     11. FINALIZE, STORE BOOKING & AUTOMATIC WHATSAPP DISPATCH
+     11. FINALIZE BILL, SAVE RECEIPT TO GOOGLE DRIVE & OPEN RECEIPT MODAL
      ========================================================= */
   async finalizeAndStoreBooking(data) {
     const techName = data.billedByTechName || this.currentTech?.name || 'Mohamed Adamkani';
@@ -1103,8 +1500,14 @@ const TechnicianApp = {
       referringDoctor: docName,
       doctorName: docName,
       doctor: docName,
+      bookingSource: 'LAB_DESK',
+      source: 'LAB_DESK',
+      channel: 'WALK_IN',
+      isLabDesk: true,
+      isWalkIn: true,
       collectionType: 'lab',
-      items: [...this.inPageCart],
+      address: `Direct Lab Walk-In (${branchName})`,
+      items: Array.isArray(data.itemsSnapshot) && data.itemsSnapshot.length > 0 ? data.itemsSnapshot : [...this.inPageCart],
       totalAmount: data.totalMrp,
       subtotal: data.subtotal || (data.finalAmount + (data.membershipDiscount || 0) + (data.couponDiscount || 0)),
       membershipDiscount: data.membershipDiscount || 0,
@@ -1118,10 +1521,11 @@ const TechnicianApp = {
       changeReturned: data.changeReturned || 0,
       paymentMode: data.paymentMode,
       paymentStatus: data.paymentStatus,
+      razorpayPaymentId: data.razorpayPaymentId || '',
       bookingStatus: 'SAMPLE_COLLECTED',
       reportStatus: 'PENDING_ENTRY',
       reportData: {},
-      billedByTechId: data.billedByTechId || this.currentTech?.staffId || 'TechlabDesk',
+      billedByTechId: data.billedByTechId || this.currentTech?.staffId || 'SCDTECH001',
       billedByTechName: techName,
       technicianName: techName,
       branchId: branchId,
@@ -1154,18 +1558,37 @@ const TechnicianApp = {
     this.clearInPageCart();
     this.loadPreviousBills();
 
-    await this.autoSendCompletedBillToWhatsApp(bookingRecord);
+    // Auto-archive Receipt PDF into Google Drive Receipt Folder
+    this.uploadReceiptPdfToDrive(bookingRecord);
+
+    Utils.showToast('Bill generated! Invoice ready to share on WhatsApp.', 'success');
   },
 
-  async autoSendCompletedBillToWhatsApp(b) {
-    const autoSentViaCloudApi = await this.triggerMetaWhatsAppAutoSend(b, false);
-    if (autoSentViaCloudApi) return;
+  async uploadReceiptPdfToDrive(b) {
+    if (!navigator.onLine || typeof Api === 'undefined') return;
+    try {
+      const doc = await this.buildVectorInvoicePDF(b);
+      const dataUri = doc.output('datauristring');
+      const pdfBase64 = dataUri.split(',')[1] || '';
+      const fileName = this.getInvoiceFileName(b);
 
-    await this.shareInvoicePDFOnWhatsApp(true);
+      await Api.request('uploadFileToDrive', {
+        folderId: this.RECEIPT_DRIVE_FOLDER_ID,
+        fileName: fileName,
+        mimeType: 'application/pdf',
+        base64: pdfBase64,
+        bookingId: b.bookingId,
+        patientName: b.patientName,
+        patientPhone: b.patientPhone,
+        fileCategory: 'RECEIPT'
+      });
+    } catch (e) {
+      console.warn('Receipt Drive upload deferred:', e);
+    }
   },
 
   /* =========================================================
-     12. INVOICE RENDERING, MONOCHROME VECTOR PDF, DIRECT PRINT & WHATSAPP
+     12. COMPACT 1-PAGE A4 VECTOR PDF & PRINT (AUTO PAGE-2 ONLY FOR 12+ ITEMS)
      ========================================================= */
   getInvoiceFileName(b) {
     const rawName = String(b?.patientName || 'Customer')
@@ -1299,10 +1722,6 @@ const TechnicianApp = {
     });
   },
 
-  /**
-   * Builds a 1-Page Exact A4 Monochrome Vector PDF using jsPDF.
-   * Zero solid black fills: uses bold black outlines & dark text only (Brand Logo retains color).
-   */
   async buildVectorInvoicePDF(b) {
     const JsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
     if (!JsPDFClass) {
@@ -1318,9 +1737,9 @@ const TechnicianApp = {
 
     const pageW = 210;
     const pageH = 297;
-    const margin = 14;
+    const margin = 12;
     const contentW = pageW - margin * 2;
-    let y = 14;
+    let y = 12;
 
     const branchText = b.branchName || this.currentTech?.branchName || 'Vettuvankeni Branch';
     const branchAddress = b.branchAddress || this.currentTech?.branchAddress || 'Masjid Street, 4th Main Road, Mahatma Gandhi Nagar, Vettuvankeni, ECR, Chennai - 600115';
@@ -1334,63 +1753,61 @@ const TechnicianApp = {
     }) + ', ' + billDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     const sampleId = `SC${billDate.toISOString().slice(2, 10).replace(/-/g, '')}${String(b.bookingId).slice(-3)}`;
 
-    // 1. Brand Logo (Top Left - Color preserved) + Monochrome Branch Tag (Top Right)
+    // 1. Compact Header
     const logoAsset = await this.loadImageAsDataUrl('assets/images/logo.png');
     if (logoAsset && logoAsset.dataUrl) {
-      const logoH = 14;
-      const logoW = Math.min(58, (logoAsset.width / logoAsset.height) * logoH);
+      const logoH = 12;
+      const logoW = Math.min(52, (logoAsset.width / logoAsset.height) * logoH);
       doc.addImage(logoAsset.dataUrl, 'PNG', margin, y, logoW, logoH, undefined, 'FAST');
     } else {
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
+      doc.setFontSize(16);
       doc.setTextColor(17, 24, 39);
-      doc.text('SELFCARE DIAGNOSTICS', margin, y + 7);
+      doc.text('SELFCARE DIAGNOSTICS', margin, y + 6);
     }
 
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(17, 24, 39);
     doc.setLineWidth(0.45);
-    doc.roundedRect(pageW - margin - 54, y + 3, 54, 8, 1.5, 1.5, 'FD');
+    doc.roundedRect(pageW - margin - 52, y + 2, 52, 7.5, 1.5, 1.5, 'FD');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
+    doc.setFontSize(8.2);
     doc.setTextColor(17, 24, 39);
-    doc.text(branchText, pageW - margin - 27, y + 8.3, { align: 'center' });
+    doc.text(branchText, pageW - margin - 26, y + 7, { align: 'center' });
 
-    y += 18;
+    y += 15;
     doc.setDrawColor(17, 24, 39);
-    doc.setLineWidth(0.5);
+    doc.setLineWidth(0.45);
     doc.line(margin, y, pageW - margin, y);
 
-    // 2. Title Banner: LABORATORY INVOICE (Monochrome)
-    y += 9;
+    // 2. Title
+    y += 6.5;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setTextColor(17, 24, 39);
     doc.text('LABORATORY INVOICE', margin, y);
 
-    y += 5;
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
+    doc.setFontSize(8.5);
     doc.setTextColor(75, 85, 99);
-    doc.text('Diagnostic Laboratory Services', margin, y);
+    doc.text('Diagnostic Laboratory Services', pageW - margin, y, { align: 'right' });
 
-    // 3. Side-by-Side Patient Details & Visit Details Boxes (Bold Outlines, No Black Fill)
-    y += 6;
-    const boxGap = 5;
+    // 3. Compact Patient & Visit Details Boxes
+    y += 4;
+    const boxGap = 4;
     const boxW = (contentW - boxGap) / 2;
-    const boxH = 44;
+    const boxH = 36;
 
-    // Left Box: Patient Details
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(17, 24, 39);
-    doc.setLineWidth(0.45);
+    doc.setLineWidth(0.4);
     doc.roundedRect(margin, y, boxW, boxH, 1.5, 1.5, 'FD');
-    doc.line(margin, y + 7.5, margin + boxW, y + 7.5);
+    doc.line(margin, y + 6.5, margin + boxW, y + 6.5);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
     doc.setTextColor(17, 24, 39);
-    doc.text('Patient Details', margin + 4, y + 5.2);
+    doc.text('Patient Details', margin + 3.5, y + 4.6);
 
     const pRows = [
       ['Name', (b.patientName || 'PATIENT').toUpperCase()],
@@ -1399,33 +1816,32 @@ const TechnicianApp = {
       ['Ref. Doctor', b.referringDoctor || b.doctorName || 'Self / Walk-In']
     ];
 
-    let py = y + 13;
+    let py = y + 11.2;
     pRows.forEach(([lbl, val]) => {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.8);
+      doc.setFontSize(8.2);
       doc.setTextColor(75, 85, 99);
-      doc.text(lbl, margin + 4, py);
-      doc.text(':', margin + 27, py);
+      doc.text(lbl, margin + 3.5, py);
+      doc.text(':', margin + 24, py);
 
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(17, 24, 39);
-      const wrappedVal = doc.splitTextToSize(String(val), boxW - 32);
-      doc.text(wrappedVal[0], margin + 30, py);
-      py += 7.2;
+      const wrappedVal = doc.splitTextToSize(String(val), boxW - 29);
+      doc.text(wrappedVal[0], margin + 26.5, py);
+      py += 6;
     });
 
-    // Right Box: Visit Details
     const rightBoxX = margin + boxW + boxGap;
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(17, 24, 39);
-    doc.setLineWidth(0.45);
+    doc.setLineWidth(0.4);
     doc.roundedRect(rightBoxX, y, boxW, boxH, 1.5, 1.5, 'FD');
-    doc.line(rightBoxX, y + 7.5, rightBoxX + boxW, y + 7.5);
+    doc.line(rightBoxX, y + 6.5, rightBoxX + boxW, y + 6.5);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
     doc.setTextColor(17, 24, 39);
-    doc.text('Visit Details', rightBoxX + 4, y + 5.2);
+    doc.text('Visit Details', rightBoxX + 3.5, y + 4.6);
 
     const vRows = [
       ['Invoice No.', String(b.bookingId)],
@@ -1435,62 +1851,78 @@ const TechnicianApp = {
       ['Report TAT', 'Within 6-12 Hours']
     ];
 
-    let vy = y + 12.5;
+    let vy = y + 10.8;
     vRows.forEach(([lbl, val]) => {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(8);
       doc.setTextColor(75, 85, 99);
-      doc.text(lbl, rightBoxX + 4, vy);
-      doc.text(':', rightBoxX + 26, vy);
+      doc.text(lbl, rightBoxX + 3.5, vy);
+      doc.text(':', rightBoxX + 23, vy);
 
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(17, 24, 39);
-      const wrappedVal = doc.splitTextToSize(String(val), boxW - 31);
-      doc.text(wrappedVal[0], rightBoxX + 29, vy);
-      vy += 6.2;
+      const wrappedVal = doc.splitTextToSize(String(val), boxW - 28);
+      doc.text(wrappedVal[0], rightBoxX + 25.5, vy);
+      vy += 5.1;
     });
 
-    // 4. Diagnostic Items Table (Bold Outlined Header - No Solid Black Fill)
-    y += boxH + 6;
+    // 4. Compact Items Table
+    y += boxH + 4.5;
     const colX = {
       idx: margin + 5,
-      desc: margin + 14,
-      tat: margin + 132,
+      desc: margin + 13,
+      tat: margin + 134,
       amt: pageW - margin - 4
     };
-    const descMaxW = 104;
+    const descMaxW = 108;
 
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(17, 24, 39);
-    doc.setLineWidth(0.55);
-    doc.rect(margin, y, contentW, 8.5, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.8);
-    doc.setTextColor(17, 24, 39);
-    doc.text('#', colX.idx, y + 5.7, { align: 'center' });
-    doc.text('Test / Package Description', colX.desc, y + 5.7);
-    doc.text('Report Time', colX.tat, y + 5.7, { align: 'center' });
-    doc.text('Amount (Rs.)', colX.amt, y + 5.7, { align: 'right' });
+    const drawTableHeader = (posY) => {
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(17, 24, 39);
+      doc.setLineWidth(0.5);
+      doc.rect(margin, posY, contentW, 7.5, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.4);
+      doc.setTextColor(17, 24, 39);
+      doc.text('#', colX.idx, posY + 5, { align: 'center' });
+      doc.text('Test / Package Description', colX.desc, posY + 5);
+      doc.text('Report Time', colX.tat, posY + 5, { align: 'center' });
+      doc.text('Amount (Rs.)', colX.amt, posY + 5, { align: 'right' });
+    };
 
-    y += 8.5;
+    drawTableHeader(y);
+    y += 7.5;
+
     const items = b.items || [];
+    const footerReserveHeight = 82;
+
     items.forEach((item, idx) => {
       const name = String(item.name || item.TestName || item.PackageName || 'Diagnostic Item');
       const tat = String(item.TAT || '6-12 Hours');
       const priceStr = Number(item.price || 0).toLocaleString('en-IN');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.8);
+      doc.setFontSize(8.3);
       const descLines = doc.splitTextToSize(name, descMaxW);
-      const rowH = Math.max(8.5, descLines.length * 4.5 + 4);
+      const rowH = Math.max(7, descLines.length * 4 + 3);
+
+      const isLastItem = idx === items.length - 1;
+      const limitY = isLastItem ? (pageH - footerReserveHeight) : (pageH - 18);
+
+      if (y + rowH > limitY) {
+        doc.addPage();
+        y = 14;
+        drawTableHeader(y);
+        y += 7.5;
+      }
 
       doc.setDrawColor(209, 213, 219);
-      doc.setLineWidth(0.3);
+      doc.setLineWidth(0.28);
       doc.rect(margin, y, contentW, rowH, 'D');
 
-      const textY = y + 5.5;
+      const textY = y + 4.7;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.8);
+      doc.setFontSize(8.3);
       doc.setTextColor(75, 85, 99);
       doc.text(String(idx + 1), colX.idx, textY, { align: 'center' });
 
@@ -1508,28 +1940,33 @@ const TechnicianApp = {
       y += rowH;
     });
 
-    // 5. Bottom Summary: Monochrome Note Box & Totals Breakdown
-    y += 6;
+    // 5. Compact Bottom Summary & Totals
+    y += 4.5;
+    if (y + 72 > pageH - 10) {
+      doc.addPage();
+      y = 16;
+    }
+
     const leftNoteW = 94;
     const rightTotX = margin + leftNoteW + 6;
     const rightTotW = contentW - leftNoteW - 6;
 
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(209, 213, 219);
-    doc.setLineWidth(0.35);
-    doc.roundedRect(margin, y, leftNoteW, 30, 1.5, 1.5, 'FD');
+    doc.setLineWidth(0.32);
+    doc.roundedRect(margin, y, leftNoteW, 26, 1.5, 1.5, 'FD');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(8.8);
     doc.setTextColor(17, 24, 39);
-    doc.text('Note:', margin + 4, y + 6);
+    doc.text('Note:', margin + 3.5, y + 5.2);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.2);
+    doc.setFontSize(7.8);
     doc.setTextColor(55, 65, 81);
-    const note1 = doc.splitTextToSize('• Certified NABL accredited clinical pathology analyzers used.', leftNoteW - 8);
-    const note2 = doc.splitTextToSize('• Digital verified reports delivered to registered WhatsApp & App within 6-12 hours.', leftNoteW - 8);
-    doc.text(note1, margin + 4, y + 11.5);
-    doc.text(note2, margin + 4, y + 19.5);
+    const note1 = doc.splitTextToSize('• Certified NABL accredited clinical pathology analyzers used.', leftNoteW - 7);
+    const note2 = doc.splitTextToSize('• Digital verified reports delivered to registered WhatsApp & App within 6-12 hours.', leftNoteW - 7);
+    doc.text(note1, margin + 3.5, y + 10);
+    doc.text(note2, margin + 3.5, y + 17);
 
     const totalMrp = Number(b.totalAmount || b.finalAmount || 0);
     const subtotal = Number(b.subtotal || (b.finalAmount + (b.membershipDiscount || 0) + (b.couponDiscount || 0)));
@@ -1537,16 +1974,16 @@ const TechnicianApp = {
     const vipDisc = Number(b.membershipDiscount || b.vipDiscount || 0);
     const refDisc = Number(b.couponDiscount || b.referralDiscount || 0);
 
-    let ty = y + 4.5;
+    let ty = y + 4;
     const drawTotRow = (label, valueStr, isBoldLabel = false) => {
       doc.setFont('helvetica', isBoldLabel ? 'bold' : 'normal');
-      doc.setFontSize(8.8);
+      doc.setFontSize(8.4);
       doc.setTextColor(17, 24, 39);
       doc.text(label, rightTotX, ty);
       doc.text(':', rightTotX + 49, ty);
       doc.setFont('helvetica', 'bold');
       doc.text(valueStr, pageW - margin, ty, { align: 'right' });
-      ty += 5.8;
+      ty += 5;
     };
 
     drawTotRow('Subtotal (MRP)', formatRs(totalMrp));
@@ -1563,93 +2000,89 @@ const TechnicianApp = {
 
     drawTotRow('Sample Collection', 'FREE', true);
 
-    ty += 1;
-    // Bold Outlined Grand Total Box (No Black Fill)
+    ty += 0.8;
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(17, 24, 39);
-    doc.setLineWidth(0.7);
-    doc.roundedRect(rightTotX, ty - 4.5, rightTotW, 10, 1.5, 1.5, 'FD');
+    doc.setLineWidth(0.65);
+    doc.roundedRect(rightTotX, ty - 4, rightTotW, 9, 1.5, 1.5, 'FD');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
     doc.setTextColor(17, 24, 39);
-    doc.text('TOTAL AMOUNT PAID', rightTotX + 4, ty + 2);
-    doc.setFontSize(11.5);
-    doc.text(formatRs(b.finalAmount), pageW - margin - 4, ty + 2.2, { align: 'right' });
+    doc.text('TOTAL AMOUNT PAID', rightTotX + 3.5, ty + 1.8);
+    doc.setFontSize(10.8);
+    doc.text(formatRs(b.finalAmount), pageW - margin - 3.5, ty + 2, { align: 'right' });
 
-    y = Math.max(y + 34, ty + 10);
+    y = Math.max(y + 29, ty + 8.5);
 
-    // 6. Payment Information Strip (Bold Outline)
+    // 6. Payment Strip
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(17, 24, 39);
+    doc.setLineWidth(0.42);
+    doc.roundedRect(margin, y, contentW, 8, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.4);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Payment Information', margin + 3.5, y + 5.3);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Payment Mode : ${b.paymentMode || 'CASH'}`, margin + 70, y + 5.3);
+
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(17, 24, 39);
     doc.setLineWidth(0.45);
-    doc.roundedRect(margin, y, contentW, 9, 1.5, 1.5, 'FD');
+    doc.roundedRect(pageW - margin - 21, y + 1.5, 17, 5, 1, 1, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.8);
+    doc.setTextColor(17, 24, 39);
+    doc.text(b.paymentStatus || 'PAID', pageW - margin - 12.5, y + 5, { align: 'center' });
 
+    // 7. Compact Footer pinned neatly inside Page 1
+    const footerStartY = Math.max(y + 11, pageH - 42);
+
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(17, 24, 39);
+    doc.setLineWidth(0.45);
+    doc.roundedRect(margin, footerStartY, contentW, 8, 1.5, 1.5, 'FD');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.8);
     doc.setTextColor(17, 24, 39);
-    doc.text('Payment Information', margin + 4, y + 6);
+    doc.text(`FREE HOME COLLECTION AVAILABLE  |  Book via Call / WhatsApp: ${branchPhone}`, pageW / 2, footerStartY + 5.3, { align: 'center' });
+
+    const addrY = footerStartY + 9.8;
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.32);
+    doc.roundedRect(margin, addrY, contentW, 14.5, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(17, 24, 39);
+    doc.text('SELFCARE DIAGNOSTICS', pageW / 2, addrY + 4.3, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
-    doc.text(`Payment Mode : ${b.paymentMode || 'CASH'}`, margin + 72, y + 6);
+    doc.setFontSize(7.8);
+    doc.setTextColor(55, 65, 81);
+    doc.text(branchAddress, pageW / 2, addrY + 8.8, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.8);
+    doc.setTextColor(17, 24, 39);
+    doc.text(`Phone: ${branchPhone}   |   Web: selfcarediagnostics.in   |   GSTIN: ${branchGstin}`, pageW / 2, addrY + 13, { align: 'center' });
+
+    const thanksY = addrY + 16.5;
+    doc.setDrawColor(209, 213, 219);
+    doc.line(margin, thanksY + 3, pageW / 2 - 46, thanksY + 3);
+    doc.line(pageW / 2 + 46, thanksY + 3, pageW - margin, thanksY + 3);
 
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(17, 24, 39);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(pageW - margin - 22, y + 1.8, 18, 5.4, 1, 1, 'FD');
+    doc.setLineWidth(0.4);
+    doc.roundedRect(pageW / 2 - 44, thanksY, 88, 6.2, 1.5, 1.5, 'FD');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(17, 24, 39);
-    doc.text(b.paymentStatus || 'PAID', pageW - margin - 13, y + 5.5, { align: 'center' });
-
-    // 7. Clean Monochrome Footer Section
-    const footerStartY = Math.max(y + 14, pageH - 48);
-
-    // 7a. Free Home Collection Banner (Bold Outline)
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(17, 24, 39);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(margin, footerStartY, contentW, 9, 1.5, 1.5, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.2);
-    doc.setTextColor(17, 24, 39);
-    doc.text(`FREE HOME COLLECTION AVAILABLE  |  Book via Call / WhatsApp: ${branchPhone}`, pageW / 2, footerStartY + 5.9, { align: 'center' });
-
-    // 7b. Branch Address & Contact Block (Monochrome)
-    const addrY = footerStartY + 11.5;
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(209, 213, 219);
-    doc.setLineWidth(0.35);
-    doc.roundedRect(margin, addrY, contentW, 16.5, 1.5, 1.5, 'FD');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
-    doc.setTextColor(17, 24, 39);
-    doc.text('SELFCARE DIAGNOSTICS', pageW / 2, addrY + 4.8, { align: 'center' });
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.2);
-    doc.setTextColor(55, 65, 81);
-    doc.text(branchAddress, pageW / 2, addrY + 9.8, { align: 'center' });
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.2);
-    doc.setTextColor(17, 24, 39);
-    doc.text(`Phone: ${branchPhone}   |   Web: selfcarediagnostics.in   |   GSTIN: ${branchGstin}`, pageW / 2, addrY + 14.5, { align: 'center' });
-
-    // 7c. Thank You Pill (Bold Outline)
-    const thanksY = addrY + 19.5;
-    doc.setDrawColor(209, 213, 219);
-    doc.line(margin, thanksY + 3.5, pageW / 2 - 48, thanksY + 3.5);
-    doc.line(pageW / 2 + 48, thanksY + 3.5, pageW - margin, thanksY + 3.5);
-
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(17, 24, 39);
-    doc.setLineWidth(0.45);
-    doc.roundedRect(pageW / 2 - 46, thanksY, 92, 7, 1.5, 1.5, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(17, 24, 39);
-    doc.text('Thank you for choosing Selfcare Diagnostics!', pageW / 2, thanksY + 4.8, { align: 'center' });
+    doc.text('Thank you for choosing Selfcare Diagnostics!', pageW / 2, thanksY + 4.2, { align: 'center' });
 
     return doc;
   },
@@ -1681,21 +2114,26 @@ const TechnicianApp = {
   },
 
   buildWhatsAppInvoiceCaption(b) {
-    const trackUrl = `https://selfcarediagnostics.in/booking.html?bookingId=${b.bookingId}`;
+    const trackUrl = `https://selfcarediagnostics.in/bookings.html?bookingId=${b.bookingId}`;
     const branchName = b.branchName || this.currentTech?.branchName || 'Vettuvankeni Branch';
     const branchAddress = b.branchAddress || this.currentTech?.branchAddress || 'Masjid Street, 4th Main Road, Vettuvankeni, ECR, Chennai - 600115';
     const branchPhone = b.branchPhone || this.currentTech?.branchPhone || '+91 7010174890';
+    const itemsList = (b.items || []).map(i => `• ${i.name} (Rs. ${i.price})`).join('\n');
 
     return (
       `*SELFCARE DIAGNOSTICS - OFFICIAL LAB INVOICE*\n` +
       `_(${branchName})_\n` +
       `----------------------------------------\n` +
-      `*Invoice No:* ${b.bookingId}\n` +
-      `*Patient:* ${b.patientName}\n` +
-      `*Doctor:* ${b.referringDoctor || 'Self / Walk-In'}\n` +
-      `*Amount Paid:* Rs. ${b.finalAmount} (${b.paymentStatus || 'PAID'})\n` +
+      `*Booking / Invoice ID:* ${b.bookingId}\n` +
+      `*Patient Name:* ${b.patientName}\n` +
+      `*Age / Gender:* ${b.patientAge || '-'} Yrs / ${b.patientGender || '-'}\n` +
+      `*Mobile:* +91 ${b.patientPhone}\n` +
+      `*Ref. Doctor:* ${b.referringDoctor || 'Self / Walk-In'}\n` +
       `----------------------------------------\n` +
-      `*Track Live Reports & Download Invoice:*\n` +
+      `*Booked Tests:*\n${itemsList}\n` +
+      `----------------------------------------\n` +
+      `*Total Amount:* Rs. ${b.finalAmount} (${b.paymentMode} • ${b.paymentStatus || 'PAID'})\n\n` +
+      `*Download Invoice & Track Live Reports:*\n` +
       `${trackUrl}\n\n` +
       `*FREE HOME COLLECTION AVAILABLE*\n` +
       `_${branchAddress}_\n` +
@@ -1704,58 +2142,12 @@ const TechnicianApp = {
     );
   },
 
-  async triggerMetaWhatsAppAutoSend(b, isSilentAuto = false) {
-    if (!navigator.onLine || typeof Api === 'undefined') return false;
-
-    try {
-      const doc = await this.buildVectorInvoicePDF(b);
-      const dataUri = doc.output('datauristring');
-      const pdfBase64 = dataUri.split(',')[1] || '';
-      const fileName = this.getInvoiceFileName(b);
-      const caption = this.buildWhatsAppInvoiceCaption(b);
-
-      const metaApiPayload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: `91${String(b.patientPhone).replace(/\D/g, '').slice(-10)}`,
-        type: 'document',
-        document: {
-          filename: fileName,
-          caption: caption,
-          mime_type: 'application/pdf',
-          base64: pdfBase64
-        },
-        bookingId: b.bookingId,
-        patientName: b.patientName,
-        patientPhone: b.patientPhone,
-        branchId: b.branchId || this.currentTech?.branchId || 'VETTUVANKENI_BRANCH',
-        branchName: b.branchName || this.currentTech?.branchName || 'Vettuvankeni Branch',
-        technicianName: b.technicianName || this.currentTech?.name || 'Mohamed Adamkani'
-      };
-
-      const res = await Api.request('sendWhatsAppInvoice', metaApiPayload);
-      const result = res?.data || res;
-
-      if (result && (result.sent === true || result.status === 'sent' || result.messageId)) {
-        if (!isSilentAuto) {
-          Utils.showToast('Invoice PDF & details sent automatically via WhatsApp!', 'success');
-        }
-        return true;
-      }
-    } catch (e) {}
-    return false;
-  },
-
-  async shareInvoicePDFOnWhatsApp(isAutoOnComplete = false) {
+  async shareInvoicePDFOnWhatsApp() {
     if (!this.lastGeneratedBooking) return;
     const b = this.lastGeneratedBooking;
+    const phone = String(b.patientPhone || '').replace(/\D/g, '').slice(-10);
     const caption = this.buildWhatsAppInvoiceCaption(b);
     const fileName = this.getInvoiceFileName(b);
-
-    if (!isAutoOnComplete) {
-      const autoSent = await this.triggerMetaWhatsAppAutoSend(b, false);
-      if (autoSent) return;
-    }
 
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1780,11 +2172,11 @@ const TechnicianApp = {
       }
 
       doc.save(fileName);
-      Utils.showToast(`Saved ${fileName} & opening WhatsApp...`, 'info');
-      window.open(`https://wa.me/91${b.patientPhone}?text=${encodeURIComponent(caption)}`, '_blank');
+      Utils.showToast(`Downloaded ${fileName} • Opening WhatsApp for +91 ${phone}`, 'info');
+      window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(caption)}`, '_blank');
     } catch (err) {
       if (err && err.name === 'AbortError') return;
-      window.open(`https://wa.me/91${b.patientPhone}?text=${encodeURIComponent(caption)}`, '_blank');
+      window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(caption)}`, '_blank');
     }
   },
 
@@ -1890,7 +2282,7 @@ const TechnicianApp = {
   },
 
   /* =========================================================
-     14. DYNAMIC UPDATE REPORTS ENGINE (ONLY BILLED TESTS)
+     14. DYNAMIC UPDATE REPORTS ENGINE
      ========================================================= */
   detectBilledParameters(booking) {
     const items = booking.items || [];
@@ -2049,8 +2441,8 @@ const TechnicianApp = {
     this.activeViewingReport = b;
     this.closeModal('update-report-modal');
     this.loadPreviousBills();
-    Utils.showToast('Diagnostic Report successfully saved & verified!', 'success');
 
+    Utils.showToast('Diagnostic Report successfully saved & verified!', 'success');
     this.openModal('report-post-save-modal');
   },
 
@@ -2069,6 +2461,7 @@ const TechnicianApp = {
   async shareCurrentReportWhatsApp() {
     if (!this.activeViewingReport) return;
     const b = this.activeViewingReport;
+    const phone = String(b.patientPhone || '').replace(/\D/g, '').slice(-10);
     const r = b.reportData || {};
 
     let summary = '';
@@ -2079,7 +2472,7 @@ const TechnicianApp = {
     if (r.height && r.weight) summary += `• Height: ${r.height} cm | Weight: ${r.weight} kg\n`;
     if (r.bmi) summary += `• BMI: ${r.bmi} kg/m²\n`;
 
-    const directTrackUrl = `https://selfcarediagnostics.in/booking.html?bookingId=${b.bookingId}`;
+    const directTrackUrl = `https://selfcarediagnostics.in/bookings.html?bookingId=${b.bookingId}`;
 
     const caption =
       `*SELFCARE DIAGNOSTICS - CLINICAL LAB REPORT*\n` +
@@ -2130,18 +2523,13 @@ const TechnicianApp = {
       if (err && err.name === 'AbortError') return;
     }
 
-    window.open(`https://wa.me/91${b.patientPhone}?text=${encodeURIComponent(caption)}`, '_blank');
+    window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(caption)}`, '_blank');
   },
 
   /* =========================================================
      15. OFFICIAL A4 REPORT RENDERING & CORNER QR CODE
      ========================================================= */
-  async openPatientReportModal(bookingId) {
-    const all = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
-    const b = all.find(item => item.bookingId === bookingId);
-    if (!b) return;
-
-    this.activeViewingReport = b;
+  populateReportSheetDom(b) {
     const r = b.reportData || {};
     const billDate = new Date(b.createdAt || Date.now());
 
@@ -2166,7 +2554,7 @@ const TechnicianApp = {
     const sampleId = `SC${billDate.toISOString().slice(2, 10).replace(/-/g, '')}${String(b.bookingId).slice(-3)}`;
     document.getElementById('rep-sample-id').textContent = sampleId;
 
-    const qrDownloadUrl = `https://selfcarediagnostics.in/booking.html?bookingId=${b.bookingId}`;
+    const qrDownloadUrl = `https://selfcarediagnostics.in/bookings.html?bookingId=${b.bookingId}`;
     const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrDownloadUrl)}`;
     const qrImg = document.getElementById('rep-corner-qr-img');
     if (qrImg) qrImg.src = qrApiUrl;
@@ -2289,6 +2677,15 @@ const TechnicianApp = {
     }
 
     if (tbody) tbody.innerHTML = rowsHtml;
+  },
+
+  async openPatientReportModal(bookingId) {
+    const all = JSON.parse(localStorage.getItem('selfcare_bookings_db') || '[]');
+    const b = all.find(item => item.bookingId === bookingId);
+    if (!b) return;
+
+    this.activeViewingReport = b;
+    this.populateReportSheetDom(b);
     this.openModal('report-view-modal');
   },
 

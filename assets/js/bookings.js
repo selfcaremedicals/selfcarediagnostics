@@ -1,15 +1,12 @@
 /* file: assets/js/bookings.js */
 /**
- * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v7.5.0
+ * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v7.6.0
  * Features:
  * 1. Strict User & Mobile Isolation: Only shows bookings & family belonging to the logged-in user.
- * 2. Scoped LocalStorage Caching (selfcare_bookings_{mobile}) preventing cross-user data leaks.
- * 3. Accurate Payable Calculation: Properly extracts and calculates finalAmount.
- * 4. VIP & Referral Discount Breakdown: Deducts VIP 10% & Referral discounts before computing totals.
- * 5. Transparent Order Summary: Renders Base Test Price, VIP Savings, Referral Savings & Grand Total Paid.
- * 6. Automatic Parent Booking Deduplication (Hides un-split parent booking when split -1, -2 exist).
- * 7. Cross-Linked Sibling Order Total Calculation for Split Sub-Bookings.
- * 8. Strict Tab Isolation (Self only sees -1, Family member only sees -2).
+ * 2. Smart Salutation Normalization (Strips Mr./Mrs./Ms./Dr. so Lab Walk-in bookings merge into Self/VIP chip).
+ * 3. Scoped LocalStorage Caching (selfcare_bookings_{mobile}) preventing cross-user data leaks.
+ * 4. Accurate Payable Calculation & VIP/Referral Discount Breakdown.
+ * 5. Automatic Parent Booking Deduplication & Cross-Linked Sibling Order Total Calculation.
  */
 
 const BookingsPage = {
@@ -39,6 +36,14 @@ const BookingsPage = {
     return String(str || '').replace(/[&<>"']/g, m => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[m]));
+  },
+
+  normalizeName(name) {
+    return String(name || '')
+      .toLowerCase()
+      .replace(/^(mr|mrs|ms|miss|dr|smt|shri|master|baby)\.?\s+/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   },
 
   safeFormatCurrency(amt) {
@@ -284,7 +289,7 @@ const BookingsPage = {
 
     const isPrimaryVip = this.isMembershipActive();
     const patientMap = new Map();
-    const normalizedSelfName = selfName.trim().toLowerCase();
+    const normalizedSelfName = this.normalizeName(selfName);
 
     // Primary Account User (Self)
     patientMap.set('self', {
@@ -299,13 +304,13 @@ const BookingsPage = {
 
     const isSelfIdentifier = (id, name, relation) => {
       const sId = String(id || '').trim().toLowerCase();
-      const sName = String(name || '').trim().toLowerCase();
+      const sName = this.normalizeName(name);
       const sRel = String(relation || '').trim().toLowerCase();
 
       if (sId === 'self' || sId === 'patient_self') return true;
       if (cleanMobile && (sId === cleanMobile || sId === `scd_${cleanMobile}`)) return true;
       if (sRel === 'self') return true;
-      if (sName === normalizedSelfName || sName === 'customer (self)' || sName === 'valued customer') return true;
+      if (sName && (sName === normalizedSelfName || sName === 'customer (self)' || sName === 'valued customer')) return true;
       return false;
     };
 
@@ -314,7 +319,7 @@ const BookingsPage = {
       if (!fm) return;
       if (isSelfIdentifier(fm.id, fm.name, fm.relation)) return;
 
-      const key = String(fm.name || fm.id || `fam_${idx}`).trim().toLowerCase();
+      const key = this.normalizeName(fm.name) || String(fm.id || `fam_${idx}`).trim().toLowerCase();
       const isFamVip = fm.membership === 'Membership' && (!fm.expiryDate || new Date(fm.expiryDate) > new Date());
 
       if (!patientMap.has(key)) {
@@ -338,8 +343,8 @@ const BookingsPage = {
 
       if (isSelfIdentifier(pId, pName, pRel)) return;
 
-      const key = String(pName).trim().toLowerCase();
-      if (!patientMap.has(key)) {
+      const key = this.normalizeName(pName);
+      if (key && !patientMap.has(key)) {
         patientMap.set(key, {
           id: pId,
           name: pName,
@@ -433,7 +438,8 @@ const BookingsPage = {
 
     container.innerHTML = this.patientsList.map((p, idx) => {
       const showCrown = this.isMembershipActive(p);
-      const initial = (p.name || 'U').charAt(0).toUpperCase();
+      const cleanDisplay = p.name.replace(/^(mr|mrs|ms|miss|dr|smt|shri)\.?\s+/i, '').trim();
+      const initial = (cleanDisplay || 'U').charAt(0).toUpperCase();
 
       return `
         <div class="patient-chip ${idx === this.selectedPatientIndex ? 'active' : ''}" 
@@ -479,9 +485,10 @@ const BookingsPage = {
       }
 
       if (match) {
+        const matchNormName = this.normalizeName(match.patientName);
         const pIdx = this.patientsList.findIndex(p => 
           (match.patientId && p.id === match.patientId) ||
-          p.name.toLowerCase() === (match.patientName || '').toLowerCase()
+          this.normalizeName(p.name) === matchNormName
         );
         this.selectPatientByIndex(pIdx >= 0 ? pIdx : 0, match.bookingId);
         return;
@@ -489,7 +496,8 @@ const BookingsPage = {
     }
 
     if (targetPatient) {
-      const pIdx = this.patientsList.findIndex(p => p.name.toLowerCase().includes(targetPatient.toLowerCase()));
+      const normTarget = this.normalizeName(targetPatient);
+      const pIdx = this.patientsList.findIndex(p => this.normalizeName(p.name).includes(normTarget));
       if (pIdx >= 0) {
         this.selectPatientByIndex(pIdx);
         return;
@@ -502,12 +510,12 @@ const BookingsPage = {
   getBookingsForPatient(patient) {
     if (!patient) return [];
     const pId = String(patient.id || '').trim().toLowerCase();
-    const pName = String(patient.name || '').trim().toLowerCase();
+    const pName = this.normalizeName(patient.name);
     const isSelf = pId === 'self' || patient.isSelf || pId === 'patient_self' || pName.includes('self');
 
     const filtered = this.allBookings.filter(b => {
       const bPatientId = String(b.patientId || '').trim().toLowerCase();
-      const bPatientName = String(b.patientName || '').trim().toLowerCase();
+      const bPatientName = this.normalizeName(b.patientName);
       const bId = String(b.bookingId || '').trim().toLowerCase();
 
       const isSubBooking = /-\d+$/.test(bId);
@@ -515,7 +523,7 @@ const BookingsPage = {
       if (isSelf) {
         if (bPatientId.startsWith('fam_')) return false;
         if (isSubBooking && !bId.endsWith('-1')) return false;
-        if (bPatientId === 'self' || bPatientId === 'patient_self' || bPatientName === pName || (isSubBooking && bId.endsWith('-1'))) {
+        if (bPatientId === 'self' || bPatientId === 'patient_self' || (bPatientName && bPatientName === pName) || (isSubBooking && bId.endsWith('-1'))) {
           return true;
         }
       } else {
@@ -523,7 +531,7 @@ const BookingsPage = {
         if (isSubBooking && bId.endsWith('-1')) return false;
 
         if (bPatientId === pId) return true;
-        if (bPatientName && (bPatientName === pName || bPatientName.includes(pName) || pName.includes(bPatientName))) {
+        if (bPatientName && pName && (bPatientName === pName || bPatientName.includes(pName) || pName.includes(bPatientName))) {
           return true;
         }
       }
@@ -536,13 +544,13 @@ const BookingsPage = {
       if (Array.isArray(items) && items.length > 0) {
         return items.some(it => {
           const itId = String(it.patientId || '').trim().toLowerCase();
-          const itName = String(it.patientName || '').trim().toLowerCase();
+          const itName = this.normalizeName(it.patientName);
           if (isSelf) {
             if (itId.startsWith('fam_')) return false;
-            return itId === 'self' || itId === 'patient_self' || itName === pName;
+            return itId === 'self' || itId === 'patient_self' || (itName && itName === pName);
           } else {
             if (itId === 'self' || itId === 'patient_self') return false;
-            return itId === pId || (itName && (itName === pName || itName.includes(pName) || pName.includes(itName)));
+            return itId === pId || (itName && pName && (itName === pName || itName.includes(pName) || pName.includes(itName)));
           }
         });
       }
@@ -567,16 +575,16 @@ const BookingsPage = {
 
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
     const pId = String(activePatient.id || '').trim().toLowerCase();
-    const pName = String(activePatient.name || '').trim().toLowerCase();
+    const pName = this.normalizeName(activePatient.name);
     const isSelf = pId === 'self' || activePatient.isSelf || pName.includes('self');
 
     const hasTaggedItems = items.some(it => it.patientId || it.patientName);
     if (hasTaggedItems) {
       const matched = items.filter(it => {
         const itId = String(it.patientId || '').trim().toLowerCase();
-        const itName = String(it.patientName || '').trim().toLowerCase();
+        const itName = this.normalizeName(it.patientName);
         if (itId && itId === pId) return true;
-        if (itName && (itName === pName || pName.includes(itName) || itName.includes(pName))) return true;
+        if (itName && pName && (itName === pName || pName.includes(itName) || itName.includes(pName))) return true;
         if (isSelf && (itId === 'self' || itId === 'patient_self' || itId === '')) return true;
         return false;
       });

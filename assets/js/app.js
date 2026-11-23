@@ -1,11 +1,11 @@
 /* file: assets/js/app.js */
 /**
- * Selfcare Diagnostics - Main Application Controller v4.4.0
+ * Selfcare Diagnostics - Main Application Controller v4.5.0
  * Features:
  * - Prevents sudden first-install page reloads (hadPreviousController guard)
  * - Instant synchronous 0ms local-first session restoration
  * - Multi-tenant vault-aware cart isolation
- * - Universal VIP Membership Controller & Instant 👑 Crown Badge Engine (Fixed Encoding)
+ * - Universal VIP Membership Controller & Instant 👑 Crown Badge Engine
  * - Dynamic Date-Time Validity Validator & Reactive Status Sync
  * - Non-blocking IndexedDB & smart dev Service Worker bypass
  */
@@ -16,37 +16,24 @@ const App = {
 
   async init() {
     try {
-      console.log('[Selfcare App] Initializing v4.4.0 with VIP Universal Crown...');
-      
-      // 1. Instant Synchronous User Session Check
       this.loadActiveUser();
-
-      // 2. Synchronous & Direct Cart Restoration
       this.loadCartDirect();
-
-      // 3. Render VIP Badges & Crown across the entire DOM
       this.refreshVipBadges();
 
-      // 4. Non-blocking Background IndexedDB Initialization
       if (typeof OfflineDB !== 'undefined' && OfflineDB.init) {
         OfflineDB.init().catch(err => console.warn('[Selfcare App] OfflineDB init notice:', err));
       }
 
-      // 5. Smart Service Worker registration
       this.handleServiceWorker();
 
-      // 6. Background catalogue sync
       if (navigator.onLine && typeof OfflineSync !== 'undefined' && OfflineSync.bootstrap) {
         setTimeout(() => {
           OfflineSync.bootstrap().catch(e => console.warn('[Selfcare App] Sync bootstrap notice:', e));
         }, 1500);
       }
 
-      // 7. Navigation & Real-time VIP change listeners
       this.setupNavigationListeners();
       this.setupVipListeners();
-
-      console.log('[Selfcare App] Initialization complete.');
     } catch (error) {
       console.error('[Selfcare App] Initialization error:', error);
     }
@@ -75,18 +62,11 @@ const App = {
   /* ==========================================================================
      VIP MEMBERSHIP & CROWN (👑) CORE CONTROLLER
      ========================================================================== */
-
-  /**
-   * Check if a given member or primary user has active VIP status & not expired
-   */
   isVipActive(memberObj = null) {
     const now = new Date();
 
-    // 1. If specific family member or patient object is passed
     if (memberObj) {
       const isSelf = memberObj.id === 'self' || memberObj.isSelf || String(memberObj.relation || '').toLowerCase() === 'self';
-      
-      // If it is NOT self, evaluate as family member
       if (!isSelf) {
         if (memberObj.isVip === true) return true;
         if (memberObj.membership === 'Membership') {
@@ -97,7 +77,6 @@ const App = {
       }
     }
 
-    // 2. Check for Primary User
     const activeMobile = localStorage.getItem('selfcare_active_user') || '';
     if (!activeMobile) return false;
 
@@ -113,7 +92,6 @@ const App = {
       } catch (e) {}
     }
 
-    // Check user profile object
     try {
       const pRaw = localStorage.getItem(`selfcare_profile_${activeMobile}`) || localStorage.getItem('selfcare_customer_profile');
       if (pRaw) {
@@ -127,9 +105,6 @@ const App = {
     return isVipFlag === 'true';
   },
 
-  /**
-   * Get formatted validity date & time string
-   */
   getVipValidityInfo(memberObj = null) {
     const activeMobile = localStorage.getItem('selfcare_active_user') || '';
     let expiryStr = null;
@@ -169,9 +144,6 @@ const App = {
     };
   },
 
-  /**
-   * Returns HTML string with Crown icon appended if VIP
-   */
   formatVipName(name, isVip = false) {
     const safeName = (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(name) : name;
     if (isVip) {
@@ -180,15 +152,11 @@ const App = {
     return safeName;
   },
 
-  /**
-   * Scans and updates Crown icons & VIP Badges across any open page UI
-   */
   refreshVipBadges() {
     try {
       const isPrimaryVip = this.isVipActive();
       const activeMobile = localStorage.getItem('selfcare_active_user') || '';
 
-      // 1. Primary User Elements update
       const primaryNameEls = document.querySelectorAll('[data-user-name], #profile-user-name, #header-user-name, .user-display-name');
       primaryNameEls.forEach(el => {
         const rawName = el.getAttribute('data-raw-name') || el.textContent.replace('👑', '').trim();
@@ -196,7 +164,6 @@ const App = {
         el.innerHTML = this.formatVipName(rawName, isPrimaryVip);
       });
 
-      // 2. Primary VIP Badge Container update
       const vipBadges = document.querySelectorAll('[data-primary-vip-badge], #vip-status-pill');
       vipBadges.forEach(badge => {
         if (isPrimaryVip) {
@@ -207,7 +174,6 @@ const App = {
         }
       });
 
-      // 3. Family Member Elements update
       let familyList = [];
       try {
         const rawFam = localStorage.getItem(`selfcare_family_${activeMobile}`) || localStorage.getItem('selfcare_family_members');
@@ -253,7 +219,6 @@ const App = {
   /* ==========================================================================
      CART CONTROLLER & NOTIFICATIONS
      ========================================================================== */
-
   safeShowToast(message, type = 'info') {
     if (typeof Utils !== 'undefined' && Utils.showToast) {
       Utils.showToast(message, type);
@@ -357,7 +322,6 @@ const App = {
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('[Selfcare App] New update detected! Activating seamlessly...');
               newWorker.postMessage({ type: 'SKIP_WAITING', action: 'skipWaiting' });
             }
           });
@@ -386,7 +350,6 @@ const App = {
       }
       if (!refreshing) {
         refreshing = true;
-        console.log('[Selfcare App] Reloading with latest version...');
         window.location.reload();
       }
     });
