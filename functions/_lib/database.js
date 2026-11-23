@@ -40,8 +40,9 @@ async function getGoogleAccessToken(env) {
     return cachedToken;
   }
 
-  const clientEmail = env.GOOGLE_CLIENT_EMAIL;
-  const privateKeyPem = env.GOOGLE_PRIVATE_KEY;
+    const clientEmail = String(env.GOOGLE_CLIENT_EMAIL || '').trim().replace(/^["']|["']$/g, '');
+    const privateKeyPem = String(env.GOOGLE_PRIVATE_KEY || '').trim().replace(/^["']|["']$/g, '');
+
 
   if (!clientEmail || !privateKeyPem) {
     throw new Error('Missing GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY in Cloudflare Environment Variables.');
