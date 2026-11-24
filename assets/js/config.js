@@ -16,7 +16,7 @@ const Config = {
   API_GATEWAY_URL: '/api/gateway',
   
   // Google Apps Script Live Web App Deployment URL (Legacy Fallback)
-  GAS_WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzM1alicIkwFVzwULAFpJwELalGwCFFOJhjnw9JGqimPz48Lt7V8llx1k6Jebv9icQBnQ/exec', 
+  GAS_WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxI9FsL5Ow1vC7pBipFreIR934D9mQk6dWwiEN7WAArgLKP6qYqF8vlLZ3Ywzo5GQjquA/exec', 
   
   SPREADSHEET_ID: '1lswBf5iPcPnt8OGA6ZfCE1tcJyqqxTaP1e2u9UwwHOw',
 
