@@ -2,7 +2,7 @@
 import { createDatabase } from '../_lib/database.js';
 import { createAuthAPI, Security } from '../_lib/auth.js';
 
-const DEFAULT_LEGACY_GAS_URL = 'https://script.google.com/macros/s/AKfycbzM1alicIkwFVzwULAFpJwELalGwCFFOJhjnw9JGqimPz48Lt7V8llx1k6Jebv9icQBnQ/exec';
+const DEFAULT_LEGACY_GAS_URL = 'https://script.google.com/macros/s/AKfycbxI9FsL50w1vC7pBipFreIR934D9mQk6dWwiEN7WAargLKP6qYqF8vlLZ3Ywzo5GQjquA/exec';
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
