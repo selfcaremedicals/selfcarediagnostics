@@ -1,13 +1,6 @@
 /* file: assets/js/app.js */
 /**
- * Selfcare Diagnostics - Main Application Controller v4.5.0
- * Features:
- * - Prevents sudden first-install page reloads (hadPreviousController guard)
- * - Instant synchronous 0ms local-first session restoration
- * - Multi-tenant vault-aware cart isolation
- * - Universal VIP Membership Controller & Instant 👑 Crown Badge Engine
- * - Dynamic Date-Time Validity Validator & Reactive Status Sync
- * - Non-blocking IndexedDB & smart dev Service Worker bypass
+ * Selfcare Diagnostics - Main Application Controller v4.6.0
  */
 
 const App = {
@@ -194,9 +187,7 @@ const App = {
           }
         });
       }
-    } catch (e) {
-      console.warn('[Selfcare App] Crown badge injection notice:', e);
-    }
+    } catch (e) {}
   },
 
   notifyVipSuccess() {
@@ -216,9 +207,6 @@ const App = {
     });
   },
 
-  /* ==========================================================================
-     CART CONTROLLER & NOTIFICATIONS
-     ========================================================================== */
   safeShowToast(message, type = 'info') {
     if (typeof Utils !== 'undefined' && Utils.showToast) {
       Utils.showToast(message, type);
@@ -269,7 +257,6 @@ const App = {
       this.cart = Array.isArray(localCart) ? localCart : [];
       this.updateCartUI();
     } catch (e) {
-      console.error('[Selfcare App] Direct cart read error:', e);
       this.cart = [];
       this.updateCartUI();
     }
@@ -338,9 +325,7 @@ const App = {
         registration.update().catch(() => {});
       }, 15 * 60 * 1000);
 
-    }).catch((err) => {
-      console.warn('[Selfcare App] Service Worker registration notice:', err);
-    });
+    }).catch(() => {});
 
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -375,9 +360,7 @@ const App = {
       if (typeof OfflineDB !== 'undefined' && OfflineDB.saveCart) {
         OfflineDB.saveCart(this.cart).catch(() => {});
       }
-    } catch (e) {
-      console.error('[Selfcare App] Error saving cart:', e);
-    }
+    } catch (e) {}
   },
 
   async addToCart(item) {
@@ -435,7 +418,6 @@ const App = {
 
       this.safeShowToast(`Added "${itemName}" to cart`, 'success');
     } catch (e) {
-      console.error('[Selfcare App] Error adding to cart:', e);
       this.safeShowToast('Could not add item to cart', 'error');
     }
   },
@@ -455,9 +437,7 @@ const App = {
 
       await this.saveCart(this.cart);
       this.safeShowToast('Item removed from cart', 'info');
-    } catch (e) {
-      console.error('[Selfcare App] Error removing from cart:', e);
-    }
+    } catch (e) {}
   },
 
   updateCartBadge() {

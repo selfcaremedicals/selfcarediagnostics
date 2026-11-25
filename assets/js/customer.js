@@ -1,24 +1,23 @@
 /* file: assets/js/customer.js */
 /**
- * Selfcare Diagnostics - Customer Dashboard JS v9.1.0
- * Clean & Optimized Edition:
- * 1. Smart Auth Deep-Linking: Redirects non-logged-in users to Login first, then auto-restores package modal.
- * 2. Add-on Booking Lock Guard: Strictly blocks re-adding booked packages
- *    and prevents package duplication in active appointments.
- * 3. Multi-Patient Isolated Cart & Conflict Validation.
- * 4. Mobile Web Share API with App-Style Box Card UI & Detailed Parameters below the box.
- * 5. Dedicated Share button on every Package card & Detail Modal.
- * 6. Safe ID-based Cart Toggle with Locked Appointment Status Badges.
- * 7. Interactive Finger Touch-Swipe + Auto-Slide Carousel Engine.
+ * Selfcare Diagnostics - Customer Dashboard JS v9.5.0
+ * Features:
+ * 1. Customer Bell (🔔) Notification Center: Reflects all live Diagnostics process stages
+ *    (Booking Confirmed, Phlebotomist Assigned + OTP, Sample Collected, Cold-Chain Transit, NABL Report Ready)
+ *    with unread badge count, live cloud sync, and tap-to-open booking tracker.
+ * 2. Smart Auth Deep-Linking: Redirects non-logged-in users to Login first, then auto-restores package modal.
+ * 3. Add-on Booking Lock Guard & Multi-Patient Isolated Cart.
+ * 4. Mobile Web Share API & Interactive Auto-Slide Carousel.
  */
 
 const CustomerDashboard = {
   allPackages: [],
   sliderIntervalId: null,
+  bellNotifications: [],
+  bellPollTimer: null,
 
   async init() {
     try {
-      // Redirect non-logged-in users with deep-links to Login first
       if (typeof Auth !== 'undefined' && !Auth.isLoggedIn()) {
         const urlParams = new URLSearchParams(window.location.search);
         const hasDeepLink = urlParams.has('package') || urlParams.has('pkg') || urlParams.has('packageId');
@@ -33,6 +32,7 @@ const CustomerDashboard = {
       this.setupEventListeners();
       this.setupAutoSlideCarousel();
       this.updateCartBadgeUI();
+      this.initBellNotificationCenter();
       await this.loadLocalCatalogue();
       this.handleDeepLinks();
     } catch (error) {
@@ -40,9 +40,268 @@ const CustomerDashboard = {
     }
   },
 
-  /**
-   * Helper: Normalized Patient ID Comparison (Case-Insensitive & 'self' alias aware)
-   */
+  /* ==========================================================================
+     CUSTOMER BELL (🔔) NOTIFICATION CENTER & LIVE DIAGNOSTICS SYNC
+     ========================================================================== */
+  initBellNotificationCenter() {
+    this.bindBellButtons();
+    this.refreshBellNotificationsFromBookings();
+    this.syncBellNotificationsLive();
+
+    if (this.bellPollTimer) clearInterval(this.bellPollTimer);
+    this.bellPollTimer = setInterval(() => {
+      this.syncBellNotificationsLive();
+    }, 20000);
+  },
+
+  bindBellButtons() {
+    const selectors = [
+      '#bell-btn',
+      '#customer-bell-btn',
+      '#notification-bell-btn',
+      '.bell-btn',
+      '.notification-bell',
+      '[data-bell-trigger]'
+    ];
+    let bellEl = document.querySelector(selectors.join(','));
+
+    if (!bellEl) {
+      const headerBtns = document.querySelectorAll('header button, header a, .app-header button, .app-header a');
+      headerBtns.forEach(el => {
+        if (el.textContent && el.textContent.includes('🔔')) {
+          bellEl = el;
+        }
+      });
+    }
+
+    if (bellEl && !bellEl.dataset.bellBound) {
+      bellEl.dataset.bellBound = 'true';
+      bellEl.style.position = 'relative';
+      bellEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.openBellNotificationDrawer();
+      });
+    }
+  },
+
+  getActiveCustomerMobile() {
+    const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+    const raw = (user && (user.mobile || user.phone)) || localStorage.getItem('selfcare_active_user') || '';
+    return String(raw).replace(/\D/g, '').slice(-10);
+  },
+
+  getBookingStageNumber(b) {
+    if (b.currentStage) return Number(b.currentStage);
+    const s = String(b.bookingStatus || '').toUpperCase();
+    if (s.includes('REPORT') || s.includes('COMPLETED')) return 5;
+    if (s.includes('TRANSIT') || s.includes('IN_LAB')) return 4;
+    if (s.includes('SAMPLE_COLLECTED') || s.includes('DRAWN')) return 3;
+    if (s.includes('ASSIGNED') || s.includes('IN_PROGRESS')) return 2;
+    return 1;
+  },
+
+  buildDiagnosticsEventsForBooking(b) {
+    if (!b || !b.bookingId) return [];
+    const stage = this.getBookingStageNumber(b);
+    const isLab = b.collectionType === 'lab' || String(b.address || '').toLowerCase().includes('direct lab');
+    const pName = b.patientName || 'Patient';
+    const slot = b.timeSlot || 'Scheduled Slot';
+    const otp = b.pickupOtp || b.otp || '';
+    const baseTime = b.updatedAt || b.createdAt || b.collectionDate || new Date().toISOString();
+
+    const catalog = isLab
+      ? [
+          { stg: 1, icon: '✅', title: 'Lab Appointment Confirmed', desc: `${pName} (${b.bookingId}) • Slot: ${slot}` },
+          { stg: 2, icon: '🏥', title: 'Lab Check-In Ready', desc: `Visit diagnostic counter for ${pName} (${b.bookingId})` },
+          { stg: 3, icon: '🩸', title: 'Sample Collected at Lab', desc: `${pName}'s sample drawn and barcoded (${b.bookingId})` },
+          { stg: 4, icon: '🔬', title: 'Clinical Analyzer Testing', desc: `NABL quality testing in progress for ${pName}` },
+          { stg: 5, icon: '📄', title: 'Certified NABL Report Ready', desc: `Download ${pName}'s official lab report now!` }
+        ]
+      : [
+          { stg: 1, icon: '✅', title: 'Booking Confirmed', desc: `${pName} (${b.bookingId}) • ${slot}${otp ? ` • OTP: ${otp}` : ''}` },
+          { stg: 2, icon: '🛵', title: 'Phlebotomist Assigned', desc: `Technician assigned for ${pName}'s home pickup${otp ? ` • Share OTP: ${otp}` : ''}` },
+          { stg: 3, icon: '🩸', title: 'Doorstep Sample Collected', desc: `${pName}'s sample collected safely (${b.bookingId})` },
+          { stg: 4, icon: '❄️', title: 'Cold-Chain Transit to Lab', desc: `${pName}'s sample transported at 2°C–8°C to lab` },
+          { stg: 5, icon: '📄', title: 'Certified NABL Report Ready', desc: `${pName}'s lab report is ready! Tap to view.` }
+        ];
+
+    return catalog
+      .filter(item => item.stg <= stage)
+      .reverse()
+      .map(item => ({
+        id: `${b.bookingId}_S${item.stg}`,
+        bookingId: b.bookingId,
+        stage: item.stg,
+        icon: item.icon,
+        title: item.title,
+        desc: item.desc,
+        time: baseTime,
+        url: item.stg === 5
+          ? `reports.html?bookingId=${encodeURIComponent(b.bookingId)}`
+          : `bookings.html?id=${encodeURIComponent(b.bookingId)}`
+      }));
+  },
+
+  refreshBellNotificationsFromBookings() {
+    const cleanMobile = this.getActiveCustomerMobile();
+    const map = new Map();
+    const keys = [
+      cleanMobile ? `selfcare_bookings_${cleanMobile}` : null,
+      'selfcare_recent_bookings',
+      'selfcare_all_bookings',
+      'selfcare_customer_bookings'
+    ].filter(Boolean);
+
+    keys.forEach(k => {
+      try {
+        const arr = JSON.parse(localStorage.getItem(k) || '[]');
+        if (Array.isArray(arr)) {
+          arr.forEach(b => {
+            if (!b || !b.bookingId) return;
+            if (cleanMobile) {
+              const bPhone = String(b.patientPhone || b.customerPhone || b.mobile || b.phone || '').replace(/\D/g, '').slice(-10);
+              if (bPhone && bPhone !== cleanMobile) return;
+            }
+            map.set(b.bookingId, { ...(map.get(b.bookingId) || {}), ...b });
+          });
+        }
+      } catch (e) {}
+    });
+
+    const bookings = Array.from(map.values()).sort((a, b) => {
+      const tA = new Date(a.updatedAt || a.createdAt || a.collectionDate || 0).getTime();
+      const tB = new Date(b.updatedAt || b.createdAt || b.collectionDate || 0).getTime();
+      return tB - tA;
+    });
+
+    const events = [];
+    bookings.forEach(b => {
+      events.push(...this.buildDiagnosticsEventsForBooking(b));
+    });
+
+    this.bellNotifications = events;
+    this.updateBellBadgeUI();
+  },
+
+  async syncBellNotificationsLive() {
+    const cleanMobile = this.getActiveCustomerMobile();
+    if (!cleanMobile || !navigator.onLine || typeof Api === 'undefined') return;
+
+    try {
+      const res = await Api.getBookingsByPatient(cleanMobile);
+      const list = Array.isArray(res) ? res : (res?.bookings || res?.data || []);
+      if (Array.isArray(list) && list.length > 0) {
+        localStorage.setItem(`selfcare_bookings_${cleanMobile}`, JSON.stringify(list));
+        localStorage.setItem('selfcare_recent_bookings', JSON.stringify(list));
+        this.refreshBellNotificationsFromBookings();
+      }
+    } catch (e) {}
+  },
+
+  getReadBellIds() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('selfcare_read_bell_ids') || '[]'));
+    } catch (e) {
+      return new Set();
+    }
+  },
+
+  updateBellBadgeUI() {
+    const readSet = this.getReadBellIds();
+    const unreadCount = this.bellNotifications.filter(n => !readSet.has(n.id)).length;
+
+    const selectors = [
+      '#bell-btn',
+      '#customer-bell-btn',
+      '#notification-bell-btn',
+      '.bell-btn',
+      '.notification-bell',
+      '[data-bell-trigger]'
+    ];
+    let bellEl = document.querySelector(selectors.join(','));
+    if (!bellEl) {
+      document.querySelectorAll('header button, header a, .app-header button, .app-header a').forEach(el => {
+        if (el.textContent && el.textContent.includes('🔔')) bellEl = el;
+      });
+    }
+    if (!bellEl) return;
+
+    bellEl.style.position = 'relative';
+    let badge = bellEl.querySelector('.scd-bell-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'scd-bell-badge';
+      badge.style.cssText = 'position:absolute; top:-4px; right:-4px; min-width:17px; height:17px; padding:0 4px; border-radius:10px; background:#E4005A; color:#FFFFFF; font-size:10px; font-weight:900; display:flex; align-items:center; justify-content:center; border:1.5px solid #FFFFFF; box-shadow:0 2px 6px rgba(228,0,90,0.4);';
+      bellEl.appendChild(badge);
+    }
+
+    if (unreadCount > 0) {
+      badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  },
+
+  markAllBellNotificationsRead() {
+    const allIds = this.bellNotifications.map(n => n.id);
+    localStorage.setItem('selfcare_read_bell_ids', JSON.stringify(allIds));
+    this.updateBellBadgeUI();
+  },
+
+  openBellNotificationDrawer() {
+    this.refreshBellNotificationsFromBookings();
+    const readSet = this.getReadBellIds();
+
+    let modal = document.getElementById('scd-bell-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'scd-bell-modal';
+      modal.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,0.55); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); display:flex; justify-content:center; align-items:flex-start; padding:68px 14px 20px;';
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+      });
+      document.body.appendChild(modal);
+    }
+
+    const listHtml = this.bellNotifications.length === 0
+      ? `<div style="text-align:center; padding:28px 14px; color:#64748B; font-size:12.5px;">No live diagnostic notifications yet. Book a test or checkup to see real-time updates here!</div>`
+      : this.bellNotifications.map(n => {
+          const isUnread = !readSet.has(n.id);
+          return `
+            <div onclick="window.location.href='${n.url}'" style="cursor:pointer; padding:12px 13px; border-radius:12px; background:${isUnread ? '#ECFDF5' : '#F8FAFC'}; border:1px solid ${isUnread ? '#A7F3D0' : '#E2E8F0'}; display:flex; gap:10px; align-items:flex-start; transition:transform 0.15s ease;">
+              <span style="font-size:18px; line-height:1.2;">${n.icon}</span>
+              <div style="flex:1;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                  <strong style="font-size:12.5px; color:#0F172A;">${Utils.escapeHtml(n.title)}</strong>
+                  ${isUnread ? '<span style="width:8px; height:8px; border-radius:50%; background:#059669; flex-shrink:0;"></span>' : ''}
+                </div>
+                <p style="font-size:11.5px; color:#334155; margin-top:3px; line-height:1.4;">${Utils.escapeHtml(n.desc)}</p>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+    modal.innerHTML = `
+      <div style="width:100%; max-width:440px; max-height:76vh; background:rgba(255,255,255,0.97); border:1.5px solid #FFFFFF; border-radius:20px; box-shadow:0 24px 48px rgba(15,23,42,0.28); display:flex; flex-direction:column; overflow:hidden;">
+        <div style="padding:14px 16px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <strong style="font-size:14.5px; color:#045D49; display:block;">🔔 Live Diagnostics Notifications</strong>
+            <span style="font-size:10.5px; color:#64748B;">Real-time updates from booking to NABL report</span>
+          </div>
+          <button type="button" onclick="document.getElementById('scd-bell-modal').style.display='none'" style="width:30px; height:30px; border-radius:50%; border:1px solid #CBD5E1; background:#F8FAFC; font-weight:900; cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:12px 14px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
+          ${listHtml}
+        </div>
+      </div>
+    `;
+
+    modal.style.display = 'flex';
+    this.markAllBellNotificationsRead();
+  },
+
   isPatientMatch(patientIdA, patientIdB) {
     const a = String(patientIdA || 'SELF').trim().toLowerCase();
     const b = String(patientIdB || 'SELF').trim().toLowerCase();
@@ -51,9 +310,6 @@ const CustomerDashboard = {
     return false;
   },
 
-  /**
-   * Identifies the current active patient context
-   */
   getTargetPatientId() {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -69,7 +325,6 @@ const CustomerDashboard = {
         return storedId.trim();
       }
 
-      // Check if active addon booking specifies a locked patient
       const addonRaw = sessionStorage.getItem('selfcare_addon_booking') || localStorage.getItem('selfcare_active_addon_booking_data');
       if (addonRaw) {
         const addon = JSON.parse(addonRaw);
@@ -77,15 +332,10 @@ const CustomerDashboard = {
           return String(addon.lockedPatientId || addon.patientId).trim();
         }
       }
-    } catch (e) {
-      console.warn('Error resolving targetPatientId in customer dashboard:', e);
-    }
+    } catch (e) {}
     return 'SELF';
   },
 
-  /**
-   * Checks if a package is already paid and locked in an active booking appointment
-   */
   isItemLockedInBooking(packageId, packageCode, packageName) {
     try {
       const addonRaw = sessionStorage.getItem('selfcare_addon_booking') || localStorage.getItem('selfcare_active_addon_booking_data');
@@ -164,9 +414,7 @@ const CustomerDashboard = {
           container.innerHTML = '<p class="empty-msg" style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 20px;">Fetching popular packages from server...</p>';
         }
       }
-    } catch (e) {
-      console.warn('Local cache read error:', e);
-    }
+    } catch (e) {}
 
     if (navigator.onLine && typeof OfflineSync !== 'undefined') {
       setTimeout(async () => {
@@ -179,17 +427,11 @@ const CustomerDashboard = {
             }
           }
           this.handleDeepLinks();
-        } catch (err) {
-          console.warn('Background sync error:', err);
-        }
+        } catch (err) {}
       }, 600);
     }
   },
 
-  /**
-   * Multi-tenant Isolated Cart Reader
-   * Merges locked items from an existing booking for ConflictValidator inspection.
-   */
   getCart() {
     let cart = [];
     if (typeof localStorage !== 'undefined') {
@@ -209,12 +451,9 @@ const CustomerDashboard = {
           const parsed = JSON.parse(raw);
           cart = Array.isArray(parsed) ? parsed : [];
         }
-      } catch (err) {
-        console.error('Cart parse error:', err);
-      }
+      } catch (err) {}
     }
 
-    // 🛡️ CRITICAL FIX: Merge locked existing booking items into cart array for deep conflict checks
     try {
       const addonRaw = sessionStorage.getItem('selfcare_addon_booking') || localStorage.getItem('selfcare_active_addon_booking_data');
       if (addonRaw) {
@@ -266,15 +505,12 @@ const CustomerDashboard = {
           });
         }
       }
-    } catch (e) {
-      console.warn('Addon booking inspection notice:', e);
-    }
+    } catch (e) {}
 
     return cart;
   },
 
   saveCartStorage(cart) {
-    // Save ONLY newly added items into localStorage (Preserve locked items in appointment store)
     const newlyAddedOnly = Array.isArray(cart) ? cart.filter(i => !i.isExistingLocked) : [];
 
     if (typeof localStorage !== 'undefined') {
@@ -300,7 +536,6 @@ const CustomerDashboard = {
   },
 
   updateCartBadgeUI() {
-    // Only count newly added items in the badge
     const cart = this.getCart().filter(i => !i.isExistingLocked);
     const count = cart.length;
     const badges = document.querySelectorAll('.cart-badge');
@@ -382,25 +617,18 @@ const CustomerDashboard = {
       item = this.allPackages.find(p => String(p.PackageID) === cleanId || String(p.PackageCode) === cleanId);
     }
 
-    if (!item) {
-      console.warn('Package not found for cart toggle:', itemOrId);
-      return;
-    }
+    if (!item) return;
 
     const targetPatientId = this.getTargetPatientId();
     const itemId = String(item.PackageID || item.PackageCode || item.id || '');
     const itemCode = String(item.PackageCode || item.code || '');
     const itemName = String(item.PackageName || item.name || '');
 
-    // 🛡️ BLOCK ACTION IF ITEM IS ALREADY PAID IN LOCKED BOOKING
     if (this.isItemLockedInBooking(itemId, itemCode, itemName)) {
       this.showLockedNotice(itemName, event);
       return;
     }
 
-    // 🛡️ STRICT ADDON MODE GUARD:
-    // If the user arrived via "➕ Add Tests", appointments are in TESTS_ONLY mode.
-    // They are not allowed to add whole health packages to an existing appointment.
     const addonRaw = sessionStorage.getItem('selfcare_addon_booking') || localStorage.getItem('selfcare_active_addon_booking_data');
     if (addonRaw) {
       try {
@@ -446,9 +674,7 @@ const CustomerDashboard = {
             }
             return;
           }
-        } catch (cvErr) {
-          console.warn('Conflict check bypass on non-fatal exception:', cvErr);
-        }
+        } catch (cvErr) {}
       }
     }
 
@@ -458,7 +684,6 @@ const CustomerDashboard = {
     }
 
     if (isAdded) {
-      // Remove item only if it is NOT a pre-existing locked item
       cart = cart.filter(i => {
         if (i.isExistingLocked) return true;
         const itemPatientId = i.patientId || 'SELF';
@@ -580,7 +805,6 @@ const CustomerDashboard = {
         Utils.showToast('Share link copied to clipboard!', 'success');
       }
     } catch (err) {
-      console.error('Clipboard copy failed:', err);
       if (typeof Utils !== 'undefined' && Utils.showToast) {
         Utils.showToast('Unable to copy share link', 'error');
       }
@@ -608,7 +832,6 @@ const CustomerDashboard = {
           return;
         } catch (err2) {
           if (err2.name === 'AbortError') return;
-          console.warn('Native share fallback:', err2);
         }
       }
     }
@@ -641,10 +864,7 @@ const CustomerDashboard = {
       pkg = pkgOrId;
     }
 
-    if (!pkg) {
-      console.warn('Package not found for sharing:', pkgOrId);
-      return;
-    }
+    if (!pkg) return;
 
     const rawId = pkg.PackageID || pkg.PackageCode || pkg.id || 'PKG';
     const pkgId = String(rawId).trim();
@@ -722,9 +942,7 @@ const CustomerDashboard = {
           }
         }, 350);
       }
-    } catch (e) {
-      console.warn('Deep link inspect notice:', e);
-    }
+    } catch (e) {}
   },
 
   renderPopularPackages() {
@@ -1023,6 +1241,7 @@ const CustomerDashboard = {
   setupEventListeners() {
     window.addEventListener('pageshow', () => {
       this.updateCartBadgeUI();
+      this.refreshBellNotificationsFromBookings();
       if (this.allPackages.length === 0) {
         this.loadLocalCatalogue();
       }
@@ -1031,6 +1250,8 @@ const CustomerDashboard = {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         this.updateCartBadgeUI();
+        this.refreshBellNotificationsFromBookings();
+        this.syncBellNotificationsLive();
       }
     });
   }

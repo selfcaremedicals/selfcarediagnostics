@@ -1,6 +1,9 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - Direct Google Apps Script API Client v7.0.0
+ * Selfcare Diagnostics - Direct Google Apps Script API Client v7.1.0
+ * Features:
+ * - Fast-read timeouts & auto cache invalidation for Home Collection & OTP sync
+ * - Automatic 4-digit Pickup OTP injection on createBooking
  */
 
 const Api = {
@@ -34,6 +37,8 @@ const Api = {
       'getAdminTests',
       'getAdminPackages',
       'getAllBookings',
+      'getPendingHomeCollections',
+      'getCaptainProfileAndRatings',
       'getPaymentStatus',
       'getBookingReport',
       'aiSearch'
@@ -43,7 +48,16 @@ const Api = {
     if (action === 'patientLogin' || action === 'patientRegister' || action === 'staffLogin') return 18000;
     if (action === 'validateReferralCode' || action === 'claimReferralReward' || action === 'getReferralData') return 35000;
     if (action === 'processPrescriptionOCR' || action === 'uploadPrescription') return 90000;
-    if (action === 'createRazorpayOrder' || action === 'verifyRazorpayPayment' || action === 'saveMembership' || action === 'updateReport') return 30000;
+    if (
+      action === 'createRazorpayOrder' ||
+      action === 'verifyRazorpayPayment' ||
+      action === 'saveMembership' ||
+      action === 'updateReport' ||
+      action === 'saveBookingPickupOtp' ||
+      action === 'assignHomeCollection' ||
+      action === 'recordCashCollection' ||
+      action === 'completeHomeCollection'
+    ) return 30000;
     return 45000;
   },
 
@@ -306,7 +320,33 @@ const Api = {
   async createBooking(bookingData) {
     this.invalidateCache('getBookingsByPatient');
     this.invalidateCache('getReferralData');
-    return this.request('createBooking', bookingData, false);
+    this.invalidateCache('getPendingHomeCollections');
+
+    // Automatically attach a random 4-digit OTP if not already generated
+    const generatedOtp = bookingData.pickupOtp || bookingData.otp || String(Math.floor(1000 + Math.random() * 9000));
+    const enrichedPayload = {
+      ...bookingData,
+      pickupOtp: generatedOtp,
+      otp: generatedOtp,
+      createdAt: bookingData.createdAt || new Date().toISOString()
+    };
+
+    try {
+      if (enrichedPayload.bookingId) {
+        const otpMap = JSON.parse(localStorage.getItem('selfcare_booking_otps') || '{}');
+        otpMap[enrichedPayload.bookingId] = generatedOtp;
+        localStorage.setItem('selfcare_booking_otps', JSON.stringify(otpMap));
+      }
+    } catch (e) {}
+
+    return this.request('createBooking', enrichedPayload, false);
+  },
+
+  async saveBookingPickupOtp(payload) {
+    this.invalidateCache('getBookingsByPatient');
+    this.invalidateCache('getBookingDetails');
+    this.invalidateCache('getPendingHomeCollections');
+    return this.request('saveBookingPickupOtp', payload, false);
   },
 
   async getBookingDetails(bookingId) {
@@ -314,7 +354,7 @@ const Api = {
   },
 
   async getBookingsByPatient(patientPhone) {
-    return this.request('getBookingsByPatient', { patientPhone }, true);
+    return this.request('getBookingsByPatient', { patientPhone }, false);
   },
 
   async getPaymentStatus(bookingId, paymentReference) {

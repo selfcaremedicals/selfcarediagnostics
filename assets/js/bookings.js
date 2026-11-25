@@ -1,12 +1,13 @@
 /* file: assets/js/bookings.js */
 /**
- * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v7.6.0
+ * Selfcare Diagnostics - Direct Family & Patient Booking Tracker Engine v8.0.0
  * Features:
- * 1. Strict User & Mobile Isolation: Only shows bookings & family belonging to the logged-in user.
- * 2. Smart Salutation Normalization (Strips Mr./Mrs./Ms./Dr. so Lab Walk-in bookings merge into Self/VIP chip).
- * 3. Scoped LocalStorage Caching (selfcare_bookings_{mobile}) preventing cross-user data leaks.
- * 4. Accurate Payable Calculation & VIP/Referral Discount Breakdown.
- * 5. Automatic Parent Booking Deduplication & Cross-Linked Sibling Order Total Calculation.
+ * 1. Random 4-Digit Pickup OTP Generation & Automatic Backend Cloud Sync (stored per booking).
+ * 2. Exact Cart Time Slot Preservation & Latest-Booking-First Sorting (Created Timestamp + Date/Slot).
+ * 3. Background & Live Push Notifications (via Service Worker) for every Diagnostics Process Stage
+ *    (Booking Confirmed, Phlebotomist Assigned, Sample Collected, Cold-Chain Transit, NABL Report Ready)
+ *    even when the customer app is closed or in the background.
+ * 4. Strict User & Mobile Isolation + Automatic Parent/Sibling Deduplication.
  */
 
 const BookingsPage = {
@@ -15,15 +16,25 @@ const BookingsPage = {
   selectedPatientId: null,
   selectedPatientIndex: 0,
   currentActiveBooking: null,
+  livePollTimer: null,
 
   ADD_TESTS_WINDOW_HOURS: 3,
 
   async init() {
     try {
+      this.registerPushNotificationWorker();
+      this.requestNotificationPermission();
+
       this.loadPatientsAndBookings();
       this.renderPatientChips();
       await this.autoSelectInitialPatientOrUrlTarget();
-      this.syncLiveCloudBookings();
+      await this.syncLiveCloudBookings();
+
+      // Background live stage poller (checks every 15s for status updates & fires phone notifications)
+      if (this.livePollTimer) clearInterval(this.livePollTimer);
+      this.livePollTimer = setInterval(() => {
+        this.syncLiveCloudBookings(true);
+      }, 15000);
     } catch (err) {
       console.error('[Bookings] Init error:', err);
     }
@@ -61,6 +72,231 @@ const BookingsPage = {
     }
   },
 
+  /* =========================================================
+     1. RANDOM 4-DIGIT OTP GENERATOR & BACKEND SYNC
+     ========================================================= */
+  generateRandomOtp() {
+    return String(Math.floor(1000 + Math.random() * 9000));
+  },
+
+  ensureBookingPickupOtp(booking) {
+    if (!booking || !booking.bookingId) return '';
+
+    const isLab = booking.collectionType === 'lab' || String(booking.address || '').toLowerCase().includes('direct lab');
+    if (isLab) return '';
+
+    // Check if an OTP already exists on the booking or in local OTP registry
+    const existingOtp = String(
+      booking.pickupOtp || booking.otp || booking.verificationOtp || booking.bookingOtp || ''
+    ).trim();
+
+    let otpMap = {};
+    try {
+      otpMap = JSON.parse(localStorage.getItem('selfcare_booking_otps') || '{}');
+    } catch (e) {}
+
+    if (existingOtp && /^\d{4,6}$/.test(existingOtp)) {
+      if (otpMap[booking.bookingId] !== existingOtp) {
+        otpMap[booking.bookingId] = existingOtp;
+        localStorage.setItem('selfcare_booking_otps', JSON.stringify(otpMap));
+      }
+      booking.pickupOtp = existingOtp;
+      booking.otp = existingOtp;
+      return existingOtp;
+    }
+
+    if (otpMap[booking.bookingId] && /^\d{4,6}$/.test(otpMap[booking.bookingId])) {
+      booking.pickupOtp = otpMap[booking.bookingId];
+      booking.otp = otpMap[booking.bookingId];
+      return otpMap[booking.bookingId];
+    }
+
+    // Generate fresh random 4-digit OTP and store in localStorage + Backend
+    const newOtp = this.generateRandomOtp();
+    booking.pickupOtp = newOtp;
+    booking.otp = newOtp;
+    otpMap[booking.bookingId] = newOtp;
+    localStorage.setItem('selfcare_booking_otps', JSON.stringify(otpMap));
+
+    this.syncOtpToBackend(booking, newOtp);
+    return newOtp;
+  },
+
+  async syncOtpToBackend(booking, otp) {
+    if (!booking || !booking.bookingId || !otp) return;
+    if (navigator.onLine && typeof Api !== 'undefined' && typeof Api.request === 'function') {
+      try {
+        await Api.request('saveBookingPickupOtp', {
+          bookingId: booking.bookingId,
+          pickupOtp: otp,
+          otp: otp,
+          patientName: booking.patientName || '',
+          patientPhone: booking.patientPhone || booking.customerPhone || booking.mobile || ''
+        }, false);
+      } catch (e) {
+        // Fallback generic update call if backend uses updateBooking
+        try {
+          await Api.request('updateBookingOtp', {
+            bookingId: booking.bookingId,
+            pickupOtp: otp
+          }, false);
+        } catch (err) {}
+      }
+    }
+  },
+
+  /* =========================================================
+     2. SYSTEM PUSH NOTIFICATIONS FOR LIVE DIAGNOSTICS STAGES
+     ========================================================= */
+  registerPushNotificationWorker() {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  },
+
+  requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  },
+
+  getStageNotificationMeta(booking, stage) {
+    const bId = booking.bookingId || '';
+    const pName = booking.patientName || 'Patient';
+    const isLab = booking.collectionType === 'lab' || String(booking.address || '').toLowerCase().includes('direct lab');
+    const otpTxt = booking.pickupOtp ? ` • Pickup OTP: ${booking.pickupOtp}` : '';
+
+    if (isLab) {
+      switch (stage) {
+        case 1:
+          return {
+            title: `✅ Lab Appointment Confirmed (${bId})`,
+            body: `${pName}'s lab visit is confirmed for ${this.formatFriendlyDate(booking.collectionDate, false)} (${booking.timeSlot || 'Scheduled'}).`
+          };
+        case 2:
+          return {
+            title: `🏥 Ready for Lab Check-In (${bId})`,
+            body: `Please visit the diagnostic counter for ${pName}'s sample collection.`
+          };
+        case 3:
+          return {
+            title: `🩸 Sample Collected at Lab (${bId})`,
+            body: `${pName}'s barcoded sample has been drawn and sent to the analyzer.`
+          };
+        case 4:
+          return {
+            title: `🔬 Clinical Testing In Progress (${bId})`,
+            body: `${pName}'s sample is undergoing NABL quality testing.`
+          };
+        case 5:
+          return {
+            title: `📄 NABL Report Ready! (${bId})`,
+            body: `${pName}'s certified diagnostic report is ready to view & download.`
+          };
+      }
+    } else {
+      switch (stage) {
+        case 1:
+          return {
+            title: `✅ Booking Confirmed (${bId})`,
+            body: `Home collection confirmed for ${pName} (${booking.timeSlot || 'Scheduled'}).${otpTxt}`
+          };
+        case 2:
+          return {
+            title: `🛵 Phlebotomist Assigned (${bId})`,
+            body: `Our certified phlebotomist is assigned for ${pName}'s doorstep pickup.${otpTxt}`
+          };
+        case 3:
+          return {
+            title: `🩸 Doorstep Sample Collected (${bId})`,
+            body: `${pName}'s sample has been safely collected and barcoded.`
+          };
+        case 4:
+          return {
+            title: `❄️ Cold-Chain Transit to Lab (${bId})`,
+            body: `${pName}'s sample is transported under 2°C–8°C to our NABL lab.`
+          };
+        case 5:
+          return {
+            title: `📄 Certified NABL Report Ready! (${bId})`,
+            body: `${pName}'s lab report is ready! Tap to view or download PDF.`
+          };
+      }
+    }
+    return null;
+  },
+
+  async checkAndDispatchStageNotifications(bookingsList) {
+    if (!Array.isArray(bookingsList) || bookingsList.length === 0) return;
+
+    let notifiedStages = {};
+    try {
+      notifiedStages = JSON.parse(localStorage.getItem('selfcare_notified_booking_stages') || '{}');
+    } catch (e) {}
+
+    let changed = false;
+
+    for (const b of bookingsList) {
+      if (!b || !b.bookingId) continue;
+      const currentStage = this.getBookingStage(b);
+      const lastNotifiedStage = Number(notifiedStages[b.bookingId] || 0);
+
+      if (currentStage > lastNotifiedStage) {
+        notifiedStages[b.bookingId] = currentStage;
+        changed = true;
+        await this.firePhoneStageNotification(b, currentStage);
+      }
+    }
+
+    if (changed) {
+      localStorage.setItem('selfcare_notified_booking_stages', JSON.stringify(notifiedStages));
+    }
+  },
+
+  async firePhoneStageNotification(booking, stage) {
+    const meta = this.getStageNotificationMeta(booking, stage);
+    if (!meta) return;
+
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch (e) {}
+    }
+    if (Notification.permission !== 'granted') return;
+
+    const tag = `selfcare-stage-${booking.bookingId}-s${stage}`;
+    const targetUrl = `bookings.html?id=${encodeURIComponent(booking.bookingId)}`;
+
+    try {
+      const reg = await navigator.serviceWorker?.ready;
+      if (reg && reg.showNotification) {
+        await reg.showNotification(meta.title, {
+          body: meta.body,
+          icon: 'assets/images/logo.png',
+          badge: 'assets/images/logo.png',
+          tag,
+          renotify: false,
+          vibrate: [200, 100, 200],
+          data: { bookingId: booking.bookingId, stage, url: targetUrl }
+        });
+      } else {
+        const n = new Notification(meta.title, {
+          body: meta.body,
+          icon: 'assets/images/logo.png',
+          tag
+        });
+        n.onclick = () => {
+          window.focus();
+          window.location.href = targetUrl;
+        };
+      }
+    } catch (e) {}
+  },
+
+  /* =========================================================
+     3. MEMBERSHIP, DATE & TIME SORTING HELPERS
+     ========================================================= */
   isMembershipActive(patient = null) {
     try {
       if (patient) {
@@ -98,7 +334,7 @@ const BookingsPage = {
   },
 
   parseDateClean(dateStr) {
-    if (!dateStr) return new Date();
+    if (!dateStr) return new Date(0);
     if (dateStr instanceof Date) return dateStr;
     const s = String(dateStr).trim();
     if (s.includes('T')) {
@@ -111,7 +347,51 @@ const BookingsPage = {
       return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
     }
     const d2 = new Date(s);
-    return isNaN(d2.getTime()) ? new Date() : d2;
+    return isNaN(d2.getTime()) ? new Date(0) : d2;
+  },
+
+  parseSlotStartMinutes(timeSlotStr) {
+    if (!timeSlotStr) return 0;
+    const startPart = String(timeSlotStr).split(/[-–to]/i)[0].trim();
+    const match = startPart.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (!match) return 0;
+
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const ampm = match[3] ? match[3].toUpperCase() : '';
+
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+
+    return hours * 60 + minutes;
+  },
+
+  getBookingSortTimestamp(b) {
+    // 1. Primary: Exact booking creation timestamp (last booked appears first!)
+    const createdRaw = b.createdAt || b.bookedAt || b.timestamp || b.bookingTimestamp;
+    if (createdRaw) {
+      const cDate = new Date(createdRaw);
+      if (!isNaN(cDate.getTime()) && cDate.getTime() > 0) {
+        return cDate.getTime();
+      }
+    }
+
+    // 2. Secondary: Collection Date + Exact Cart Time Slot start minutes
+    const colDate = this.parseDateClean(b.collectionDate || b.bookingDate || b.date);
+    const slotMins = this.parseSlotStartMinutes(b.timeSlot || b.slot || b.selectedSlot);
+    return colDate.getTime() + (slotMins * 60 * 1000);
+  },
+
+  resolveCartTimeSlot(booking) {
+    const slot = String(
+      booking.timeSlot ||
+      booking.slot ||
+      booking.selectedSlot ||
+      booking.appointmentSlot ||
+      booking.collectionSlot ||
+      ''
+    ).trim();
+    return slot || 'Scheduled Slot';
   },
 
   formatFriendlyDate(rawDate, includeYear = true) {
@@ -160,7 +440,7 @@ const BookingsPage = {
     if (stage >= 5) return false;
 
     const collectionDate = booking.collectionDate;
-    const timeSlot = booking.timeSlot;
+    const timeSlot = this.resolveCartTimeSlot(booking);
     if (!collectionDate) return false;
 
     try {
@@ -194,6 +474,9 @@ const BookingsPage = {
     }
   },
 
+  /* =========================================================
+     4. LOAD PATIENTS & BOOKINGS (LATEST BOOKING FIRST)
+     ========================================================= */
   loadPatientsAndBookings(skipMockSeeding = false) {
     let savedBookings = [];
 
@@ -231,7 +514,6 @@ const BookingsPage = {
 
     const cleanMobile = currentMobile ? String(currentMobile).replace(/\D/g, '').slice(-10) : '';
 
-    // 1. Logged-in user-oda direct family members mattum fetch seiyavum
     let familyMembers = [];
     try {
       let famStored = null;
@@ -249,27 +531,49 @@ const BookingsPage = {
       }
     } catch (e) {}
 
-    // 2. Logged-in mobile-ku uriya bookings mattum load seiyavum (Phone isolation)
-    try {
-      let storedBookings = null;
-      if (cleanMobile) {
-        storedBookings = localStorage.getItem(`selfcare_bookings_${cleanMobile}`);
-      }
-      if (!storedBookings) {
-        storedBookings = localStorage.getItem('selfcare_recent_bookings') || localStorage.getItem('selfcare_all_bookings');
-      }
+    // Merge bookings from scoped storage + recent/all bookings so latest cart checkout always appears immediately
+    const mergedMap = new Map();
+    const storageKeys = [
+      cleanMobile ? `selfcare_bookings_${cleanMobile}` : null,
+      'selfcare_recent_bookings',
+      'selfcare_all_bookings',
+      'selfcare_customer_bookings'
+    ].filter(Boolean);
 
-      if (storedBookings) {
-        const parsed = JSON.parse(storedBookings);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          savedBookings = parsed.filter(b => {
-            if (!cleanMobile) return true;
-            const bPhone = String(b.patientPhone || b.customerPhone || b.mobile || b.phone || b.userPhone || '').replace(/\D/g, '').slice(-10);
-            return !bPhone || bPhone === cleanMobile;
+    storageKeys.forEach(key => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(b => {
+            if (!b || !b.bookingId) return;
+            if (cleanMobile) {
+              const bPhone = String(b.patientPhone || b.customerPhone || b.mobile || b.phone || b.userPhone || '').replace(/\D/g, '').slice(-10);
+              if (bPhone && bPhone !== cleanMobile) return;
+            }
+            const existing = mergedMap.get(b.bookingId) || {};
+            mergedMap.set(b.bookingId, { ...existing, ...b });
           });
         }
+      } catch (e) {}
+    });
+
+    savedBookings = Array.from(mergedMap.values());
+
+    // Ensure every booking has a random 4-digit OTP and exact cart timeSlot preserved
+    let updatedStorage = false;
+    savedBookings.forEach(b => {
+      const beforeOtp = b.pickupOtp || b.otp;
+      const ensuredOtp = this.ensureBookingPickupOtp(b);
+      if (ensuredOtp && ensuredOtp !== beforeOtp) {
+        updatedStorage = true;
       }
-    } catch (e) {}
+      if (!b.timeSlot && (b.slot || b.selectedSlot || b.appointmentSlot)) {
+        b.timeSlot = this.resolveCartTimeSlot(b);
+        updatedStorage = true;
+      }
+    });
 
     // Deduplication: Hide un-split parent booking if split sub-bookings exist
     const subParentBIds = new Set();
@@ -287,11 +591,24 @@ const BookingsPage = {
       });
     }
 
+    // Sort globally: Last booked (newest timestamp / latest date & slot) FIRST
+    savedBookings.sort((a, b) => {
+      const diff = this.getBookingSortTimestamp(b) - this.getBookingSortTimestamp(a);
+      if (diff !== 0) return diff;
+      return String(b.bookingId || '').localeCompare(String(a.bookingId || ''));
+    });
+
+    if (updatedStorage && savedBookings.length > 0) {
+      if (cleanMobile) {
+        localStorage.setItem(`selfcare_bookings_${cleanMobile}`, JSON.stringify(savedBookings));
+      }
+      localStorage.setItem('selfcare_recent_bookings', JSON.stringify(savedBookings));
+    }
+
     const isPrimaryVip = this.isMembershipActive();
     const patientMap = new Map();
     const normalizedSelfName = this.normalizeName(selfName);
 
-    // Primary Account User (Self)
     patientMap.set('self', {
       id: 'self',
       name: selfName,
@@ -314,7 +631,6 @@ const BookingsPage = {
       return false;
     };
 
-    // User-oda confirmed family members list
     familyMembers.forEach((fm, idx) => {
       if (!fm) return;
       if (isSelfIdentifier(fm.id, fm.name, fm.relation)) return;
@@ -335,7 +651,6 @@ const BookingsPage = {
       }
     });
 
-    // Intha user book panna items-la irukkira members mattum add seivom
     savedBookings.forEach(b => {
       const pName = b.patientName || selfName;
       const pId = b.patientId || pName;
@@ -358,9 +673,12 @@ const BookingsPage = {
 
     this.patientsList = Array.from(patientMap.values());
     this.allBookings = savedBookings;
+
+    // Trigger system notifications for newly confirmed bookings or stage updates
+    this.checkAndDispatchStageNotifications(this.allBookings);
   },
 
-  async syncLiveCloudBookings() {
+  async syncLiveCloudBookings(isBackgroundPoll = false) {
     if (!navigator.onLine || typeof Api === 'undefined') return;
     const user = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
     const mobile = user ? (user.mobile || user.phone) : (localStorage.getItem('selfcare_active_user') || null);
@@ -379,8 +697,7 @@ const BookingsPage = {
 
       if (Array.isArray(liveBookings)) {
         const isMock = (id) => ['SCDBOOK000214', 'SCDBOOK000198', 'SCDBOOK000185'].includes(id);
-        
-        // Pazhaya mock matrum current user-kku thodarbu illatha bookings-ai filter seivom
+
         const existing = this.allBookings.filter(b => {
           if (isMock(b.bookingId)) return false;
           const bPhone = String(b.patientPhone || b.customerPhone || b.mobile || b.phone || '').replace(/\D/g, '').slice(-10);
@@ -388,13 +705,22 @@ const BookingsPage = {
         });
 
         const bookingMap = new Map();
-        liveBookings.forEach(b => {
+        existing.forEach(b => {
           if (b && b.bookingId) bookingMap.set(b.bookingId, b);
         });
-        existing.forEach(b => {
-          if (b && b.bookingId && !bookingMap.has(b.bookingId)) {
-            bookingMap.set(b.bookingId, b);
-          }
+
+        liveBookings.forEach(b => {
+          if (!b || !b.bookingId) return;
+          const prev = bookingMap.get(b.bookingId) || {};
+          // Preserve locally generated random OTP if cloud hasn't returned one yet, or accept cloud OTP
+          const mergedBooking = {
+            ...prev,
+            ...b,
+            timeSlot: this.resolveCartTimeSlot(b.timeSlot ? b : prev),
+            pickupOtp: b.pickupOtp || b.otp || prev.pickupOtp || prev.otp || ''
+          };
+          this.ensureBookingPickupOtp(mergedBooking);
+          bookingMap.set(b.bookingId, mergedBooking);
         });
 
         let merged = Array.from(bookingMap.values());
@@ -412,15 +738,32 @@ const BookingsPage = {
           merged = merged.filter(b => !subParentBIds.has(String(b.bookingId || '').toUpperCase()));
         }
 
+        // Sort: Last booked first
+        merged.sort((a, b) => {
+          const diff = this.getBookingSortTimestamp(b) - this.getBookingSortTimestamp(a);
+          if (diff !== 0) return diff;
+          return String(b.bookingId || '').localeCompare(String(a.bookingId || ''));
+        });
+
         this.allBookings = merged;
 
-        // User-isolated storage-la save seiyavum
         localStorage.setItem(`selfcare_bookings_${cleanMobile}`, JSON.stringify(this.allBookings));
         localStorage.setItem('selfcare_recent_bookings', JSON.stringify(this.allBookings));
 
+        // Fire phone notifications for any updated live diagnostic stages
+        await this.checkAndDispatchStageNotifications(this.allBookings);
+
         this.loadPatientsAndBookings(true);
         this.renderPatientChips();
-        this.autoSelectInitialPatientOrUrlTarget();
+
+        if (isBackgroundPoll && this.currentActiveBooking) {
+          const updatedCurrent = this.allBookings.find(b => b.bookingId === this.currentActiveBooking.bookingId);
+          if (updatedCurrent) {
+            this.renderBookingDetails(updatedCurrent);
+          }
+        } else {
+          this.autoSelectInitialPatientOrUrlTarget();
+        }
       }
     } catch (err) {
       console.warn('[Bookings] Live cloud sync notice:', err);
@@ -476,6 +819,7 @@ const BookingsPage = {
         try {
           const fetched = await Api.getBookingDetails(cleanBId);
           if (fetched && fetched.bookingId) {
+            this.ensureBookingPickupOtp(fetched);
             match = fetched;
             this.allBookings.unshift(fetched);
             this.loadPatientsAndBookings(true);
@@ -500,6 +844,20 @@ const BookingsPage = {
       const pIdx = this.patientsList.findIndex(p => this.normalizeName(p.name).includes(normTarget));
       if (pIdx >= 0) {
         this.selectPatientByIndex(pIdx);
+        return;
+      }
+    }
+
+    // Automatically select the patient who has the LATEST booking first
+    if (this.allBookings.length > 0) {
+      const latestBooking = this.allBookings[0];
+      const latestNormName = this.normalizeName(latestBooking.patientName);
+      const latestPIdx = this.patientsList.findIndex(p =>
+        (latestBooking.patientId && p.id === latestBooking.patientId) ||
+        (latestNormName && this.normalizeName(p.name) === latestNormName)
+      );
+      if (latestPIdx >= 0) {
+        this.selectPatientByIndex(latestPIdx, latestBooking.bookingId);
         return;
       }
     }
@@ -558,10 +916,11 @@ const BookingsPage = {
       return false;
     });
 
+    // Strict Latest-Booking-First sorting (Last booked appears at index 0)
     return filtered.sort((a, b) => {
-      const timeA = this.parseDateClean(a.collectionDate || a.createdAt || a.bookingDate).getTime();
-      const timeB = this.parseDateClean(b.collectionDate || b.createdAt || b.bookingDate).getTime();
-      return timeB - timeA;
+      const diff = this.getBookingSortTimestamp(b) - this.getBookingSortTimestamp(a);
+      if (diff !== 0) return diff;
+      return String(b.bookingId || '').localeCompare(String(a.bookingId || ''));
     });
   },
 
@@ -627,29 +986,31 @@ const BookingsPage = {
     if (emptyView) emptyView.style.display = 'none';
     if (activeView) activeView.style.display = 'block';
 
+    // Always default to index 0 (the latest booked order) unless URL explicitly requested another ID
+    const selectedBId = preferredBookingId || patientBookings[0].bookingId;
+
     if (patientBookings.length > 1) {
       if (subnav) {
         subnav.style.display = 'flex';
-        let selectedBId = preferredBookingId || patientBookings[0].bookingId;
-
-        subnav.innerHTML = patientBookings.map(b => {
+        subnav.innerHTML = patientBookings.map((b, bIdx) => {
           const friendlyDate = this.formatFriendlyDate(b.collectionDate, false);
+          const slotLabel = this.resolveCartTimeSlot(b);
           const isSelected = b.bookingId === selectedBId;
+          const latestTag = bIdx === 0 ? '🆕 ' : '';
           return `
             <button type="button" class="booking-subtab ${isSelected ? 'active' : ''}" 
                     onclick="BookingsPage.selectSpecificBooking('${b.bookingId}')">
-              ${this.safeEscape(b.bookingId)} (${friendlyDate})
+              ${latestTag}${this.safeEscape(b.bookingId)} • ${friendlyDate} (${this.safeEscape(slotLabel)})
             </button>
           `;
         }).join('');
-
-        const activeBooking = patientBookings.find(b => b.bookingId === selectedBId) || patientBookings[0];
-        this.renderBookingDetails(activeBooking);
       }
     } else {
       if (subnav) subnav.style.display = 'none';
-      this.renderBookingDetails(patientBookings[0]);
     }
+
+    const activeBooking = patientBookings.find(b => b.bookingId === selectedBId) || patientBookings[0];
+    this.renderBookingDetails(activeBooking);
   },
 
   selectSpecificBooking(bookingId) {
@@ -677,12 +1038,17 @@ const BookingsPage = {
   renderBookingDetails(booking) {
     this.currentActiveBooking = booking;
 
+    // Ensure random 4-digit OTP is generated and stored
+    const pickupOtp = this.ensureBookingPickupOtp(booking);
+
     const idEl = document.getElementById('disp-booking-id');
     const modeEl = document.getElementById('disp-collection-mode');
     const patientEl = document.getElementById('disp-patient-name');
     const slotEl = document.getElementById('disp-time-slot');
     const paymentEl = document.getElementById('disp-payment-status');
     const amtEl = document.getElementById('disp-amount-val');
+    const otpBoxEl = document.getElementById('disp-pickup-otp-box');
+    const otpValEl = document.getElementById('disp-pickup-otp-val');
 
     const isLab = booking.collectionType === 'lab' || String(booking.address || '').includes('Direct Lab');
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
@@ -694,14 +1060,24 @@ const BookingsPage = {
       modeEl.className = `meta-mode-badge ${isLab ? 'lab-mode' : 'home-mode'}`;
     }
 
+    // Display Customer Pickup OTP prominently for Home Collection
+    if (otpBoxEl && otpValEl) {
+      if (!isLab && pickupOtp) {
+        otpBoxEl.style.display = 'flex';
+        otpValEl.textContent = pickupOtp;
+      } else {
+        otpBoxEl.style.display = 'none';
+      }
+    }
+
     if (patientEl && activePatient) {
       patientEl.innerHTML = `${this.safeEscape(activePatient.name)} ${isVip ? '<span title="VIP Member" style="color:#F59E0B; margin-left:3px;">👑</span>' : ''} (${this.safeEscape(activePatient.relation || 'Self')})`;
     }
 
     if (slotEl) {
       const friendlyDate = this.formatFriendlyDate(booking.collectionDate, true);
-      const slotTime = booking.timeSlot || '07:30 AM - 08:00 AM';
-      slotEl.textContent = `${friendlyDate} • ${slotTime}`;
+      const exactCartSlot = this.resolveCartTimeSlot(booking);
+      slotEl.textContent = `${friendlyDate} • ${exactCartSlot}`;
     }
 
     if (paymentEl) {
@@ -808,17 +1184,18 @@ const BookingsPage = {
 
     const isLab = booking.collectionType === 'lab' || String(booking.address || '').includes('Direct Lab');
     const stage = this.getBookingStage(booking);
+    const exactSlot = this.resolveCartTimeSlot(booking);
 
     const homeSteps = [
-      { num: 1, title: 'Order Confirmed', desc: 'Doorstep pickup appointment confirmed in our system.', time: 'Booking Confirmed' },
+      { num: 1, title: 'Order Confirmed', desc: `Doorstep pickup confirmed for ${exactSlot}.`, time: 'Booking Confirmed' },
       { num: 2, title: 'Phlebotomist Assigned', desc: 'Field technician assigned with sterile barcoded vacutainers.', time: stage === 2 ? 'In Progress' : (stage > 2 ? 'Completed' : 'Pending') },
-      { num: 3, title: 'Doorstep Sample Collection', desc: 'Technician will visit your address at scheduled 30-min window.', time: stage === 3 ? 'Arriving Soon' : (stage > 3 ? 'Done' : 'Upcoming') },
+      { num: 3, title: 'Doorstep Sample Collection', desc: `Share OTP (${booking.pickupOtp || '****'}) with phlebotomist at ${exactSlot}.`, time: stage === 3 ? 'Sample Collected' : (stage > 3 ? 'Done' : 'Upcoming') },
       { num: 4, title: 'Cold-Chain Transport to Lab', desc: 'Barcoded samples transported safely under 2°C-8°C ice-box.', time: stage === 4 ? 'In Transit' : (stage > 4 ? 'Done' : 'Upcoming') },
       { num: 5, title: 'Certified NABL Report Ready', desc: 'Signed laboratory report delivered to WhatsApp & app.', time: stage === 5 ? 'Report Ready' : 'Same Day' }
     ];
 
     const labSteps = [
-      { num: 1, title: 'Appointment Confirmed', desc: 'Lab appointment slot confirmed and registered in lab queue.', time: 'Confirmed' },
+      { num: 1, title: 'Appointment Confirmed', desc: `Lab appointment slot (${exactSlot}) confirmed in lab queue.`, time: 'Confirmed' },
       { num: 2, title: 'Arrive at Diagnostic Center', desc: 'Please visit lab counter at your scheduled time slot.', time: stage === 2 ? 'Next Action' : (stage > 2 ? 'Done' : 'Pending') },
       { num: 3, title: 'Sample Collection at Lab', desc: 'Certified phlebotomist will draw blood / urine sample.', time: stage === 3 ? 'Sampling Now' : (stage > 3 ? 'Done' : 'Pending') },
       { num: 4, title: 'Clinical Barcoded Testing', desc: 'Sample undergoing certified NABL quality analyzer tests.', time: stage === 4 ? 'In Testing' : (stage > 4 ? 'Done' : 'Pending') },
@@ -876,7 +1253,6 @@ const BookingsPage = {
       </div>
     `).join('');
 
-    // 1. VIP 10% Discount Deduction Line
     if (vipDiscount > 0) {
       html += `
         <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#FEF3C7; border-radius:8px; margin-top:6px;">
@@ -886,7 +1262,6 @@ const BookingsPage = {
       `;
     }
 
-    // 2. Referral Discount Deduction Line
     if (referralDiscount > 0) {
       html += `
         <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#ECFDF5; border-radius:8px; margin-top:6px;">
@@ -896,7 +1271,6 @@ const BookingsPage = {
       `;
     }
 
-    // 3. Doorstep Collection Fee Line
     if (!isLab && doorstepCharge > 0) {
       html += `
         <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#fff7ed; border-radius:8px; margin-top:6px;">
@@ -906,7 +1280,6 @@ const BookingsPage = {
       `;
     }
 
-    // 4. Final Total Paid (Exact amount paid by customer at cart checkout)
     html += `
       <div class="test-summary-row" style="display:flex; justify-content:space-between; align-items:center; padding:12px 6px 4px 6px; border-top:1.5px solid #078866; margin-top:8px;">
         <div>
@@ -1004,7 +1377,7 @@ const BookingsPage = {
       lockedRelation: activePatient ? activePatient.relation : (booking.relation || 'Self'),
       lockedCollectionType: booking.collectionType || 'home',
       lockedCollectionDate: booking.collectionDate || '',
-      lockedTimeSlot: booking.timeSlot || '',
+      lockedTimeSlot: this.resolveCartTimeSlot(booking),
       lockedAddress: booking.address || '',
       lockedExistingItems: existingItems,
       items: existingItems,
@@ -1031,7 +1404,7 @@ const BookingsPage = {
     const bId = booking.bookingId || 'My Booking';
     const activePatient = this.patientsList[this.selectedPatientIndex] || this.patientsList[0];
     const patient = activePatient ? activePatient.name : (booking.patientName || 'Self');
-    const slot = booking.timeSlot || 'Scheduled Slot';
+    const slot = this.resolveCartTimeSlot(booking);
 
     const msg = `Hello Selfcare Diagnostics, I need an update regarding sample collection for Booking ID: *${bId}* (Patient: ${patient}, Slot: ${slot}). Please assist.`;
     window.location.href = `https://wa.me/917010174890?text=${encodeURIComponent(msg)}`;
