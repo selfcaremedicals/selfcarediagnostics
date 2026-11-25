@@ -1,9 +1,9 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v20.0.0
+ * Selfcare Diagnostics - Service Worker v21.0.0
  */
 
-const CACHE_VERSION = '20.0.0';
+const CACHE_VERSION = '21.0.0';
 const CACHE_NAME = `selfcare-cache-v${CACHE_VERSION}`;
 
 const ASSETS_TO_CACHE = [
