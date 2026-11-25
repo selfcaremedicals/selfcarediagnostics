@@ -1,12 +1,6 @@
 /* file: assets/js/api.js */
 /**
- * Selfcare Diagnostics - API Gateway v6.7.1 (Cloudflare Pages Gateway Edition)
- * Updates:
- * - Routed API calls through Config.API_GATEWAY_URL (/api/gateway) with GAS fallback
- * - Added patientRegister & patientLogin endpoints for password-based patient auth
- * - Added updateReport & getBookingReport endpoints for diagnostic laboratory findings
- * - High-speed In-Memory TTL Response Caching for Instant UI updates
- * - Dedicated endpoints for Referral, VIP, Blood SOS, and Razorpay
+ * Selfcare Diagnostics - Direct Google Apps Script API Client v7.0.0
  */
 
 const Api = {
@@ -45,26 +39,11 @@ const Api = {
       'aiSearch'
     ];
 
-    if (fastReadActions.includes(action)) {
-      return 8500;
-    }
-
-    if (action === 'patientLogin' || action === 'patientRegister' || action === 'staffLogin') {
-      return 15000;
-    }
-
-    if (action === 'validateReferralCode' || action === 'claimReferralReward' || action === 'getReferralData') {
-      return 35000;
-    }
-
-    if (action === 'processPrescriptionOCR' || action === 'uploadPrescription') {
-      return 90000;
-    }
-
-    if (action === 'createRazorpayOrder' || action === 'verifyRazorpayPayment' || action === 'saveMembership' || action === 'updateReport') {
-      return 30000;
-    }
-
+    if (fastReadActions.includes(action)) return 12000;
+    if (action === 'patientLogin' || action === 'patientRegister' || action === 'staffLogin') return 18000;
+    if (action === 'validateReferralCode' || action === 'claimReferralReward' || action === 'getReferralData') return 35000;
+    if (action === 'processPrescriptionOCR' || action === 'uploadPrescription') return 90000;
+    if (action === 'createRazorpayOrder' || action === 'verifyRazorpayPayment' || action === 'saveMembership' || action === 'updateReport') return 30000;
     return 45000;
   },
 
@@ -98,17 +77,12 @@ const Api = {
           throw new Error('No internet connection. Operating in offline mode.');
         }
 
-        const baseUrl = (typeof Config !== 'undefined' && (Config.API_GATEWAY_URL || Config.GAS_WEB_APP_URL))
-          ? (Config.API_GATEWAY_URL || Config.GAS_WEB_APP_URL)
-          : '';
-        if (!baseUrl) {
-          throw new Error('API_GATEWAY_URL is not configured in config.js');
+        const gasUrl = (typeof Config !== 'undefined' && Config.GAS_WEB_APP_URL) ? Config.GAS_WEB_APP_URL.trim() : '';
+        if (!gasUrl || !gasUrl.startsWith('https://')) {
+          throw new Error('GAS_WEB_APP_URL is not configured in config.js');
         }
 
-        const origin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null')
-          ? window.location.origin
-          : 'https://selfcarediagnostics.in';
-        const url = new URL(baseUrl, origin);
+        const url = new URL(gasUrl);
         url.searchParams.append('action', action);
 
         const payloadData = {
@@ -119,7 +93,7 @@ const Api = {
         const options = {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'text/plain;charset=utf-8'
           },
           body: JSON.stringify(payloadData)
         };
@@ -174,9 +148,6 @@ const Api = {
     return promise;
   },
 
-  // ==========================================================
-  // CLINICAL LAB REPORTS ENGINE
-  // ==========================================================
   async updateReport(payload) {
     this.invalidateCache('getBookingsByPatient');
     this.invalidateCache('getBookingDetails');
@@ -188,9 +159,6 @@ const Api = {
     return this.request('getBookingReport', { bookingId, patientPhone }, false);
   },
 
-  // ==========================================================
-  // REFERRAL & REWARD ENGINE APIS
-  // ==========================================================
   async validateReferralCode(code, mobile, amount) {
     return this.request('validateReferralCode', { code, mobile, amount }, false);
   },
@@ -204,9 +172,6 @@ const Api = {
     return this.request('claimReferralReward', { mobile }, false);
   },
 
-  // ==========================================================
-  // EMERGENCY BLOOD CONNECT CLOUD APIS
-  // ==========================================================
   async getBloodData() {
     return this.request('getBloodData', {}, true);
   },
@@ -226,13 +191,11 @@ const Api = {
     return this.request('registerBloodDonor', donorPayload, false);
   },
 
-  // ==========================================================
-  // AUTHENTICATION & PROFILE APIS
-  // ==========================================================
-  async patientRegister(mobile, password) {
+  async patientRegister(mobile, password, name = '') {
     return this.request('patientRegister', {
       mobile,
       password,
+      name,
       userId: `SCD_${mobile}`
     }, false);
   },
@@ -262,9 +225,6 @@ const Api = {
     return this.request('updateProfile', profileData, false);
   },
 
-  // ==========================================================
-  // VIP MEMBERSHIP GATEWAY APIS
-  // ==========================================================
   async saveMembership(membershipPayload) {
     this.invalidateCache('getProfile');
     this.invalidateCache('getFamilyMembers');
@@ -276,9 +236,6 @@ const Api = {
     return this.request('getMembershipStatus', { mobile }, false);
   },
 
-  // ==========================================================
-  // FAMILY VAULT DIRECTORY APIS
-  // ==========================================================
   async getFamilyMembers(primaryMobile) {
     return this.request('getFamilyMembers', {
       mobile: primaryMobile,
@@ -298,9 +255,6 @@ const Api = {
     return this.request('deleteFamilyMember', payload, false);
   },
 
-  // ==========================================================
-  // CATALOGUE APIS
-  // ==========================================================
   async getTests() {
     return this.request('getTests', {}, true);
   },
@@ -329,9 +283,6 @@ const Api = {
     return this.request('aiSearch', { query }, true);
   },
 
-  // ==========================================================
-  // PRESCRIPTION & OCR APIS
-  // ==========================================================
   async uploadPrescription(payload) {
     return this.request('uploadPrescription', payload, false);
   },
@@ -352,9 +303,6 @@ const Api = {
     return this.request('confirmPrescriptionTests', { prescriptionId, confirmedTestIds }, false);
   },
 
-  // ==========================================================
-  // BOOKINGS & LIVE TRACKING APIS
-  // ==========================================================
   async createBooking(bookingData) {
     this.invalidateCache('getBookingsByPatient');
     this.invalidateCache('getReferralData');
@@ -369,16 +317,10 @@ const Api = {
     return this.request('getBookingsByPatient', { patientPhone }, true);
   },
 
-  // ==========================================================
-  // PAYMENT STATUS CHECK
-  // ==========================================================
   async getPaymentStatus(bookingId, paymentReference) {
     return this.request('getPaymentStatus', { bookingId, paymentReference }, false);
   },
 
-  // ==========================================================
-  // RAZORPAY ONLINE PAYMENT GATEWAY APIS
-  // ==========================================================
   async createRazorpayOrder(orderPayload) {
     return this.request('createRazorpayOrder', orderPayload, false);
   },
@@ -391,7 +333,6 @@ const Api = {
 if (typeof window !== 'undefined') {
   window.Api = Api;
 }
-
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Api;
 }

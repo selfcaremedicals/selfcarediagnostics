@@ -1,32 +1,25 @@
 /* file: assets/js/config.js */
 /**
- * Selfcare Diagnostics - Frontend Configuration (config.js) v8.2.1
- * Defines API endpoints, versioning, database configuration, cache settings,
- * Razorpay Live Gateway, and Cashfree Production Gateway status constants.
+ * Selfcare Diagnostics - Frontend Configuration (config.js) v8.3.0 (Direct GAS Edition)
  */
 
 const Config = {
-  APP_VERSION: '8.2.1',
-  CACHE_VERSION: 'selfcare-cache-v8.2.1',
+  APP_VERSION: '8.3.0',
+  CACHE_VERSION: 'selfcare-cache-v8.3.0',
 
   // Razorpay Live Key ID
   RAZORPAY_KEY_ID: 'rzp_live_Tq9S3sQhh5B3hW',
 
-  // Cloudflare Pages Functions API Gateway (Primary)
-  API_GATEWAY_URL: '/api/gateway',
-  
-  // Google Apps Script Live Web App Deployment URL (Legacy Fallback)
-  GAS_WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxI9FsL5Ow1vC7pBipFreIR934D9mQk6dWwiEN7WAArgLKP6qYqF8vlLZ3Ywzo5GQjquA/exec', 
-  
+  // Direct Google Apps Script Web App URL (Cloudflare removed)
+  API_GATEWAY_URL: '',
+  GAS_WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxI9FsL50w1vC7pBipFreIR934D9mQk6dWwiEN7WAargLKP6qYqF8vlLZ3Ywzo5GQjquA/exec',
+
   SPREADSHEET_ID: '1lswBf5iPcPnt8OGA6ZfCE1tcJyqqxTaP1e2u9UwwHOw',
 
   // IndexedDB Configuration
   DB_NAME: 'selfcare_db',
   DB_VERSION: 1,
 
-  // ==========================================================
-  // CASHFREE PRODUCTION GATEWAY PUBLIC SETTINGS
-  // ==========================================================
   CASHFREE: {
     SDK_URL: 'https://sdk.cashfree.com/js/v3/cashfree.js',
     MODE: 'production',
@@ -34,21 +27,17 @@ const Config = {
     RETURN_URL: 'https://selfcarediagnostics.in/cart.html?cf_order_id={order_id}'
   },
 
-  // ==========================================================
-  // LEGACY UPI FALLBACK CONFIGURATION
-  // ==========================================================
   UPI: {
     MERCHANT_VPA: '0798545a0252206.bqr@kotak',
     MERCHANT_NAME: 'Selfcare Diagnostics',
     CURRENCY: 'INR',
-    MCC: '8099', // Medical Services & Diagnostic Labs
+    MCC: '8099',
     TRANSACTION_PREFIX: 'SCDPAY',
     BOOKING_PREFIX: 'SCDBOOK',
     INTENT_TIMEOUT_MS: 180000,
     POLL_INTERVAL_MS: 3000
   },
 
-  // Payment Status Lifecycle
   PAYMENT_STATUS: {
     PENDING: 'PAYMENT_PENDING',
     SUCCESS: 'PAYMENT_SUCCESS',
@@ -59,7 +48,6 @@ const Config = {
     VERIFICATION_PENDING: 'PAYMENT_VERIFICATION_PENDING'
   },
 
-  // Booking Status Lifecycle
   BOOKING_STATUS: {
     PAYMENT_PENDING: 'PAYMENT_PENDING',
     CONFIRMED: 'CONFIRMED',
@@ -70,7 +58,6 @@ const Config = {
   }
 };
 
-// Expose Config across all client scopes
 if (typeof window !== 'undefined') {
   window.Config = Config;
   window.CONFIG = Config;
@@ -83,7 +70,6 @@ if (typeof globalThis !== 'undefined') {
   globalThis.Config = Config;
   globalThis.CONFIG = Config;
 }
-
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Config;
 }
