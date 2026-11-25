@@ -1,8 +1,8 @@
 /* file: assets/css/bookings.css */
 /**
- * Selfcare Diagnostics - Bookings & Multi-Patient Live Tracking CSS
+ * Selfcare Diagnostics - Bookings & Multi-Patient Live Tracking CSS v6.5.0
  * Features:
- * - Direct Tracking Display (Zero search input)
+ * - Direct Tracking Display & Random 4-Digit Pickup OTP Banner
  * - Horizontal Patient Name Selector Chips (Customer + Family Members)
  * - 3D Glassmorphism Cards with Emerald Theme
  * - Interactive Vertical Timeline Stepper with Pulse Animation
@@ -88,7 +88,7 @@ body {
 }
 
 /* =========================================================================
-   PATIENT SELECTOR CHIPS (Name-wise show aaganum)
+   PATIENT SELECTOR CHIPS
    ========================================================================= */
 .patient-selector-section {
   padding: 14px 16px;
@@ -139,7 +139,6 @@ body {
   display: none;
 }
 
-/* Individual Patient Chip */
 .patient-chip {
   display: flex;
   align-items: center;
@@ -184,7 +183,6 @@ body {
   color: var(--text-muted);
 }
 
-/* Active Selected Chip */
 .patient-chip.active {
   background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
   border-color: var(--dark-green);
@@ -206,7 +204,7 @@ body {
 }
 
 /* =========================================================================
-   SUB-NAVIGATION IF PATIENT HAS MULTIPLE BOOKINGS
+   SUB-NAVIGATION (LATEST BOOKED FIRST)
    ========================================================================= */
 .bookings-subnav-container {
   display: flex;
@@ -217,10 +215,10 @@ body {
 }
 
 .booking-subtab {
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 7px 12px;
+  border-radius: 9px;
   background: #ffffff;
-  border: 1px solid rgba(7, 136, 102, 0.2);
+  border: 1px solid rgba(7, 136, 102, 0.25);
   font-size: 11px;
   font-weight: 700;
   color: var(--dark-green);
@@ -231,10 +229,11 @@ body {
 .booking-subtab.active {
   background: var(--dark-green);
   color: #ffffff;
+  box-shadow: 0 3px 10px rgba(4, 93, 73, 0.25);
 }
 
 /* =========================================================================
-   BOOKING META DETAILS CARD
+   BOOKING META DETAILS CARD & PICKUP OTP BANNER
    ========================================================================= */
 .booking-meta-card {
   padding: 16px 18px;
@@ -283,6 +282,45 @@ body {
   border: 1px solid #A7F3D0;
 }
 
+/* Random 4-Digit Pickup OTP Banner */
+.pickup-otp-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #FEF3C7, #FFFBEB);
+  border: 1.5px solid #F59E0B;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.otp-banner-title {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 900;
+  color: #92400E;
+}
+
+.otp-banner-sub {
+  display: block;
+  font-size: 10px;
+  color: #B45309;
+  margin-top: 1px;
+}
+
+.otp-banner-code {
+  background: #0F172A;
+  color: #34D399;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+}
+
 .meta-info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -299,19 +337,6 @@ body {
   font-size: 12.5px;
   color: var(--text-main);
   font-weight: 700;
-}
-
-.location-banner {
-  background: #F9FAFB;
-  border: 1px solid rgba(7, 136, 102, 0.15);
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin-top: 12px;
-  font-size: 11px;
-  color: var(--text-main);
-  display: flex;
-  gap: 6px;
-  align-items: center;
 }
 
 /* =========================================================================
@@ -357,7 +382,6 @@ body {
   padding-bottom: 0;
 }
 
-/* Connecting Line */
 .step-item::before {
   content: '';
   position: absolute;
@@ -376,7 +400,6 @@ body {
   background: var(--primary-green);
 }
 
-/* Step Node Circle */
 .step-node {
   position: absolute;
   left: -28px;
@@ -438,7 +461,7 @@ body {
 }
 
 /* =========================================================================
-   TESTS SUMMARY
+   TESTS SUMMARY & WHATSAPP SUPPORT
    ========================================================================= */
 .tests-summary-card {
   padding: 14px 16px;
@@ -470,9 +493,6 @@ body {
   border-bottom: none;
 }
 
-/* =========================================================================
-   WHATSAPP SUPPORT ACTION
-   ========================================================================= */
 .support-card {
   padding: 14px 16px;
   display: flex;
@@ -516,7 +536,7 @@ body {
 }
 
 /* =========================================================================
-   EMPTY STATE (When patient has no active bookings)
+   EMPTY STATE & 5-TAB BOTTOM NAVIGATION
    ========================================================================= */
 .empty-state-card {
   padding: 36px 20px;
@@ -569,9 +589,6 @@ body {
   border: 1px solid var(--primary-green);
 }
 
-/* =========================================================================
-   5-TAB FIXED BOTTOM NAVIGATION
-   ========================================================================= */
 .bottom-nav {
   position: fixed;
   bottom: 0;
