@@ -12,7 +12,7 @@ const Config = {
 
   // Direct Google Apps Script Web App URL (Cloudflare removed)
   API_GATEWAY_URL: '',
-  GAS_WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxI9FsL50w1vC7pBipFreIR934D9mQk6dWwiEN7WAargLKP6qYqF8vlLZ3Ywzo5GQjquA/exec',
+  GAS_WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxI9FsL5Ow1vC7pBipFreIR934D9mQk6dWwiEN7WAArgLKP6qYqF8vlLZ3Ywzo5GQjquA/exec',
 
   SPREADSHEET_ID: '1lswBf5iPcPnt8OGA6ZfCE1tcJyqqxTaP1e2u9UwwHOw',
 
