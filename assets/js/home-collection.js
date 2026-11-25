@@ -1,38 +1,41 @@
 /* file: assets/js/home-collection.js */
 /**
- * Selfcare Diagnostics - Home Collection Captain & Payout Engine v4.0.0
+ * Selfcare Diagnostics - Home Collection Captain & Payout Engine v4.3.0
  * Features:
- * 1. Persistent Duty Toggle (Remains ON across logins until manually switched OFF).
- * 2. Persistent Declined / Dismissed Notification Memory (Never re-notifies declined/seen orders).
- * 3. Unlimited Concurrent Active Pickups (Accept any number of orders simultaneously).
- * 4. Accurate Google Maps Navigation (Uses exact customer GPS coordinates or full geocoded address).
- * 5. Exact Booking OTP Verification (Matches exact OTP created during customer booking).
- * 6. Footer ILD Sample Delivery Directory Popup with One-Tap Direct Call.
- * 7. Self-Editable Captain Profile & UPI Details + Mandatory Full Cash Settlement via Razorpay before Withdrawal.
- * 8. Direct WhatsApp Withdrawal Request with Auto Wallet Reset to ₹0.
+ * 1. Continuous Rapido-Style Alert Loop (Repeats sound, vibration & OS banner until Accept or Decline).
+ * 2. Strict Accept / Decline Locking:
+ *    - Accept opens app directly & locks booking to this technician.
+ *    - Decline permanently blocks booking from re-appearing without opening app.
+ * 3. Multi-Technician Broadcast & "You Missed / Someone Accepted" Alert when another technician claims first.
+ * 4. Strict Customer Saved Coordinates (No Address Text Geocoding) + 10 km Haversine Radius Dispatch Filter.
+ * 5. Technician Profile Address + Live GPS Column & Silent 10-Second Background GPS Sync while ONLINE.
+ * 6. Next-Day Withdrawal Rule + Strict Balance Cap + Direct WhatsApp Payout to +91 7010174890 with GPay Link.
  */
 
 const HomeCollectionApp = {
   SINGLE_VISIT_FEE: 150,
   MULTI_VISIT_FEE: 250,
-  ADMIN_WHATSAPP_NUMBER: '919840000000', // Fallback; overridden by Config.WHATSAPP_NUMBER if present
+  MAX_DISPATCH_RADIUS_KM: 10,
+  ADMIN_WHATSAPP_NUMBER: '917010174890',
 
   isOnline: false,
+  notificationsEnabled: false,
   pollTimer: null,
+  silentGpsTimer: null,
   dayFilter: 'ALL',
 
   currentCaptain: null,
   incomingOrders: [],
+  missedOrders: [],
   activeTrips: [],
   completedTrips: [],
 
   // Active OTP Target Booking ID
   otpTargetBookingId: null,
 
-  // Rapido Incoming Alert State
+  // Continuous Rapido Incoming Alert State
   popupOrder: null,
-  popupTimerId: null,
-  popupSecondsLeft: 30,
+  alertLoopTimerId: null,
   seenAlertIds: new Set(),
   declinedIds: new Set(),
 
@@ -60,7 +63,6 @@ const HomeCollectionApp = {
     totalEarned: 0,
     totalPaidOut: 0,
     codCashHeld: 0,
-    payoutCycle: 'DAILY',
     bank: {
       holderName: '',
       upiId: '',
@@ -71,9 +73,7 @@ const HomeCollectionApp = {
   },
 
   init() {
-    if (typeof Config !== 'undefined' && Config.WHATSAPP_NUMBER) {
-      this.ADMIN_WHATSAPP_NUMBER = String(Config.WHATSAPP_NUMBER).replace(/\D/g, '');
-    }
+    this.ADMIN_WHATSAPP_NUMBER = '917010174890';
 
     this.registerServiceWorkerNotifications();
     this.checkUrlPopupAction();
@@ -89,7 +89,7 @@ const HomeCollectionApp = {
   },
 
   /* =========================================================
-     1. SESSION GUARD & PERSISTENT ALERT MEMORY
+     1. SESSION GUARD & PERSISTENT DECLINE / ALERT MEMORY
      ========================================================= */
   getSavedCaptainSession() {
     try {
@@ -102,7 +102,6 @@ const HomeCollectionApp = {
       const staffId = parsed?.id || parsed?.staffId || parsed?.captainId;
       if (!staffId) return null;
 
-      // Merge any self-saved profile overrides
       const savedProfileRaw = localStorage.getItem(`selfcare_hc_profile_${staffId}`);
       const savedProfile = savedProfileRaw ? JSON.parse(savedProfileRaw) : {};
 
@@ -112,7 +111,10 @@ const HomeCollectionApp = {
         age: savedProfile.age || parsed.age || '',
         gender: savedProfile.gender || parsed.gender || 'Male',
         mobile: savedProfile.mobile || parsed.mobile || (parsed.branchPhone ? String(parsed.branchPhone).replace(/\D/g, '').slice(-10) : ''),
-        address: savedProfile.address || parsed.address || parsed.zone || 'Vettuvankeni, ECR, Chennai',
+        address: savedProfile.address || parsed.address || parsed.zone || '',
+        lat: Number(savedProfile.lat || parsed.lat || 0) || null,
+        lng: Number(savedProfile.lng || parsed.lng || 0) || null,
+        locationText: savedProfile.locationText || parsed.locationText || '',
         upiId: savedProfile.upiId || parsed.upiId || '',
         upiHolderName: savedProfile.upiHolderName || parsed.upiHolderName || parsed.name || '',
         accountNo: savedProfile.accountNo || parsed.accountNo || '',
@@ -138,18 +140,20 @@ const HomeCollectionApp = {
     try {
       localStorage.setItem(
         `selfcare_hc_declined_${this.currentCaptain.id}`,
-        JSON.stringify(Array.from(this.declinedIds).slice(-300))
+        JSON.stringify(Array.from(this.declinedIds).slice(-500))
       );
       localStorage.setItem(
         `selfcare_hc_seen_${this.currentCaptain.id}`,
-        JSON.stringify(Array.from(this.seenAlertIds).slice(-300))
+        JSON.stringify(Array.from(this.seenAlertIds).slice(-500))
       );
     } catch (e) {}
   },
 
   logoutCaptain() {
     if (this.pollTimer) clearInterval(this.pollTimer);
-    // Note: Intentionally keeping 'selfcare_hc_online' & alert memory intact so duty stays ON across logins
+    if (this.silentGpsTimer) clearInterval(this.silentGpsTimer);
+    this.stopContinuousAlertLoop();
+
     localStorage.removeItem('selfcare_captain_session');
     localStorage.removeItem('selfcare_active_tech');
     localStorage.removeItem('selfcare_active_technician');
@@ -180,16 +184,307 @@ const HomeCollectionApp = {
     this.renderProfileView();
     this.renderActiveTrips();
 
-    // Persistent Duty State: defaults to ON once switched ON, survives across logins
     const dutyStored = localStorage.getItem('selfcare_hc_online');
     const savedOnline = dutyStored === null ? true : (dutyStored === 'true');
-    const toggle = document.getElementById('hc-duty-toggle');
-    if (toggle) toggle.checked = savedOnline;
+    const dutyToggle = document.getElementById('hc-duty-toggle');
+    if (dutyToggle) dutyToggle.checked = savedOnline;
+
+    const notifStored = localStorage.getItem('selfcare_hc_notif_enabled');
+    const permGranted = ('Notification' in window) && Notification.permission === 'granted';
+    const savedNotif = notifStored === null ? permGranted : (notifStored === 'true' && permGranted);
+    const notifToggle = document.getElementById('hc-notif-toggle');
+    if (notifToggle) notifToggle.checked = savedNotif;
+
+    this.notificationsEnabled = savedNotif;
+    this.updateNotifUiState();
     this.toggleDuty(savedOnline, true);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.isOnline) {
+        this.syncBookings(false);
+      }
+    });
   },
 
   /* =========================================================
-     2. SELF-EDITABLE CAPTAIN PROFILE, UPI & RATINGS
+     2. TECHNICIAN LIVE LOCATION & SILENT 10-SEC GPS TRACKING
+     ========================================================= */
+  startSilentLocationTracking() {
+    if (this.silentGpsTimer) clearInterval(this.silentGpsTimer);
+
+    const updateSilently = () => {
+      if (!this.isOnline || !('geolocation' in navigator) || !this.currentCaptain) return;
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = Number(pos.coords.latitude.toFixed(6));
+          const lng = Number(pos.coords.longitude.toFixed(6));
+          if (!lat || !lng) return;
+
+          const locStr = `${lat}, ${lng}`;
+          this.currentCaptain.lat = lat;
+          this.currentCaptain.lng = lng;
+          this.currentCaptain.locationText = locStr;
+
+          // Persist silently in localStorage
+          localStorage.setItem(`selfcare_hc_profile_${this.currentCaptain.id}`, JSON.stringify(this.currentCaptain));
+          localStorage.setItem('selfcare_captain_session', JSON.stringify(this.currentCaptain));
+
+          // Update input field silently if user is viewing profile without disturbing typing
+          const locInput = document.getElementById('hc-inp-location');
+          if (locInput && document.activeElement !== locInput) {
+            locInput.value = locStr;
+          }
+
+          // Silently sync live GPS coordinates to backend & Service Worker
+          this.syncStateToServiceWorker();
+          if (navigator.onLine && typeof Api !== 'undefined') {
+            Api.request('updateTechnicianLocation', {
+              captainId: this.currentCaptain.id,
+              techId: this.currentCaptain.id,
+              lat,
+              lng,
+              location: locStr,
+              isOnline: true,
+              updatedAt: new Date().toISOString()
+            }).catch(() => {});
+          }
+        },
+        () => {}, // Silent ignore on transient GPS timeout
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+      );
+    };
+
+    // Run immediately on going ONLINE, then every 10 seconds silently
+    updateSilently();
+    this.silentGpsTimer = setInterval(updateSilently, 10000);
+  },
+
+  stopSilentLocationTracking() {
+    if (this.silentGpsTimer) {
+      clearInterval(this.silentGpsTimer);
+      this.silentGpsTimer = null;
+    }
+  },
+
+  captureLiveLocationManual() {
+    if (!('geolocation' in navigator)) {
+      Utils.showToast('GPS Location is not supported on this device', 'error');
+      return;
+    }
+
+    Utils.showToast('Fetching live GPS coordinates...', 'info');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        const locStr = `${lat}, ${lng}`;
+
+        this.currentCaptain.lat = lat;
+        this.currentCaptain.lng = lng;
+        this.currentCaptain.locationText = locStr;
+
+        const locInp = document.getElementById('hc-inp-location');
+        if (locInp) locInp.value = locStr;
+
+        localStorage.setItem(`selfcare_hc_profile_${this.currentCaptain.id}`, JSON.stringify(this.currentCaptain));
+        localStorage.setItem('selfcare_captain_session', JSON.stringify(this.currentCaptain));
+
+        this.syncStateToServiceWorker();
+        if (this.isOnline) this.syncBookings(false);
+        Utils.showToast(`Live Location updated (${locStr})`, 'success');
+      },
+      () => {
+        Utils.showToast('Please allow GPS Location permission in browser settings.', 'error');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  },
+
+  /* =========================================================
+     3. CUSTOMER SAVED COORDINATES & 10 KM HAVERSINE RADIUS ENGINE
+     ========================================================= */
+  extractCustomerCoordinates(b) {
+    // 1. Direct numeric latitude & longitude columns saved from customer booking backend
+    const directLat = Number(b.latitude || b.lat || b.customerLat || b.destCoords?.lat || 0);
+    const directLng = Number(b.longitude || b.lng || b.customerLng || b.destCoords?.lng || 0);
+    if (directLat && directLng && !b.destCoords?.isFallback) {
+      return { lat: directLat, lng: directLng };
+    }
+
+    // 2. Parse coordinates from customer's saved location column (Google Maps URL or "lat, lng")
+    const rawLoc = String(b.location?.link || b.location || b.customerLocation || b.gpsLocation || '').trim();
+    if (!rawLoc) return null;
+
+    // Match ?q=lat,lng or @lat,lng or destination=lat,lng or plain "13.0213, 80.2231"
+    const patterns = [
+      /[?&](?:q|query|destination|ll)=(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/i,
+      /@(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/,
+      /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/
+    ];
+
+    for (const regex of patterns) {
+      const m = rawLoc.match(regex);
+      if (m) {
+        const lat = Number(m[1]);
+        const lng = Number(m[2]);
+        if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && lat !== 0 && lng !== 0) {
+          return { lat, lng };
+        }
+      }
+    }
+
+    return null;
+  },
+
+  calculateDistanceKm(lat1, lon1, lat2, lon2) {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const R = 6371; // Earth radius in km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Number((R * c).toFixed(2));
+  },
+
+  buildAccurateMapsUrl(b) {
+    // Strictly navigate using customer's saved backend location coordinates or saved Maps link (NEVER text address)
+    const coords = this.extractCustomerCoordinates(b);
+    if (coords) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${coords.lat},${coords.lng}`)}`;
+    }
+
+    const rawLoc = String(b.location?.link || b.location || b.customerLocation || b.gpsLocation || '').trim();
+    if (rawLoc.startsWith('http://') || rawLoc.startsWith('https://')) {
+      return rawLoc;
+    }
+
+    return '';
+  },
+
+  /* =========================================================
+     4. NOTIFICATION ALERT TOGGLE & SERVICE WORKER SYNC
+     ========================================================= */
+  async toggleNotifications(enable) {
+    const toggle = document.getElementById('hc-notif-toggle');
+
+    if (enable) {
+      if (!('Notification' in window)) {
+        Utils.showToast('This browser does not support screen notifications.', 'error');
+        if (toggle) toggle.checked = false;
+        this.notificationsEnabled = false;
+        this.updateNotifUiState();
+        return;
+      }
+
+      if (Notification.permission === 'denied') {
+        Utils.showToast('Notification permission blocked in browser settings. Please allow notifications.', 'error');
+        if (toggle) toggle.checked = false;
+        this.notificationsEnabled = false;
+        localStorage.setItem('selfcare_hc_notif_enabled', 'false');
+        this.updateNotifUiState();
+        return;
+      }
+
+      let permission = Notification.permission;
+      if (permission === 'default') {
+        permission = await Notification.requestPermission();
+      }
+
+      if (permission === 'granted') {
+        this.notificationsEnabled = true;
+        localStorage.setItem('selfcare_hc_notif_enabled', 'true');
+        this.playRapidoAlertTone();
+        this.syncStateToServiceWorker();
+        Utils.showToast('Screen Popup Alerts ON! Continuous Rapido-style alerts enabled.', 'success');
+      } else {
+        this.notificationsEnabled = false;
+        localStorage.setItem('selfcare_hc_notif_enabled', 'false');
+        if (toggle) toggle.checked = false;
+        Utils.showToast('Please tap "Allow" to enable screen popup notifications.', 'warning');
+      }
+    } else {
+      this.notificationsEnabled = false;
+      localStorage.setItem('selfcare_hc_notif_enabled', 'false');
+      this.stopContinuousAlertLoop();
+      this.syncStateToServiceWorker();
+      Utils.showToast('Screen Popup Alerts turned OFF', 'info');
+    }
+
+    this.updateNotifUiState();
+  },
+
+  enableBothDutyAndAlerts() {
+    const dutyToggle = document.getElementById('hc-duty-toggle');
+    const notifToggle = document.getElementById('hc-notif-toggle');
+    if (dutyToggle && !this.isOnline) {
+      dutyToggle.checked = true;
+      this.toggleDuty(true);
+    }
+    if (notifToggle && !this.notificationsEnabled) {
+      notifToggle.checked = true;
+      this.toggleNotifications(true);
+    }
+  },
+
+  updateNotifUiState() {
+    const lbl = document.getElementById('hc-notif-label');
+    const pill = document.getElementById('hc-notif-pill-box');
+    const banner = document.getElementById('hc-alert-status-banner');
+    const bTitle = document.getElementById('hc-alert-banner-title');
+    const bSub = document.getElementById('hc-alert-banner-sub');
+
+    if (this.notificationsEnabled) {
+      if (lbl) { lbl.textContent = '🔔 ON'; lbl.classList.add('online'); }
+      if (pill) pill.classList.add('is-online');
+    } else {
+      if (lbl) { lbl.textContent = '🔕 OFF'; lbl.classList.remove('online'); }
+      if (pill) pill.classList.remove('is-online');
+    }
+
+    if (banner) {
+      if (this.isOnline && this.notificationsEnabled) {
+        banner.style.display = 'none';
+      } else {
+        banner.style.display = 'flex';
+        if (!this.isOnline && !this.notificationsEnabled) {
+          if (bTitle) bTitle.textContent = '⚠️ Duty & Screen Popups are OFF';
+          if (bSub) bSub.textContent = 'Turn ON both Duty & 🔔 Alert switches to receive Rapido-style screen popups.';
+        } else if (!this.isOnline) {
+          if (bTitle) bTitle.textContent = '🛵 You are currently OFFLINE';
+          if (bSub) bSub.textContent = 'Switch Duty to ON to start receiving incoming home collection orders.';
+        } else {
+          if (bTitle) bTitle.textContent = '🔔 Mobile Screen Popups are OFF';
+          if (bSub) bSub.textContent = 'Turn ON 🔔 Alert switch to get Rapido-style screen popups even when minimized.';
+        }
+      }
+    }
+  },
+
+  async syncStateToServiceWorker() {
+    try {
+      const reg = await navigator.serviceWorker?.ready;
+      if (reg && reg.active) {
+        reg.active.postMessage({
+          type: 'CAPTAIN_STATE_SYNC',
+          isOnline: this.isOnline,
+          notificationsEnabled: this.notificationsEnabled,
+          captainId: this.currentCaptain?.id || '',
+          lat: this.currentCaptain?.lat || null,
+          lng: this.currentCaptain?.lng || null,
+          maxRadiusKm: this.MAX_DISPATCH_RADIUS_KM,
+          apiUrl: (typeof Config !== 'undefined' && Config.GAS_WEB_APP_URL) ? Config.GAS_WEB_APP_URL : '',
+          declinedIds: Array.from(this.declinedIds).slice(-300)
+        });
+      }
+    } catch (e) {}
+  },
+
+  /* =========================================================
+     5. SELF-EDITABLE CAPTAIN PROFILE, ADDRESS, LOCATION & UPI
      ========================================================= */
   saveCaptainProfile() {
     const name = String(document.getElementById('hc-inp-name')?.value || '').trim();
@@ -197,6 +492,7 @@ const HomeCollectionApp = {
     const mobile = String(document.getElementById('hc-inp-mobile')?.value || '').replace(/\D/g, '').slice(-10);
     const gender = String(document.getElementById('hc-inp-gender')?.value || 'Male').trim();
     const address = String(document.getElementById('hc-inp-address')?.value || '').trim();
+    const locationText = String(document.getElementById('hc-inp-location')?.value || '').trim();
     const upiId = String(document.getElementById('hc-inp-upi')?.value || '').trim();
     const upiHolderName = String(document.getElementById('hc-inp-upi-name')?.value || '').trim();
     const accountNo = String(document.getElementById('hc-inp-acc')?.value || '').trim();
@@ -207,6 +503,10 @@ const HomeCollectionApp = {
       return;
     }
 
+    const coordMatch = locationText.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+    const lat = coordMatch ? Number(coordMatch[1]) : this.currentCaptain.lat;
+    const lng = coordMatch ? Number(coordMatch[2]) : this.currentCaptain.lng;
+
     this.currentCaptain = {
       ...this.currentCaptain,
       name,
@@ -214,6 +514,9 @@ const HomeCollectionApp = {
       mobile,
       gender,
       address,
+      lat,
+      lng,
+      locationText: lat && lng ? `${lat}, ${lng}` : locationText,
       upiId,
       upiHolderName: upiHolderName || name,
       accountNo,
@@ -231,6 +534,7 @@ const HomeCollectionApp = {
     };
     this.saveWalletData();
     this.renderProfileView();
+    this.syncStateToServiceWorker();
 
     if (navigator.onLine && typeof Api !== 'undefined') {
       Api.request('updateCaptainProfile', {
@@ -239,7 +543,7 @@ const HomeCollectionApp = {
       }).catch(() => {});
     }
 
-    Utils.showToast('Profile & UPI details saved successfully!', 'success');
+    Utils.showToast('Profile, Location & UPI details saved!', 'success');
   },
 
   async syncCaptainProfileAndRatings() {
@@ -307,6 +611,7 @@ const HomeCollectionApp = {
     setVal('hc-inp-mobile', c.mobile);
     setVal('hc-inp-gender', c.gender || 'Male');
     setVal('hc-inp-address', c.address);
+    setVal('hc-inp-location', c.locationText || (c.lat && c.lng ? `${c.lat}, ${c.lng}` : ''));
     setVal('hc-inp-upi', c.upiId);
     setVal('hc-inp-upi-name', c.upiHolderName || c.name);
     setVal('hc-inp-acc', c.accountNo);
@@ -356,7 +661,7 @@ const HomeCollectionApp = {
   },
 
   /* =========================================================
-     3. ILD SAMPLE DELIVERY POPUP DIRECTORY
+     6. ILD SAMPLE DELIVERY POPUP DIRECTORY
      ========================================================= */
   openIldModal() {
     const searchInput = document.getElementById('hc-ild-search');
@@ -394,7 +699,7 @@ const HomeCollectionApp = {
   },
 
   /* =========================================================
-     4. DATE, STORAGE & PERSISTENT DUTY SWITCH
+     7. DATE, STORAGE & PERSISTENT DUTY SWITCH
      ========================================================= */
   getLocalYmd(dateObj = new Date()) {
     const y = dateObj.getFullYear();
@@ -472,7 +777,6 @@ const HomeCollectionApp = {
       if (actMulti) {
         this.activeTrips = JSON.parse(actMulti);
       } else {
-        // Migrate legacy single active trip if any
         const legacyAct = localStorage.getItem(`selfcare_hc_active_${this.currentCaptain.id}`);
         if (legacyAct) {
           this.activeTrips = [JSON.parse(legacyAct)];
@@ -499,49 +803,52 @@ const HomeCollectionApp = {
     const pill = document.getElementById('hc-duty-pill-box');
 
     if (this.isOnline) {
-      this.requestNotificationPermission();
       if (lbl) { lbl.textContent = 'ONLINE'; lbl.classList.add('online'); }
       if (pill) pill.classList.add('is-online');
 
+      // Start silent 10-second background GPS updates
+      this.startSilentLocationTracking();
       this.syncBookings(!silent);
+
       if (this.pollTimer) clearInterval(this.pollTimer);
-      this.pollTimer = setInterval(() => this.syncBookings(false), 10000);
+      this.pollTimer = setInterval(() => this.syncBookings(false), 5000);
     } else {
-      if (lbl) { lbl.textContent = 'OFFLINE'; lbl.classList.remove('online'); }
+      if (lbl) { lbl.textContent = 'OFF'; lbl.classList.remove('online'); }
       if (pill) pill.classList.remove('is-online');
+      this.stopSilentLocationTracking();
+      this.stopContinuousAlertLoop();
       if (this.pollTimer) clearInterval(this.pollTimer);
       this.renderIncomingList();
     }
+
+    this.updateNotifUiState();
+    this.syncStateToServiceWorker();
     this.renderActiveTrips();
   },
 
   /* =========================================================
-     5. EXACT GOOGLE MAPS NAVIGATION & VISIT FEE EVALUATION
+     8. NEXT-DAY WITHDRAWAL BALANCE CALCULATOR
      ========================================================= */
-  buildAccurateMapsUrl(b) {
-    // 1. Check explicit latitude/longitude fields
-    if (b.latitude && b.longitude) {
-      return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${b.latitude},${b.longitude}`)}`;
-    }
-    if (b.destCoords && b.destCoords.lat && b.destCoords.lng && !b.destCoords.isFallback) {
-      return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${b.destCoords.lat},${b.destCoords.lng}`)}`;
-    }
+  getTodayEarnedHoldAmount() {
+    const todayYmd = this.getLocalYmd(new Date());
+    let todayHold = 0;
 
-    // 2. Check if customer shared a Google Maps link or lat,lng string in location
-    const rawLoc = String(b.location?.link || b.location || '').trim();
-    if (rawLoc.startsWith('http://') || rawLoc.startsWith('https://')) {
-      return rawLoc;
-    }
-    const coordMatch = rawLoc.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
-    if (coordMatch) {
-      return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${coordMatch[1]},${coordMatch[2]}`)}`;
-    }
+    (this.completedTrips || []).forEach(t => {
+      const completedDate = t.completedAt || t.collectionDate;
+      if (!completedDate) return;
+      const dObj = new Date(completedDate);
+      if (!isNaN(dObj.getTime()) && this.getLocalYmd(dObj) === todayYmd) {
+        todayHold += Number(t.techEarning || this.SINGLE_VISIT_FEE);
+      }
+    });
 
-    // 3. Use exact full customer address + landmark + pincode for Google Maps Navigation
-    const fullQuery = [b.address, b.landmark, b.area, b.pincode, 'Chennai, Tamil Nadu']
-      .filter(Boolean)
-      .join(', ');
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(fullQuery || 'Vettuvankeni, Chennai')}`;
+    return Math.floor(todayHold);
+  },
+
+  getNextDayWithdrawableAmount() {
+    const totalAvail = Math.floor(Number(this.wallet.availableBalance || 0));
+    const todayHold = this.getTodayEarnedHoldAmount();
+    return Math.max(0, totalAvail - todayHold);
   },
 
   evaluateVisitFee(b) {
@@ -602,7 +909,7 @@ const HomeCollectionApp = {
   },
 
   /* =========================================================
-     6. LIVE SYNC (NO GPS LIMIT, UNLIMITED ORDERS, NO REPEAT POPUPS)
+     9. LIVE SYNC: 10 KM RADIUS BROADCAST + CLAIMED BY OTHER TECH DETECTION
      ========================================================= */
   async syncBookings(showToast = false) {
     let rawBookings = [];
@@ -614,7 +921,11 @@ const HomeCollectionApp = {
         const res = await Api.request('getPendingHomeCollections', {
           todayDate: todayYmd,
           tomorrowDate: tomorrowYmd,
-          customerOnly: true
+          customerOnly: true,
+          captainId: this.currentCaptain.id,
+          lat: this.currentCaptain.lat,
+          lng: this.currentCaptain.lng,
+          radiusKm: this.MAX_DISPATCH_RADIUS_KM
         });
         const list = res?.bookings || res?.data || (Array.isArray(res) ? res : []);
         if (Array.isArray(list)) rawBookings.push(...list);
@@ -652,14 +963,35 @@ const HomeCollectionApp = {
 
     const doneIds = new Set(this.completedTrips.map(t => t.bookingId));
     const activeIds = new Set(this.activeTrips.map(t => t.bookingId));
+    const techLat = Number(this.currentCaptain.lat || 0);
+    const techLng = Number(this.currentCaptain.lng || 0);
+    const hasTechGps = Boolean(techLat && techLng);
+
     const map = new Map();
+    const newlyClaimedByOthers = [];
 
     rawBookings.forEach(b => {
       if (!this.isStrictCustomerHomeBooking(b)) return;
       if (doneIds.has(b.bookingId)) return;
       if (activeIds.has(b.bookingId)) return;
 
-      if (b.assignedTechId && String(b.assignedTechId) !== String(this.currentCaptain.id)) return;
+      // Permanently skip declined bookings (cannot be accepted again)
+      if (this.declinedIds.has(b.bookingId)) return;
+
+      // Check if another technician already accepted this call
+      const assignedId = String(b.assignedTechId || b.captainId || '').trim();
+      if (assignedId && assignedId !== String(this.currentCaptain.id)) {
+        // If this technician was previously alerted or saw this booking, notify "You Missed / Someone Accepted"
+        if (this.seenAlertIds.has(b.bookingId) || this.incomingOrders.some(o => o.bookingId === b.bookingId)) {
+          newlyClaimedByOthers.push({
+            bookingId: b.bookingId,
+            patientName: b.patientName || 'Customer',
+            acceptedBy: b.assignedTechName || b.captainName || 'Another Technician',
+            missedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+        }
+        return;
+      }
 
       const bookingDateYmd = this.normalizeBookingDateYmd(b.collectionDate || b.date || b.appointmentDate);
       let scheduleDayType = null;
@@ -673,9 +1005,30 @@ const HomeCollectionApp = {
         return;
       }
 
+      // Strict Customer Saved Coordinates + 10 km Radius Check
+      const custCoords = this.extractCustomerCoordinates(b);
+      if (!custCoords) {
+        // Customer has not saved valid GPS coordinates; skip so we never guess from address text
+        return;
+      }
+
+      let distanceKm = null;
+      if (hasTechGps) {
+        distanceKm = this.calculateDistanceKm(techLat, techLng, custCoords.lat, custCoords.lng);
+        // Only deliver to technicians within 10 km radius of customer's saved location
+        if (distanceKm > this.MAX_DISPATCH_RADIUS_KM) {
+          return;
+        }
+      } else {
+        // Technician has not enabled/set live location yet; cannot match 10 km radius
+        return;
+      }
+
       const feeInfo = this.evaluateVisitFee(b);
       map.set(b.bookingId, {
         ...b,
+        custCoords,
+        distanceKm,
         collectionDate: bookingDateYmd || todayYmd,
         scheduleDayType,
         techEarning: feeInfo.fee,
@@ -685,11 +1038,38 @@ const HomeCollectionApp = {
       });
     });
 
+    // If the currently ringing popup order was just claimed by another technician, stop popup & show missed alert
+    if (this.popupOrder) {
+      const stillAvailable = map.has(this.popupOrder.bookingId);
+      if (!stillAvailable) {
+        const missedBid = this.popupOrder.bookingId;
+        this.stopContinuousAlertLoop();
+        if (!newlyClaimedByOthers.some(m => m.bookingId === missedBid)) {
+          newlyClaimedByOthers.push({
+            bookingId: missedBid,
+            patientName: 'Customer',
+            acceptedBy: 'Another Technician',
+            missedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+        }
+      }
+    }
+
+    if (newlyClaimedByOthers.length > 0) {
+      newlyClaimedByOthers.forEach(item => {
+        if (!this.missedOrders.some(m => m.bookingId === item.bookingId)) {
+          this.missedOrders.unshift(item);
+          Utils.showToast(`⚠️ You missed ${item.bookingId} — Someone accepted this call!`, 'warning');
+        }
+      });
+      this.missedOrders = this.missedOrders.slice(0, 5);
+    }
+
     this.incomingOrders = Array.from(map.values()).sort((a, b) => {
       if (a.scheduleDayType !== b.scheduleDayType) {
         return a.scheduleDayType === 'TODAY' ? -1 : 1;
       }
-      return String(b.bookingId).localeCompare(String(a.bookingId));
+      return (a.distanceKm || 0) - (b.distanceKm || 0);
     });
 
     const todayCnt = this.incomingOrders.filter(o => o.scheduleDayType === 'TODAY').length;
@@ -702,27 +1082,33 @@ const HomeCollectionApp = {
     if (cntToday) cntToday.textContent = todayCnt;
     if (cntTmrw) cntTmrw.textContent = tmrwCnt;
 
+    this.renderMissedOrders();
     this.renderIncomingList();
 
-    // Only notify genuinely NEW orders that have NEVER been declined or notified before
-    if (this.isOnline && !this.popupOrder && this.incomingOrders.length > 0) {
+    // Trigger continuous Rapido popup if Duty ON + Alert ON + new unclaimed nearby order
+    if (this.isOnline && this.notificationsEnabled && !this.popupOrder && this.incomingOrders.length > 0) {
       const freshOrder = this.incomingOrders.find(
         o => !this.seenAlertIds.has(o.bookingId) && !this.declinedIds.has(o.bookingId)
       );
       if (freshOrder) {
         this.seenAlertIds.add(freshOrder.bookingId);
         this.saveAlertMemory();
+        this.syncStateToServiceWorker();
         this.triggerRapidoIncomingAlert(freshOrder);
       }
     }
 
     if (showToast) {
-      Utils.showToast(`Synced: ${todayCnt} Today, ${tmrwCnt} Tomorrow Customer Pickups`, 'info');
+      if (!hasTechGps) {
+        Utils.showToast('Enable Live Location in Profile to receive orders within 10 km!', 'warning');
+      } else {
+        Utils.showToast(`Synced: ${this.incomingOrders.length} nearby orders within 10 km`, 'info');
+      }
     }
   },
 
   /* =========================================================
-     7. BACKGROUND PUSH NOTIFICATIONS & RAPIDO POPUP
+     10. CONTINUOUS RAPIDO ALERT SOUND & BACKGROUND HEADS-UP BANNER
      ========================================================= */
   registerServiceWorkerNotifications() {
     if ('serviceWorker' in navigator) {
@@ -733,20 +1119,14 @@ const HomeCollectionApp = {
         if (event.data && event.data.type === 'CAPTAIN_POPUP_ACTION') {
           const { action, bookingId } = event.data;
           if (action === 'accept' && bookingId) {
-            this.acceptBooking(bookingId);
+            this.stopContinuousAlertLoop();
+            this.acceptBooking(bookingId, true);
           } else if (action === 'decline' && bookingId) {
-            this.declinedIds.add(bookingId);
-            this.seenAlertIds.add(bookingId);
-            this.saveAlertMemory();
+            this.stopContinuousAlertLoop();
+            this.markOrderDeclinedPermanently(bookingId);
           }
         }
       });
-    }
-  },
-
-  requestNotificationPermission() {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
     }
   },
 
@@ -756,13 +1136,12 @@ const HomeCollectionApp = {
     const bid = params.get('bookingId');
     if (act && bid) {
       setTimeout(() => {
-        if (act === 'accept') this.acceptBooking(bid);
-        if (act === 'decline') {
-          this.declinedIds.add(bid);
-          this.seenAlertIds.add(bid);
-          this.saveAlertMemory();
+        if (act === 'accept') {
+          this.acceptBooking(bid, true);
+        } else if (act === 'decline') {
+          this.markOrderDeclinedPermanently(bid);
         }
-      }, 1200);
+      }, 900);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   },
@@ -772,28 +1151,30 @@ const HomeCollectionApp = {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
-      const notes = [880, 1108.73, 1318.51];
+      const notes = [880, 1174.66, 1396.91, 1760];
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'sine';
+        osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.14);
-        gain.gain.setValueAtTime(0.18, ctx.currentTime + idx * 0.14);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.14 + 0.35);
+        gain.gain.setValueAtTime(0.22, ctx.currentTime + idx * 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.14 + 0.36);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(ctx.currentTime + idx * 0.14);
-        osc.stop(ctx.currentTime + idx * 0.14 + 0.36);
+        osc.stop(ctx.currentTime + idx * 0.14 + 0.38);
       });
     } catch (e) {}
   },
 
   async triggerSystemNotification(order) {
+    if (!this.notificationsEnabled) return;
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
     const payText = order.isCash ? `Cash ₹${order.finalAmount || 0}` : 'Paid Online';
-    const title = `🛵 New Home Pickup (+₹${order.techEarning})`;
-    const body = `${order.patientName || 'Patient'} • ${order.address || 'Chennai'}\n${order.timeSlot || 'Scheduled'} • ${payText}`;
+    const distText = order.distanceKm !== null ? `${order.distanceKm} km away` : 'Nearby';
+    const title = `🛵 NEW PICKUP (+₹${order.techEarning}) • ${distText}`;
+    const body = `${order.patientName || 'Patient'} • ${order.timeSlot || 'Scheduled'}\n${payText} • Tap Accept or Decline`;
 
     try {
       const reg = await navigator.serviceWorker?.ready;
@@ -803,9 +1184,10 @@ const HomeCollectionApp = {
           icon: 'assets/images/logo.png',
           badge: 'assets/images/logo.png',
           tag: `hc-pickup-${order.bookingId}`,
-          renotify: false,
+          renotify: true,
           requireInteraction: true,
-          vibrate: [300, 150, 300, 150, 400],
+          silent: false,
+          vibrate: [500, 200, 500, 200, 600],
           data: { bookingId: order.bookingId, url: 'home-collection.html' },
           actions: [
             { action: 'accept', title: '✓ Accept Pickup' },
@@ -819,12 +1201,24 @@ const HomeCollectionApp = {
   },
 
   triggerRapidoIncomingAlert(order) {
+    this.stopContinuousAlertLoop();
     this.popupOrder = order;
-    this.popupSecondsLeft = 30;
 
+    // Immediate chime + vibration + OS heads-up notification
     this.playRapidoAlertTone();
-    if (navigator.vibrate) navigator.vibrate([300, 120, 300]);
+    if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
     this.triggerSystemNotification(order);
+
+    // Repeat siren, vibration & heads-up notification continuously every 3.5s until Accept or Decline
+    this.alertLoopTimerId = setInterval(() => {
+      if (!this.popupOrder || !this.isOnline || !this.notificationsEnabled) {
+        this.stopContinuousAlertLoop();
+        return;
+      }
+      this.playRapidoAlertTone();
+      if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
+      this.triggerSystemNotification(this.popupOrder);
+    }, 3500);
 
     const items = Array.isArray(order.items) ? order.items : [];
     const testSummary = items.map(i => i.name || i.TestName || 'Lab Test').join(', ') || 'Diagnostic Package';
@@ -834,10 +1228,11 @@ const HomeCollectionApp = {
       if (el) el.textContent = val;
     };
 
+    setTxt('hc-rap-distance', order.distanceKm !== null ? `${order.distanceKm} km away` : '≤ 10 km');
     setTxt('hc-rap-fee', `₹${order.techEarning}`);
     setTxt('hc-rap-visit-type', `${order.visitLabel} • Customer Home Pickup`);
     setTxt('hc-rap-patient', `${order.patientName || 'Customer'} (${order.bookingId})`);
-    setTxt('hc-rap-address', order.address || 'Chennai');
+    setTxt('hc-rap-address', order.address || 'Saved GPS Location');
     setTxt('hc-rap-slot', `${order.collectionDate} • ${order.timeSlot || 'Scheduled Slot'}`);
     setTxt('hc-rap-tests', `Tests: ${testSummary}`);
 
@@ -852,56 +1247,97 @@ const HomeCollectionApp = {
       }
     }
 
-    const timerEl = document.getElementById('hc-rapido-timer');
-    if (timerEl) timerEl.textContent = `${this.popupSecondsLeft}s`;
-
     const popupEl = document.getElementById('hc-rapido-popup');
     if (popupEl) popupEl.style.display = 'flex';
-
-    if (this.popupTimerId) clearInterval(this.popupTimerId);
-    this.popupTimerId = setInterval(() => {
-      this.popupSecondsLeft -= 1;
-      if (timerEl) timerEl.textContent = `${this.popupSecondsLeft}s`;
-      if (this.popupSecondsLeft <= 0) {
-        this.closeRapidoPopup();
-      }
-    }, 1000);
   },
 
   acceptIncomingPopup() {
     if (!this.popupOrder) return;
     const bid = this.popupOrder.bookingId;
-    this.closeRapidoPopup();
-    this.acceptBooking(bid);
+    this.stopContinuousAlertLoop();
+    this.acceptBooking(bid, true);
   },
 
   declineIncomingPopup() {
     if (this.popupOrder) {
-      this.declinedIds.add(this.popupOrder.bookingId);
-      this.seenAlertIds.add(this.popupOrder.bookingId);
-      this.saveAlertMemory();
+      const bid = this.popupOrder.bookingId;
+      this.stopContinuousAlertLoop();
+      this.markOrderDeclinedPermanently(bid);
+      Utils.showToast('Order declined permanently', 'info');
+    } else {
+      this.stopContinuousAlertLoop();
     }
-    this.closeRapidoPopup();
-    Utils.showToast('Pickup request declined', 'info');
   },
 
-  closeRapidoPopup() {
-    if (this.popupTimerId) clearInterval(this.popupTimerId);
-    this.popupTimerId = null;
+  markOrderDeclinedPermanently(bookingId) {
+    this.declinedIds.add(bookingId);
+    this.seenAlertIds.add(bookingId);
+    this.incomingOrders = this.incomingOrders.filter(o => o.bookingId !== bookingId);
+    this.saveAlertMemory();
+    this.syncStateToServiceWorker();
+    this.renderIncomingList();
+
+    // Close matching OS notification banner
+    navigator.serviceWorker?.ready.then((reg) => {
+      reg.getNotifications({ tag: `hc-pickup-${bookingId}` }).then((list) => {
+        list.forEach(n => n.close());
+      });
+    }).catch(() => {});
+  },
+
+  stopContinuousAlertLoop() {
+    if (this.alertLoopTimerId) {
+      clearInterval(this.alertLoopTimerId);
+      this.alertLoopTimerId = null;
+    }
     this.popupOrder = null;
     const el = document.getElementById('hc-rapido-popup');
     if (el) el.style.display = 'none';
   },
 
   /* =========================================================
-     8. RENDER CUSTOMER BOOKING QUEUE & UNLIMITED ACTIVE ORDERS
+     11. RENDER MISSED ORDERS, NEARBY QUEUE & ACTIVE PICKUPS
      ========================================================= */
+  renderMissedOrders() {
+    const box = document.getElementById('hc-missed-orders-box');
+    if (!box) return;
+
+    if (!this.missedOrders || this.missedOrders.length === 0) {
+      box.innerHTML = '';
+      return;
+    }
+
+    box.innerHTML = this.missedOrders.map(m => `
+      <div class="hc-missed-card">
+        <div>
+          <strong>⚠️ You Missed • Someone Accepted the Call</strong>
+          <span>Booking <b>${Utils.escapeHtml(m.bookingId)}</b> (${Utils.escapeHtml(m.patientName)}) was accepted by ${Utils.escapeHtml(m.acceptedBy)} at ${Utils.escapeHtml(m.missedAt)}.</span>
+        </div>
+        <button type="button" class="hc-close-circle-btn" onclick="HomeCollectionApp.dismissMissedCard('${Utils.escapeHtml(m.bookingId)}')">✕</button>
+      </div>
+    `).join('');
+  },
+
+  dismissMissedCard(bookingId) {
+    this.missedOrders = this.missedOrders.filter(m => m.bookingId !== bookingId);
+    this.renderMissedOrders();
+  },
+
   renderIncomingList() {
     const container = document.getElementById('hc-incoming-list');
     if (!container) return;
 
     if (!this.isOnline) {
-      container.innerHTML = `<div class="hc-empty-state">You are currently <strong>OFFLINE</strong>. Switch ON the top duty toggle to receive Customer Home Collection requests.</div>`;
+      container.innerHTML = `<div class="hc-empty-state">You are currently <strong>OFFLINE</strong>. Switch ON the top duty toggle to receive nearby Customer Home Collection requests.</div>`;
+      return;
+    }
+
+    if (!this.currentCaptain?.lat || !this.currentCaptain?.lng) {
+      container.innerHTML = `
+        <div class="hc-empty-state">
+          <strong>📍 Live GPS Location Required</strong><br>
+          Enable GPS permission or tap <b>Get Location</b> in Profile to receive bookings within 10 km of your location.
+        </div>`;
       return;
     }
 
@@ -912,7 +1348,7 @@ const HomeCollectionApp = {
     });
 
     if (filtered.length === 0) {
-      container.innerHTML = `<div class="hc-empty-state">No new customer home collection bookings available right now.</div>`;
+      container.innerHTML = `<div class="hc-empty-state">No active customer bookings within 10 km of your live location right now.</div>`;
       return;
     }
 
@@ -925,6 +1361,10 @@ const HomeCollectionApp = {
         ? `<span class="hc-badge-today">● TODAY ON-TIME</span>`
         : `<span class="hc-badge-tomorrow">📅 TOMORROW</span>`;
 
+      const distBadge = o.distanceKm !== null
+        ? `<span class="hc-badge-today" style="background:rgba(2,132,199,0.12); color:#0284C7; border-color:rgba(2,132,199,0.3);">📍 ${o.distanceKm} km away</span>`
+        : '';
+
       const payPill = o.isCash
         ? `<span class="hc-pay-pill-cash">💵 CASH: ₹${o.finalAmount || 0}</span>`
         : `<span class="hc-pay-pill-online">✅ PAID ONLINE (₹${o.finalAmount || 0})</span>`;
@@ -934,12 +1374,13 @@ const HomeCollectionApp = {
           <div class="hc-order-top">
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
               ${dayBadge}
+              ${distBadge}
             </div>
             <span class="hc-fee-tag">+ ₹${o.techEarning} Payout</span>
           </div>
 
           <strong class="hc-order-title">${Utils.escapeHtml(o.patientName || 'Customer')} • ${Utils.escapeHtml(o.bookingId)}</strong>
-          <p class="hc-order-addr">🏠 ${Utils.escapeHtml(o.address || 'Chennai')}</p>
+          <p class="hc-order-addr">🏠 ${Utils.escapeHtml(o.address || 'Saved Customer Location')}</p>
 
           <div class="hc-tags-wrap">
             ${payPill}
@@ -949,23 +1390,92 @@ const HomeCollectionApp = {
 
           <p class="hc-tests-line"><strong>Tests:</strong> ${Utils.escapeHtml(testSummary)}</p>
 
-          <button type="button" class="hc-btn-3d-primary" onclick="HomeCollectionApp.acceptBooking('${o.bookingId}')">
-            Accept Pickup (Earn ₹${o.techEarning}) ➔
-          </button>
+          <div style="display:grid; grid-template-columns: 1fr 2fr; gap:8px;">
+            <button type="button" class="hc-btn-secondary" onclick="HomeCollectionApp.markOrderDeclinedPermanently('${o.bookingId}')">
+              ✕ Decline
+            </button>
+            <button type="button" class="hc-btn-3d-primary" onclick="HomeCollectionApp.acceptBooking('${o.bookingId}', true)">
+              ✓ Accept (₹${o.techEarning})
+            </button>
+          </div>
         </div>
       `;
     }).join('');
   },
 
-  acceptBooking(bookingId) {
-    // Unlimited orders allowed simultaneously! No single-order restriction.
+  async acceptBooking(bookingId, switchToOrdersTab = false) {
+    if (this.declinedIds.has(bookingId)) {
+      Utils.showToast('You already declined this order.', 'error');
+      return;
+    }
+
     if (this.activeTrips.some(t => t.bookingId === bookingId)) {
+      if (switchToOrdersTab) this.switchTab('orders');
       Utils.showToast('Booking already in your active pickups', 'info');
       return;
     }
 
-    const order = this.incomingOrders.find(o => o.bookingId === bookingId);
+    let order = this.incomingOrders.find(o => o.bookingId === bookingId);
+
+    // If accepted directly from background notification before list refreshed, fetch booking details
+    if (!order && navigator.onLine && typeof Api !== 'undefined') {
+      try {
+        const res = await Api.getBookingDetails(bookingId);
+        const b = res?.booking || res;
+        if (b && b.bookingId) {
+          const assignedId = String(b.assignedTechId || b.captainId || '').trim();
+          if (assignedId && assignedId !== String(this.currentCaptain.id)) {
+            this.missedOrders.unshift({
+              bookingId,
+              patientName: b.patientName || 'Customer',
+              acceptedBy: b.assignedTechName || b.captainName || 'Another Technician',
+              missedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            this.renderMissedOrders();
+            Utils.showToast(`⚠️ Someone already accepted ${bookingId}!`, 'warning');
+            return;
+          }
+          const feeInfo = this.evaluateVisitFee(b);
+          order = {
+            ...b,
+            techEarning: feeInfo.fee,
+            isMultiVisit: feeInfo.isMulti,
+            visitLabel: feeInfo.label,
+            isCash: this.isCashPayment(b)
+          };
+        }
+      } catch (e) {}
+    }
+
     if (!order) return;
+
+    // Claim on backend first so other nearby technicians immediately get "You Missed / Someone Accepted"
+    if (navigator.onLine && typeof Api !== 'undefined') {
+      try {
+        const claimRes = await Api.request('assignHomeCollection', {
+          bookingId: order.bookingId,
+          captainId: this.currentCaptain.id,
+          captainName: this.currentCaptain.name,
+          techId: this.currentCaptain.id,
+          techName: this.currentCaptain.name,
+          techEarning: order.techEarning
+        });
+
+        if (claimRes && claimRes.alreadyAssigned && String(claimRes.assignedTechId) !== String(this.currentCaptain.id)) {
+          this.incomingOrders = this.incomingOrders.filter(o => o.bookingId !== bookingId);
+          this.missedOrders.unshift({
+            bookingId,
+            patientName: order.patientName || 'Customer',
+            acceptedBy: claimRes.assignedTechName || 'Another Technician',
+            missedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+          this.renderIncomingList();
+          this.renderMissedOrders();
+          Utils.showToast(`⚠️ You missed it! ${claimRes.assignedTechName || 'Another technician'} accepted first.`, 'warning');
+          return;
+        }
+      } catch (e) {}
+    }
 
     const newTrip = {
       ...order,
@@ -978,22 +1488,23 @@ const HomeCollectionApp = {
     this.incomingOrders = this.incomingOrders.filter(o => o.bookingId !== bookingId);
     this.seenAlertIds.add(bookingId);
     this.saveAlertMemory();
+    this.syncStateToServiceWorker();
     this.saveTripsData();
     this.renderIncomingList();
     this.renderActiveTrips();
 
-    if (navigator.onLine && typeof Api !== 'undefined') {
-      Api.request('assignHomeCollection', {
-        bookingId: order.bookingId,
-        captainId: this.currentCaptain.id,
-        captainName: this.currentCaptain.name,
-        techId: this.currentCaptain.id,
-        techName: this.currentCaptain.name,
-        techEarning: order.techEarning
-      }).catch(() => {});
+    if (switchToOrdersTab) {
+      this.switchTab('orders');
     }
 
-    Utils.showToast(`Accepted ${bookingId}! Added to Active Pickups.`, 'success');
+    // Close OS notification banner if open
+    navigator.serviceWorker?.ready.then((reg) => {
+      reg.getNotifications({ tag: `hc-pickup-${bookingId}` }).then((list) => {
+        list.forEach(n => n.close());
+      });
+    }).catch(() => {});
+
+    Utils.showToast(`Accepted ${bookingId}! Navigate using customer's saved GPS location.`, 'success');
   },
 
   getVacutainerGuide(items) {
@@ -1083,6 +1594,10 @@ const HomeCollectionApp = {
         stepBtn = `<button type="button" class="hc-btn-3d-primary" onclick="HomeCollectionApp.completeLabDrop('${t.bookingId}')">🏥 Drop Sample at Lab & Credit ₹${t.techEarning}</button>`;
       }
 
+      const navBtnHtml = navUrl
+        ? `<a href="${navUrl}" target="_blank" rel="noopener noreferrer" class="hc-btn-secondary" style="flex:1;">🗺️ Navigate Customer GPS</a>`
+        : `<button type="button" class="hc-btn-secondary" style="flex:1; opacity:0.6;" onclick="Utils.showToast('Customer GPS coordinates missing in booking', 'error')">⚠️ No GPS Saved</button>`;
+
       return `
         <div class="hc-active-card">
           <div class="hc-order-top">
@@ -1109,7 +1624,7 @@ const HomeCollectionApp = {
           </div>
 
           <div style="display:flex; gap:8px; margin-bottom:10px;">
-            <a href="${navUrl}" target="_blank" rel="noopener noreferrer" class="hc-btn-secondary" style="flex:1;">🗺️ Navigate Map</a>
+            ${navBtnHtml}
             <a href="tel:+91${Utils.escapeHtml(t.patientPhone || '')}" class="hc-btn-secondary" style="flex:1;">📞 Call Customer</a>
           </div>
 
@@ -1129,15 +1644,13 @@ const HomeCollectionApp = {
   },
 
   /* =========================================================
-     9. STRICT BOOKING OTP VERIFICATION & LAB DROP
+     12. STRICT BOOKING OTP VERIFICATION & LAB DROP
      ========================================================= */
   getExpectedBookingOtp(trip) {
-    // Check explicit OTP fields created in booking workflow
     const rawOtp = trip.pickupOtp || trip.otp || trip.verificationOtp || trip.bookingOtp || trip.collectionOtp;
     if (rawOtp !== undefined && rawOtp !== null && String(rawOtp).trim() !== '') {
       return String(rawOtp).trim();
     }
-    // Fallback deterministic 4-digit booking OTP (last 4 digits of Booking ID)
     const digits = String(trip.bookingId || '').replace(/\D/g, '');
     return digits.slice(-4);
   },
@@ -1198,7 +1711,7 @@ const HomeCollectionApp = {
       id: `TXN${Date.now()}`,
       type: 'CREDIT',
       title: `${trip.visitLabel} • ${trip.bookingId}`,
-      sub: `${trip.patientName} (${trip.isCash ? `Cash ₹${codAmt} Collected` : 'Paid Online'})`,
+      sub: `${trip.patientName} (${trip.isCash ? `Cash ₹${codAmt} Collected` : 'Paid Online'}) • Unlocks Tomorrow`,
       amount: fee,
       date: new Date().toISOString()
     });
@@ -1227,11 +1740,11 @@ const HomeCollectionApp = {
       }).catch(() => {});
     }
 
-    Utils.showToast(`Lab Drop Verified! ₹${fee} credited to wallet.`, 'success');
+    Utils.showToast(`Lab Drop Verified! ₹${fee} credited (Withdrawable Tomorrow).`, 'success');
   },
 
   /* =========================================================
-     10. PERFORMANCE STATS, FULL RAZORPAY CASH SETTLEMENT & WHATSAPP PAYOUT
+     13. PERFORMANCE STATS, RAZORPAY SETTLEMENT & NEXT-DAY WHATSAPP PAYOUT
      ========================================================= */
   renderPerformanceStats() {
     const now = new Date();
@@ -1300,55 +1813,69 @@ const HomeCollectionApp = {
     setTxt('hc-w-month-amt', `₹${monthEarn.toLocaleString('en-IN')}`);
   },
 
-  selectPayoutCycle(cycle) {
-    this.wallet.payoutCycle = cycle;
-    this.saveWalletData();
-    Utils.showToast(`Payout schedule set to ${cycle}`, 'success');
-  },
-
   openPayoutModal() {
-    // 1. Block withdrawal completely if ANY customer cash is unsettled
     if (Number(this.wallet.codCashHeld || 0) > 0) {
       Utils.showToast(`Settle ₹${this.wallet.codCashHeld} collected cash via Razorpay first before withdrawing!`, 'error');
       return;
     }
 
-    // 2. Ensure Captain has filled their UPI ID in Profile
-    const targetUpi = this.wallet.bank?.upiId || this.currentCaptain?.upiId;
+    const targetUpi = String(this.wallet.bank?.upiId || this.currentCaptain?.upiId || '').trim();
     if (!targetUpi) {
       Utils.showToast('Please enter your UPI ID in Profile tab before requesting withdrawal', 'error');
       this.switchTab('profile');
       return;
     }
 
-    if (this.wallet.availableBalance < 150) {
-      Utils.showToast('Minimum ₹150 balance required for withdrawal', 'error');
+    const todayHold = this.getTodayEarnedHoldAmount();
+    const withdrawable = this.getNextDayWithdrawableAmount();
+
+    if (withdrawable < 150) {
+      if (todayHold > 0) {
+        Utils.showToast(`Today's ₹${todayHold} earnings unlock tomorrow! Same-day withdrawal is not allowed.`, 'warning');
+      } else {
+        Utils.showToast('Minimum ₹150 unlocked balance required for withdrawal', 'error');
+      }
       return;
     }
 
-    const avail = Number(this.wallet.availableBalance);
-    document.getElementById('hc-modal-avail').textContent = `₹${avail}`;
-    document.getElementById('hc-modal-cycle').textContent = this.wallet.payoutCycle;
+    document.getElementById('hc-modal-avail').textContent = `₹${withdrawable}`;
+    document.getElementById('hc-modal-max-lbl').textContent = `₹${withdrawable}`;
 
     const amtInput = document.getElementById('hc-payout-amt');
-    amtInput.value = avail;
+    const confirmBtn = document.getElementById('hc-confirm-payout-btn');
+    amtInput.min = 150;
+    amtInput.max = withdrawable;
+    amtInput.value = withdrawable;
 
-    const updatePreview = () => {
-      const reqAmt = Number(amtInput.value || 0);
+    const validateAndPreview = () => {
+      let rawVal = Math.floor(Number(amtInput.value || 0));
+
+      if (rawVal > withdrawable) {
+        rawVal = withdrawable;
+        amtInput.value = withdrawable;
+        Utils.showToast(`Maximum withdrawable balance is ₹${withdrawable}`, 'warning');
+      }
+
+      const isValid = rawVal >= 150 && rawVal <= withdrawable;
+      if (confirmBtn) {
+        confirmBtn.disabled = !isValid;
+        confirmBtn.style.opacity = isValid ? '1' : '0.5';
+      }
+
       const previewEl = document.getElementById('hc-payout-preview-box');
       if (previewEl) {
         previewEl.innerHTML = `
-          <strong>WhatsApp Payout Slip Preview:</strong><br>
+          <strong>WhatsApp Payout Slip Preview (To +91 7010174890):</strong><br>
           Technician: <b>${Utils.escapeHtml(this.currentCaptain.name)}</b> (${Utils.escapeHtml(this.currentCaptain.id)})<br>
           Phone: +91 ${Utils.escapeHtml(this.currentCaptain.mobile || 'N/A')}<br>
           UPI ID: <b>${Utils.escapeHtml(targetUpi)}</b><br>
-          Withdraw Amount: <b>₹${reqAmt}</b>
+          Withdraw Amount: <b>₹${rawVal}</b> ${!isValid ? '<span style="color:#DC2626;">(Min ₹150 - Max ₹' + withdrawable + ')</span>' : ''}
         `;
       }
     };
 
-    amtInput.oninput = updatePreview;
-    updatePreview();
+    amtInput.oninput = validateAndPreview;
+    validateAndPreview();
 
     document.getElementById('hc-payout-modal').style.display = 'flex';
   },
@@ -1359,23 +1886,30 @@ const HomeCollectionApp = {
       return;
     }
 
-    const amt = Number(document.getElementById('hc-payout-amt').value || 0);
-    const targetUpi = this.wallet.bank?.upiId || this.currentCaptain?.upiId;
+    const withdrawable = this.getNextDayWithdrawableAmount();
+    const amt = Math.floor(Number(document.getElementById('hc-payout-amt').value || 0));
+    const targetUpi = String(this.wallet.bank?.upiId || this.currentCaptain?.upiId || '').trim();
 
     if (!targetUpi) {
       Utils.showToast('Please update your UPI ID in Profile first.', 'error');
       return;
     }
 
-    if (amt < 150 || amt > this.wallet.availableBalance) {
-      Utils.showToast(`Enter amount between ₹150 and ₹${this.wallet.availableBalance}`, 'error');
+    if (amt < 150 || amt > withdrawable) {
+      document.getElementById('hc-payout-amt').value = withdrawable;
+      Utils.showToast(`You can only withdraw between ₹150 and ₹${withdrawable}`, 'error');
       return;
     }
 
     const payoutId = `PAY${Math.floor(100000 + Math.random() * 900000)}`;
     const c = this.currentCaptain;
+    const holderName = String(c.upiHolderName || c.name || 'Selfcare Captain').trim();
 
-    // Build formatted WhatsApp message sent from Technician to Admin
+    const baseSite = (window.location.origin && window.location.origin.startsWith('http'))
+      ? window.location.origin
+      : 'https://selfcarediagnostics.in';
+    const directPayLink = `${baseSite}/upi-pay.html?pa=${encodeURIComponent(targetUpi)}&pn=${encodeURIComponent(holderName)}&am=${amt}&id=${encodeURIComponent(payoutId)}`;
+
     const waText = [
       `*SELFCARE CAPTAIN PAYOUT REQUEST*`,
       `Request ID: ${payoutId}`,
@@ -1384,16 +1918,17 @@ const HomeCollectionApp = {
       `Age / Gender: ${c.age || 'N/A'} / ${c.gender || 'N/A'}`,
       `Phone Number: +91 ${c.mobile || 'N/A'}`,
       `UPI ID: ${targetUpi}`,
-      `UPI Holder Name: ${c.upiHolderName || c.name}`,
+      `UPI Holder Name: ${holderName}`,
       c.accountNo ? `Bank A/C: ${c.accountNo} (${c.ifsc || ''})` : '',
-      `Payout Cycle: ${this.wallet.payoutCycle}`,
       `*Withdraw Amount: ₹${amt}*`,
-      `Cash Settlement Status: SETTLED (₹0 Pending)`
+      `Cash Settlement Status: SETTLED (₹0 Pending)`,
+      ``,
+      `*Tap Link to Pay Directly via GPay / UPI:*`,
+      directPayLink
     ].filter(Boolean).join('\n');
 
-    const waUrl = `https://wa.me/${this.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(waText)}`;
+    const waUrl = `https://wa.me/917010174890?text=${encodeURIComponent(waText)}`;
 
-    // Sync payout request to backend
     if (navigator.onLine && typeof Api !== 'undefined') {
       Api.request('requestTechnicianPayout', {
         payoutId,
@@ -1402,20 +1937,18 @@ const HomeCollectionApp = {
         mobile: c.mobile,
         age: c.age,
         amount: amt,
-        cycle: this.wallet.payoutCycle,
         mode: 'WHATSAPP_UPI',
         upiId: targetUpi
       }).catch(() => {});
     }
 
-    // Reset wallet balance to ₹0 upon sending WhatsApp payout request
-    this.wallet.availableBalance = 0;
+    this.wallet.availableBalance = Math.max(0, Number(this.wallet.availableBalance || 0) - amt);
     this.wallet.totalPaidOut += amt;
     this.wallet.ledger.unshift({
       id: payoutId,
       type: 'DEBIT',
       title: `WhatsApp Payout Request Sent`,
-      sub: `UPI: ${targetUpi} • Wallet Reset to ₹0`,
+      sub: `UPI: ${targetUpi} • Remaining Wallet: ₹${this.wallet.availableBalance}`,
       amount: amt,
       date: new Date().toISOString()
     });
@@ -1423,13 +1956,11 @@ const HomeCollectionApp = {
     this.saveWalletData();
     this.closeModal('hc-payout-modal');
 
-    // Open WhatsApp with pre-filled technician & payout details
     window.open(waUrl, '_blank', 'noopener,noreferrer');
-    Utils.showToast(`WhatsApp payout request opened & wallet reset to ₹0!`, 'success');
+    Utils.showToast(`WhatsApp payout sent to +91 7010174890!`, 'success');
   },
 
   async payCodViaRazorpay() {
-    // Strictly full amount only — no partial payment
     const fullDue = Number(this.wallet.codCashHeld || 0);
     if (fullDue <= 0) return;
 
@@ -1453,14 +1984,13 @@ const HomeCollectionApp = {
 
       const rzp = new Razorpay({
         key: (typeof Config !== 'undefined' && Config.RAZORPAY_KEY_ID) || 'rzp_live_Tq9S3sQhh5B3hW',
-        amount: Math.round(fullDue * 100), // Full amount in paise
+        amount: Math.round(fullDue * 100),
         currency: 'INR',
         name: 'Selfcare Diagnostics',
         description: `Full Cash Settlement (${this.currentCaptain.name})`,
         image: 'assets/images/logo.png',
         ...(orderId ? { order_id: orderId } : {}),
         handler: (response) => {
-          // Only executes on verified Razorpay success
           if (!response || !response.razorpay_payment_id) {
             Utils.showToast('Payment verification failed. Cash balance unchanged.', 'error');
             return;
@@ -1512,16 +2042,29 @@ const HomeCollectionApp = {
 
   renderWallet() {
     const w = this.wallet;
+    const todayHold = this.getTodayEarnedHoldAmount();
+    const withdrawable = this.getNextDayWithdrawableAmount();
+
     const setTxt = (id, val) => {
       const el = document.getElementById(id);
       if (el) el.textContent = val;
     };
 
     setTxt('hc-header-wallet', `₹${w.availableBalance}`);
-    setTxt('hc-wallet-avail', `₹${w.availableBalance}`);
+    setTxt('hc-wallet-avail', `₹${withdrawable}`);
     setTxt('hc-wallet-total', `₹${w.totalEarned}`);
-    setTxt('hc-wallet-paidout', `₹${w.totalPaidOut}`);
+    setTxt('hc-wallet-today-hold', `₹${todayHold}`);
     setTxt('hc-wallet-cod', `₹${w.codCashHeld}`);
+
+    const lockedNote = document.getElementById('hc-today-locked-note');
+    if (lockedNote) {
+      if (todayHold > 0) {
+        lockedNote.style.display = 'block';
+        lockedNote.textContent = `⏳ ₹${todayHold} earned today unlocks tomorrow`;
+      } else {
+        lockedNote.style.display = 'none';
+      }
+    }
 
     const codBox = document.getElementById('hc-cod-settle-box');
     const codInline = document.getElementById('hc-cod-due-inline');
@@ -1533,17 +2076,14 @@ const HomeCollectionApp = {
       if (Number(w.codCashHeld) > 0) {
         withdrawBtn.style.opacity = '0.55';
         withdrawBtn.textContent = '🔒 Settle Cash to Withdraw';
+      } else if (withdrawable < 150) {
+        withdrawBtn.style.opacity = '0.6';
+        withdrawBtn.textContent = todayHold > 0 ? '⏳ Unlocks Tomorrow' : 'Withdraw via WhatsApp ➔';
       } else {
         withdrawBtn.style.opacity = '1';
-        withdrawBtn.textContent = 'Withdraw via WhatsApp ➔';
+        withdrawBtn.textContent = `Withdraw ₹${withdrawable} via WhatsApp ➔`;
       }
     }
-
-    ['DAILY', 'WEEKLY', 'MONTHLY'].forEach(c => {
-      document.getElementById(`cycle-card-${c}`)?.classList.toggle('active', w.payoutCycle === c);
-    });
-    const pill = document.getElementById('hc-cycle-pill');
-    if (pill) pill.textContent = `${w.payoutCycle} PAYOUT`;
 
     const upiTxt = document.getElementById('hc-linked-upi-text');
     const upiVal = w.bank?.upiId || this.currentCaptain?.upiId;
