@@ -1,13 +1,28 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v23.0.0
+ * Selfcare Diagnostics - Service Worker v24.0.0
  * Features:
+ * - Instant Firebase Cloud Messaging (FCM) Background & Screen-Off Alerts
  * - Background 10 km Radius Home Collection Order Polling & Heads-Up Screen Alerts
  * - Direct Accept (opens app) & Silent Permanent Decline (stays outside app)
  * - Smart Network-First Caching for Dynamic Captain & Booking Modules
  */
 
-const CACHE_VERSION = '23.0.0';
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: "AIzaSyDGu9ZYCjHPVU4kZC2jADqoxcc4NLoNB3s",
+  authDomain: "selfcare-diagnostics-84a53.firebaseapp.com",
+  projectId: "selfcare-diagnostics-84a53",
+  storageBucket: "selfcare-diagnostics-84a53.firebasestorage.app",
+  messagingSenderId: "660066717689",
+  appId: "1:660066717689:web:d80396d5cd05300deeb728"
+});
+
+const swMessaging = firebase.messaging();
+
+const CACHE_VERSION = '24.0.0';
 const CACHE_NAME = `selfcare-cache-v${CACHE_VERSION}`;
 
 const ASSETS_TO_CACHE = [
@@ -83,6 +98,38 @@ let captainState = {
 };
 
 /* =========================================================
+   FIREBASE BACKGROUND / SCREEN-OFF PUSH HANDLER
+   ========================================================= */
+swMessaging.onBackgroundMessage((payload) => {
+  const data = payload.data || {};
+  const notif = payload.notification || {};
+  const bookingId = data.bookingId || '';
+
+  if (bookingId && Array.isArray(captainState.declinedIds) && captainState.declinedIds.includes(bookingId)) {
+    return;
+  }
+
+  const title = data.title || notif.title || '🛵 NEW PICKUP • Selfcare Captain';
+  const body = data.body || notif.body || 'New home collection booking near you. Tap Accept or Decline.';
+
+  return self.registration.showNotification(title, {
+    body,
+    icon: './assets/images/logo.png',
+    badge: './assets/images/logo.png',
+    tag: bookingId ? `hc-pickup-${bookingId}` : 'hc-pickup-alert',
+    renotify: true,
+    requireInteraction: true,
+    silent: false,
+    vibrate: [500, 200, 500, 200, 600],
+    data: { bookingId, url: './home-collection.html' },
+    actions: [
+      { action: 'accept', title: '✓ Accept Pickup' },
+      { action: 'decline', title: '✕ Decline' }
+    ]
+  });
+});
+
+/* =========================================================
    HELPER: HAVERSINE 10 KM DISTANCE & COORDINATE PARSER
    ========================================================= */
 function extractCustomerCoords(b) {
@@ -134,7 +181,7 @@ function getLocalYmd(dateObj = new Date()) {
 }
 
 /* =========================================================
-   BACKGROUND ORDER CHECKER (WHEN APP IS MINIMIZED)
+   FALLBACK BACKGROUND ORDER CHECKER
    ========================================================= */
 async function checkNearbyOrdersInBackground() {
   if (!captainState.isOnline || !captainState.notificationsEnabled) return;
@@ -179,7 +226,6 @@ async function checkNearbyOrdersInBackground() {
       const status = String(b.bookingStatus || 'CONFIRMED').toUpperCase();
       if (status === 'COMPLETED' || status === 'CANCELLED') continue;
 
-      // Skip if already accepted by any technician
       const assignedId = String(b.assignedTechId || b.captainId || '').trim();
       if (assignedId) continue;
 
@@ -273,11 +319,6 @@ self.addEventListener('sync', (event) => {
   }
 });
 
-self.addEventListener('push', (event) => {
-  if (!captainState.isOnline || !captainState.notificationsEnabled) return;
-  event.waitUntil(checkNearbyOrdersInBackground());
-});
-
 /* =========================================================
    NOTIFICATION CLICK (ACCEPT -> OPEN APP | DECLINE -> STAY OUT)
    ========================================================= */
@@ -344,6 +385,8 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('whatsapp.com') ||
     url.hostname.includes('qrserver.com') ||
     url.hostname.includes('cdnjs.cloudflare.com') ||
+    url.hostname.includes('gstatic.com') ||
+    url.hostname.includes('googleapis.com') ||
     url.protocol.startsWith('chrome-extension')
   ) {
     return;
