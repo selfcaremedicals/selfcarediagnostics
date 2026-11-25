@@ -1453,3 +1453,120 @@ body.hc-body-bg {
     gap: 0;
   }
 }
+/* =========================================================
+   DUAL HEADER TOGGLES, MISSED ORDER CARD & NEXT-DAY RULE
+   ========================================================= */
+.hc-header-switches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hc-header-switches .hc-duty-pill {
+  padding: 4px 9px;
+  gap: 6px;
+}
+
+.hc-header-switches .hc-switch {
+  width: 36px;
+  height: 20px;
+}
+
+.hc-header-switches .hc-slider::before {
+  height: 14px;
+  width: 14px;
+}
+
+.hc-header-switches .hc-switch input:checked + .hc-slider::before {
+  transform: translateX(16px);
+}
+
+.hc-notif-pill.is-online {
+  border-color: #0284C7;
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.24), inset 0 1.5px 1px #FFFFFF;
+}
+
+.hc-notif-pill .hc-switch input:checked + .hc-slider {
+  background: linear-gradient(135deg, #0EA5E9, #0284C7);
+}
+
+.hc-notif-pill .duty-lbl.online {
+  color: #0284C7;
+}
+
+.hc-alert-banner {
+  background: linear-gradient(135deg, rgba(224, 242, 254, 0.94), rgba(240, 249, 255, 0.96));
+  border: 1.5px solid #0284C7;
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 8px 20px rgba(2, 132, 199, 0.12);
+}
+
+.hc-alert-banner strong {
+  display: block;
+  font-size: 12.5px;
+  color: #0C4A6E;
+}
+
+.hc-alert-banner span {
+  display: block;
+  font-size: 11px;
+  color: #0369A1;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.hc-missed-card {
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.95), rgba(254, 226, 226, 0.92));
+  border: 1.5px solid #D97706;
+  border-radius: 14px;
+  padding: 11px 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.hc-missed-card strong {
+  display: block;
+  font-size: 12px;
+  color: #92400E;
+}
+
+.hc-missed-card span {
+  display: block;
+  font-size: 11px;
+  color: #78350F;
+  margin-top: 2px;
+}
+
+.hc-nextday-banner {
+  margin-top: 12px;
+  padding: 11px 13px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: 12px;
+  font-size: 11.5px;
+  color: #92400E;
+}
+
+.hc-nextday-banner strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.hc-locked-sub-note {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #D97706;
+  margin-top: 3px;
+}
