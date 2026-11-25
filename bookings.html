@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="assets/css/global.css?v=5.8.0">
   <link rel="stylesheet" href="assets/css/components.css?v=5.8.0">
   <link rel="stylesheet" href="assets/css/responsive.css?v=5.8.0">
-  <link rel="stylesheet" href="assets/css/bookings.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/bookings.css?v=6.5.0">
 
   <style>
     /* Membership Crown Badges */
@@ -103,7 +103,7 @@
   <!-- Main Container -->
   <main class="main-container">
 
-    <!-- Section 1: Patient & Family Selector (Single clean chip per member) -->
+    <!-- Section 1: Patient & Family Selector -->
     <section class="patient-selector-section glass-card animate-fade">
       <div class="section-title-wrap">
         <div>
@@ -118,15 +118,15 @@
       </div>
     </section>
 
-    <!-- Section 2: Chronological Date-wise Booking Switcher -->
+    <!-- Section 2: Latest-First Chronological Booking Switcher -->
     <div id="patient-bookings-subnav" class="bookings-subnav-container" style="display: none;">
-      <!-- Populated when a patient has >1 booking -->
+      <!-- Populated when a patient has >1 booking (Latest booked shown first) -->
     </div>
 
     <!-- Section 3: DIRECT ACTIVE LIVE TRACKING VIEW -->
     <div id="active-track-view" style="display: none;">
 
-      <!-- 1. Booking Info Overview Card (Address banner removed) -->
+      <!-- 1. Booking Info Overview Card -->
       <section class="booking-meta-card glass-card animate-fade">
         <div class="meta-head-row">
           <div>
@@ -134,6 +134,15 @@
             <strong class="meta-id-val" id="disp-booking-id">SCDBOOK000000</strong>
           </div>
           <span class="meta-mode-badge" id="disp-collection-mode">🏠 Home Pickup</span>
+        </div>
+
+        <!-- Random 4-Digit Home Collection Verification OTP Banner -->
+        <div id="disp-pickup-otp-box" class="pickup-otp-banner" style="display: none;">
+          <div>
+            <span class="otp-banner-title">🔐 Home Collection Verification OTP</span>
+            <small class="otp-banner-sub">Share this code with the phlebotomist only after sample collection</small>
+          </div>
+          <strong class="otp-banner-code" id="disp-pickup-otp-val">0000</strong>
         </div>
 
         <div class="meta-info-grid">
@@ -240,6 +249,6 @@
   <script src="assets/js/offline-sync.js?v=5.8.0"></script>
   <script src="assets/js/auth.js?v=5.8.0"></script>
   <script src="assets/js/app.js?v=5.8.0"></script>
-  <script src="assets/js/bookings.js?v=6.4.0"></script>
+  <script src="assets/js/bookings.js?v=8.0.0"></script>
 </body>
 </html>

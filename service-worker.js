@@ -1,9 +1,9 @@
 /* file: service-worker.js */
 /**
- * Selfcare Diagnostics - Service Worker v21.0.0
+ * Selfcare Diagnostics - Service Worker v22.0.0
  */
 
-const CACHE_VERSION = '21.0.0';
+const CACHE_VERSION = '22.0.0';
 const CACHE_NAME = `selfcare-cache-v${CACHE_VERSION}`;
 
 const ASSETS_TO_CACHE = [
@@ -86,6 +86,36 @@ self.addEventListener('message', (event) => {
   }
 });
 
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  const action = event.action || '';
+  let targetUrl = data.url || './bookings.html';
+
+  if (action === 'accept' && data.bookingId) {
+    targetUrl = `./home-collection.html?hc_action=accept&bookingId=${encodeURIComponent(data.bookingId)}`;
+  } else if (action === 'decline' && data.bookingId) {
+    targetUrl = `./home-collection.html?hc_action=decline&bookingId=${encodeURIComponent(data.bookingId)}`;
+  }
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (action && data.bookingId) {
+          client.postMessage({ type: 'CAPTAIN_POPUP_ACTION', action, bookingId: data.bookingId });
+        }
+        if ('focus' in client) {
+          client.navigate(targetUrl).catch(() => {});
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -144,6 +174,9 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('/technician.css') ||
     url.pathname.endsWith('/home-collection.js') ||
     url.pathname.endsWith('/home-collection.css') ||
+    url.pathname.endsWith('/bookings.js') ||
+    url.pathname.endsWith('/customer.js') ||
+    url.pathname.endsWith('/api.js') ||
     url.pathname.endsWith('/admin.js')
   ) {
     event.respondWith(
