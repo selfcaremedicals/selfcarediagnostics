@@ -1,0 +1,197 @@
+<!-- file: refer.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Refer & Earn - Selfcare Diagnostics</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4A154B">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Versioned Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=15.7.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=15.7.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=15.7.0">
+  <link rel="stylesheet" href="assets/css/refer.css?v=15.7.0">
+</head>
+<body class="refer-body">
+
+  <!-- Top App Header -->
+  <header class="refer-top-header">
+    <div class="header-back-btn" onclick="window.location.href='profile.html'">
+      <span>←</span> Back
+    </div>
+    <div class="header-title-text">
+      <h2>Refer & Earn</h2>
+    </div>
+    <div class="header-action-badge" id="refer-cycle-badge">
+      Cycle #1
+    </div>
+  </header>
+
+  <!-- Main Referral Container -->
+  <main class="refer-container">
+
+    <!-- Hero Card Banner -->
+    <section class="refer-hero-card">
+      <div class="hero-sparkle-tag">🎁 FREE TEST PACKAGE (MAX CAP ₹2,499)</div>
+      <div class="hero-icon-wrap">🎉</div>
+      <h3>Invite Friends, Earn Free Tests!</h3>
+      <p>When a friend uses your referral code and spends a <strong>minimum of ₹500</strong>, you earn a <strong>10% Discount</strong>. Refer 10 qualified friends to unlock a <strong>100% FREE Test Package (Up to ₹2,499)!</strong></p>
+
+      <!-- Active Discount Highlight Box -->
+      <div class="reward-accumulate-box">
+        <div class="reward-box-left">
+          <span class="reward-lbl">CURRENT UNLOCKED DISCOUNT</span>
+          <div class="reward-percentage-text">
+            <span id="active-discount-percent">0</span>% <small>OFF</small>
+          </div>
+          <p class="reward-status-sub" id="active-discount-sub">0 of 10 Qualified Friends (Min ₹500)</p>
+          <span class="max-cap-pill">🛡️ Max Cap: ₹2,499 Free Limit</span>
+        </div>
+        <div class="reward-box-right">
+          <button type="button" class="btn-use-reward" id="btn-redeem-discount" onclick="ReferPage.redeemDiscount()">
+            Use in Cart 🛍️
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10-Milestone Progress Tracker (0% to 100%) -->
+    <section class="milestone-tracker-card">
+      <div class="tracker-header">
+        <div>
+          <h4>100% Free Test Milestone</h4>
+          <span class="sub-tracker-note">10% per friend (Min ₹500 spend) • Max Value ₹2,499</span>
+        </div>
+        <span class="tracker-count-pill" id="friends-count-pill">0/10 Friends</span>
+      </div>
+
+      <!-- Linear Gauge Bar -->
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="milestone-progress-fill" style="width: 0%;"></div>
+      </div>
+
+      <!-- 10 Visual Step Dots -->
+      <div class="milestone-steps-grid" id="milestone-steps-container">
+        <!-- Rendered dynamically by refer.js -->
+      </div>
+
+      <!-- ⏳ 1-MONTH VALIDITY COUNTDOWN (Triggers at 100%) -->
+      <div class="expiry-countdown-banner animate-pulse-glow" id="expiry-100-banner" style="display: none;">
+        <div class="expiry-head">
+          <span class="expiry-badge-icon">⏳</span>
+          <strong>100% FREE TEST UNLOCKED (MAX ₹2,499 VALUE)!</strong>
+        </div>
+        <p class="expiry-text">
+          This 100% discount reward is valid until <strong><span id="expiry-date-display">--</span></strong> (<span id="expiry-days-left">30</span> days remaining). Maximum discount cap is <strong>₹2,499</strong>. If not redeemed within 1 month, it will automatically reset to <strong>0%</strong> for a fresh referral cycle!
+        </p>
+      </div>
+
+      <!-- Auto Reset Notice (If expired previously) -->
+      <div class="cycle-expired-alert" id="cycle-expired-alert" style="display: none;">
+        ⚠️ <strong>Notice:</strong> Your previous 100% discount reward reached its 1-month expiry limit and has been reset to 0% to start a fresh cycle.
+      </div>
+    </section>
+
+    <!-- Referral Code & Share Action Box -->
+    <section class="refer-code-box">
+      <span class="refer-code-tag">YOUR UNIQUE REFERRAL CODE</span>
+      <div class="code-display-wrap">
+        <span class="refer-code-text" id="my-referral-code">LOADING...</span>
+        <button type="button" class="btn-copy-code" onclick="ReferPage.copyReferralCode()">
+          📋 Copy
+        </button>
+      </div>
+      <p class="share-helper-text">Share this code with your friends and family. Remind them to book tests with a minimum spend of ₹500 to qualify!</p>
+
+      <div class="share-actions-row">
+        <button type="button" class="btn-share-whatsapp" onclick="ReferPage.shareViaWhatsApp()">
+          💬 Share on WhatsApp
+        </button>
+        <button type="button" class="btn-share-generic" onclick="ReferPage.shareNative()">
+          📲 More Options
+        </button>
+      </div>
+    </section>
+
+    <!-- How It Works Card -->
+    <section class="how-it-works-card">
+      <h4>Referral Guidelines & Terms:</h4>
+      <div class="steps-list">
+        <div class="how-step-item">
+          <div class="step-num">1</div>
+          <div class="step-desc">
+            <strong>Share Referral Code:</strong> Send your personal referral code to your friends and relatives.
+          </div>
+        </div>
+        <div class="how-step-item">
+          <div class="step-num">2</div>
+          <div class="step-desc">
+            <strong>Min ₹500 Booking:</strong> The referred user must apply your code and complete a test booking of <strong>₹500 or more</strong>.
+          </div>
+        </div>
+        <div class="how-step-item">
+          <div class="step-num">3</div>
+          <div class="step-desc">
+            <strong>+10% Discount per Friend:</strong> You unlock 10% discount for each qualified booking (2 friends = 20%, 3 friends = 30%).
+          </div>
+        </div>
+        <div class="how-step-item">
+          <div class="step-num">4</div>
+          <div class="step-desc">
+            <strong>Max ₹2,499 Cap & 1-Month Expiry:</strong> 10 qualified friends unlock 100% discount for tests <strong>up to ₹2,499 in value</strong>. Any amount exceeding ₹2,499 can be paid directly at checkout. The 100% discount is valid for <strong>1 month (30 days)</strong> from the date unlocked. Upon redemption or after 30 days, the progress resets to 0% so you can refer again!
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Referral History List -->
+    <section class="referral-history-card">
+      <div class="history-head-row">
+        <h4>Referral Activity (Current Cycle)</h4>
+        <span class="history-count-badge" id="history-total-badge">0 Bookings</span>
+      </div>
+      <div class="history-list-wrap" id="referral-history-list">
+        <!-- Rendered dynamically by refer.js -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <a href="customer.html" class="nav-item">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="reports.html" class="nav-item">
+      <span class="nav-icon">📑</span>
+      <span class="nav-label">Reports</span>
+    </a>
+    <a href="bookings.html" class="nav-item">
+      <span class="nav-icon">📍</span>
+      <span class="nav-label">Track Booking</span>
+    </a>
+    <a href="profile.html" class="nav-item active">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">My Account</span>
+    </a>
+    <a href="cart.html" class="nav-item">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">Cart</span>
+      <span class="cart-badge" style="display:none;">0</span>
+    </a>
+  </nav>
+
+  <!-- Core Scripts -->
+  <script src="assets/js/config.js?v=15.7.0"></script>
+  <script src="assets/js/utils.js?v=15.7.0"></script>
+  <script src="assets/js/api.js?v=15.7.0"></script>
+  <script src="assets/js/auth.js?v=15.7.0"></script>
+  <script src="assets/js/refer.js?v=15.7.0"></script>
+</body>
+</html>

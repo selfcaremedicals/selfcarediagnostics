@@ -1,0 +1,179 @@
+<!-- file: index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "DiagnosticLab",
+    "name": "Selfcare Diagnostics",
+    "url": "https://selfcarediagnostics.in/",
+    "logo": "https://selfcarediagnostics.in/assets/images/logo.png",
+    "image": "https://selfcarediagnostics.in/assets/images/logo.png",
+    "telephone": "+917010174890",
+    "email": "selfcaremedicals@gmail.com",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Masjid Street, 4th Main Road, Mahatma Gandhi Nagar, Vettuvankeni",
+      "addressLocality": "Chennai",
+      "addressRegion": "Tamil Nadu",
+      "postalCode": "600115",
+      "addressCountry": "IN"
+    },
+    "areaServed": "Chennai",
+    "priceRange": "₹₹"
+  }
+  </script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Selfcare Diagnostics - Empowering Wellness</title>
+  <meta name="description" content="Selfcare Diagnostics - Diagnostic laboratory in Chennai offering blood tests, health checkups, preventive health packages and convenient home sample collection.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://selfcarediagnostics.in/">
+  <meta property="og:title" content="Selfcare Diagnostics | Diagnostic Laboratory in Chennai">
+  <meta property="og:description" content="Blood tests, health checkups, preventive health packages and home sample collection from Selfcare Diagnostics.">
+  <meta property="og:url" content="https://selfcarediagnostics.in/">
+  <meta property="og:type" content="website">
+
+  <link rel="icon" type="image/png" href="https://selfcarediagnostics.in/assets/images/logo.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #033F33, #045D49, #078866);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .splash-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: splashPop 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    .splash-logo {
+      height: 70px;
+      object-fit: contain;
+      filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.35));
+    }
+
+    .splash-title {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 1.2px;
+      margin-top: 10px;
+    }
+
+    .splash-sub {
+      color: #A7F3D0;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(255, 255, 255, 0.25);
+      border-top-color: #FFFFFF;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      margin-top: 22px;
+    }
+
+    @keyframes splashPop {
+      from { opacity: 0; transform: scale(0.85) translateY(12px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="splash-wrap">
+    <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="splash-logo" onerror="this.style.display='none'; document.getElementById('fb-title').style.display='block';">
+    <div id="fb-title" style="display:none;" class="splash-title">
+      SELFCARE <span style="color:#A7F3D0;">DIAGNOSTICS</span>
+    </div>
+    <p class="splash-sub">Empowering Wellness</p>
+    <div class="spinner"></div>
+  </div>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+
+      if (params.get('logout') === 'true') {
+        localStorage.removeItem('selfcare_active_user');
+        localStorage.removeItem('selfcare_user_role');
+        localStorage.removeItem('selfcare_active_tech');
+        localStorage.removeItem('selfcare_active_technician');
+        localStorage.removeItem('selfcare_captain_session');
+        localStorage.removeItem('selfcare_tech_workspace');
+        localStorage.removeItem('selfcare_auth_token');
+        localStorage.removeItem('selfcare_permanent_user');
+        window.location.replace('login.html');
+        return;
+      }
+
+      const role = localStorage.getItem('selfcare_user_role');
+      const activeUser = localStorage.getItem('selfcare_active_user');
+      const permanentUser = localStorage.getItem('selfcare_permanent_user');
+      const queryStr = window.location.search || '';
+
+      setTimeout(() => {
+        if (role === 'admin' && activeUser && activeUser.toUpperCase().startsWith('SCDADMIN')) {
+          window.location.replace('admin.html');
+          return;
+        }
+
+        if (role === 'technician' && activeUser && activeUser.toUpperCase().startsWith('SCDTECH')) {
+          const lastWorkspace = localStorage.getItem('selfcare_tech_workspace') || 'technician.html';
+          window.location.replace(lastWorkspace);
+          return;
+        }
+
+        if (activeUser || permanentUser) {
+          if (!activeUser && permanentUser) {
+            try {
+              const p = JSON.parse(permanentUser);
+              const mob = p.mobile || p.phone;
+              if (mob) {
+                localStorage.setItem('selfcare_active_user', mob);
+                localStorage.setItem('selfcare_user_role', 'patient');
+                localStorage.setItem('selfcare_auth_token', p.token || `LIFETIME_PATIENT_TOKEN_${mob}`);
+              }
+            } catch (e) {}
+          }
+          window.location.replace('customer.html' + queryStr);
+          return;
+        }
+
+        window.location.replace('login.html' + queryStr);
+      }, 450);
+    })();
+  </script>
+</body>
+</html>

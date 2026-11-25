@@ -1,0 +1,117 @@
+<!-- file: upi-pay.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Selfcare Diagnostics • Direct GPay / UPI Payout</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+      background: #0F172A;
+      color: #0F172A;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: #FFFFFF;
+      border-radius: 22px;
+      padding: 24px 20px;
+      text-align: center;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+    }
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      color: #059669;
+      background: rgba(16, 185, 129, 0.14);
+      padding: 5px 12px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+    }
+    h2 { font-size: 18px; font-weight: 900; margin-bottom: 4px; }
+    .upi { font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 16px; word-break: break-all; }
+    .amt-box {
+      background: #F8FAFC;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+    .amt-box small { display: block; font-size: 11px; font-weight: 800; color: #64748B; }
+    .amt-box strong { display: block; font-size: 34px; font-weight: 900; color: #059669; margin-top: 2px; }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      font-size: 14.5px;
+      font-weight: 900;
+      text-decoration: none;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    .btn-gpay {
+      background: #0F172A;
+      color: #FFFFFF;
+    }
+    .btn-upi {
+      background: #059669;
+      color: #FFFFFF;
+    }
+    .note { font-size: 11px; color: #64748B; margin-top: 8px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="tag">SELFCARE CAPTAIN PAYOUT</span>
+    <h2 id="payee-name">Technician Payout</h2>
+    <div class="upi" id="payee-upi">Loading UPI...</div>
+
+    <div class="amt-box">
+      <small>PAYOUT AMOUNT</small>
+      <strong id="pay-amount">₹0</strong>
+    </div>
+
+    <a id="gpay-btn" href="#" class="btn btn-gpay">Pay via Google Pay (GPay) ➔</a>
+    <a id="upi-btn" href="#" class="btn btn-upi">Pay via Any UPI App ➔</a>
+
+    <p class="note">Opening Google Pay automatically. If it does not open, tap the button above.</p>
+  </div>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const pa = (params.get('pa') || '').trim();
+      const pn = (params.get('pn') || 'Selfcare Captain').trim();
+      const am = Number(params.get('am') || 0).toFixed(2);
+      const id = (params.get('id') || 'PAYOUT').trim();
+
+      document.getElementById('payee-name').textContent = pn;
+      document.getElementById('payee-upi').textContent = pa ? `UPI ID: ${pa}` : 'Invalid UPI ID';
+      document.getElementById('pay-amount').textContent = `₹${Number(am).toLocaleString('en-IN')}`;
+
+      if (pa && Number(am) > 0) {
+        const upiQuery = `pa=${encodeURIComponent(pa)}&pn=${encodeURIComponent(pn)}&am=${am}&cu=INR&tn=${encodeURIComponent('Selfcare Payout ' + id)}`;
+        const standardUpiUrl = `upi://pay?${upiQuery}`;
+        const gpayIntentUrl = `intent://pay?${upiQuery}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+
+        document.getElementById('upi-btn').href = standardUpiUrl;
+        document.getElementById('gpay-btn').href = /Android/i.test(navigator.userAgent) ? gpayIntentUrl : standardUpiUrl;
+
+        // Auto-launch Google Pay / UPI app immediately on page open
+        setTimeout(() => {
+          window.location.href = /Android/i.test(navigator.userAgent) ? gpayIntentUrl : standardUpiUrl;
+        }, 300);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+<!-- file: login.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Login - Selfcare Diagnostics</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Versioned Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=6.0.0">
+  <link rel="stylesheet" href="assets/css/login.css?v=7.0.0">
+</head>
+<body>
+
+  <!-- 3D Ambient Background Orbs -->
+  <div class="bg-3d-scene" aria-hidden="true">
+    <div class="orb-3d orb-1"></div>
+    <div class="orb-3d orb-2"></div>
+    <div class="orb-3d orb-3"></div>
+  </div>
+
+  <!-- Clean 3D Floating Glass Header -->
+  <header class="app-header glass-3d-header">
+    <div class="header-center-brand">
+      <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="header-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="fallback-logo" style="display:none;">
+        <h1 class="logo-text">SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
+        <p class="tagline">Empowering Wellness</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Login Container -->
+  <main class="login-container">
+
+    <!-- ANIMATED MASCOT PARADE -->
+    <div class="mascot-parade-stage" aria-hidden="true">
+      <div class="mascot-walker">
+        <svg class="mascot-svg" viewBox="0 0 210 84" width="210" height="84" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="flagGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#099A74" />
+              <stop offset="55%" stop-color="#078866" />
+              <stop offset="100%" stop-color="#045D49" />
+            </linearGradient>
+            <filter id="flagShadow" x="-10%" y="-10%" width="125%" height="135%">
+              <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#033F33" flood-opacity="0.22" />
+            </filter>
+          </defs>
+
+          <g class="mascot-body-bob">
+            <g class="mascot-flag-wave" filter="url(#flagShadow)">
+              <path d="M161 12 Q122 8, 86 12 T14 12 L14 38 Q50 42, 86 38 T158 38 Z"
+                    fill="url(#flagGrad)" stroke="#A7F3D0" stroke-width="1.4" />
+              <text x="86" y="28.5" text-anchor="middle" fill="#FFFFFF"
+                    font-size="11.2" font-weight="800" letter-spacing="0.2">
+                Welcome to Selfcare
+              </text>
+            </g>
+
+            <line x1="154" y1="66" x2="162" y2="10" stroke="#045D49" stroke-width="2.4" stroke-linecap="round" />
+            <circle cx="162" cy="9" r="3.2" fill="#F59E0B" />
+            <ellipse cx="174" cy="78" rx="14" ry="3.5" fill="rgba(4, 93, 73, 0.18)" />
+
+            <g class="mascot-leg-back">
+              <rect x="170" y="60" width="5.5" height="14" rx="2.7" fill="#045D49" />
+              <ellipse cx="174" cy="74" rx="4.5" ry="2.5" fill="#10231E" />
+            </g>
+
+            <g class="mascot-leg-front">
+              <rect x="174" y="60" width="5.5" height="14" rx="2.7" fill="#078866" />
+              <ellipse cx="178" cy="74" rx="4.5" ry="2.5" fill="#10231E" />
+            </g>
+
+            <path d="M164 43 C164 39, 184 39, 184 43 L186 62 L162 62 Z"
+                  fill="#FFFFFF" stroke="#078866" stroke-width="1.4" />
+            <polygon points="171,40 179,40 175,49" fill="#078866" />
+
+            <circle cx="175" cy="27" r="12" fill="#FDCB9E" />
+            <path d="M163 26 C163 16, 187 16, 187 25 C183 21, 170 21, 165 27 Z" fill="#1E293B" />
+            <circle cx="180" cy="26.5" r="1.7" fill="#10231E" />
+            <circle cx="180.6" cy="25.9" r="0.55" fill="#FFFFFF" />
+            <circle cx="178" cy="30.5" r="2" fill="#FDA4AF" opacity="0.75" />
+            <path d="M180 31.5 Q182.5 33.5 184.5 31" fill="none" stroke="#9A3412" stroke-width="1.4" stroke-linecap="round" />
+
+            <path d="M172 45 Q164 49 157 48" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" />
+            <path d="M172 45 Q164 49 157 48" fill="none" stroke="#078866" stroke-width="1.3" stroke-linecap="round" />
+            <circle cx="157" cy="48" r="3" fill="#FDCB9E" />
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- PATIENT LOGIN & CUSTOMER SIGN UP ONLY -->
+    <div id="patient-auth-wrapper">
+      
+      <!-- SUB-TABS: LOGIN vs SIGN UP (CUSTOMERS ONLY) -->
+      <div class="patient-subtabs-wrap glass-3d-card anim-3d-rise">
+        <button type="button" class="subtab-btn active" id="subtab-patient-login" onclick="LoginPage.switchPatientMode('login')">
+          Patient Login
+        </button>
+        <button type="button" class="subtab-btn" id="subtab-patient-signup" onclick="LoginPage.switchPatientMode('signup')">
+          Customer Sign Up
+        </button>
+      </div>
+
+      <!-- STEP 1: UNIFIED PATIENT LOGIN VIEW -->
+      <section id="view-patient-login" class="auth-card glass-3d-card anim-3d-flip">
+        <div class="card-head">
+          <h3>Patient Login</h3>
+          <p>Enter your registered mobile number &amp; password</p>
+        </div>
+
+        <div class="form-group">
+          <label for="mobile-number-input">Mobile Number</label>
+          <div class="staff-input-wrap input-3d-box">
+            <input 
+              type="text" 
+              id="mobile-number-input" 
+              placeholder="Enter 10-digit mobile number" 
+              autocomplete="username" 
+              oninput="LoginPage.handleUnifiedIdInput(this)"
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="patient-password-input">Password</label>
+          <div class="staff-input-wrap input-3d-box">
+            <input 
+              type="password" 
+              id="patient-password-input" 
+              placeholder="Enter Password" 
+              autocomplete="current-password"
+              onkeydown="if(event.key==='Enter') LoginPage.handleUnifiedLogin()"
+            >
+            <button type="button" class="pwd-eye-btn" aria-label="Show password" onclick="LoginPage.togglePasswordVisibility('patient-password-input', this)">👁️</button>
+          </div>
+          <span class="input-hint" id="patient-login-error" style="display: none;">Invalid Mobile Number or Password.</span>
+        </div>
+
+        <button type="button" class="login-action-btn btn-3d-glow" id="patient-login-btn" onclick="LoginPage.handleUnifiedLogin()">
+          <span>Login ➔</span>
+        </button>
+
+        <div class="auth-switch-prompt">
+          New customer? 
+          <button type="button" class="switch-link-btn" onclick="LoginPage.switchPatientMode('signup')">Sign Up Now</button>
+        </div>
+
+        <!-- Trust Badges -->
+        <div class="auth-trust-features">
+          <div class="trust-feat">
+            <span>🛡️</span>
+            <small>One-Time Lifetime Login</small>
+          </div>
+          <div class="trust-feat">
+            <span>🛒</span>
+            <small>Permanent Saved Cart</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 2: CUSTOMER SIGN UP VIEW (PATIENTS ONLY) -->
+      <section id="view-patient-signup" class="auth-card glass-3d-card anim-3d-flip" style="display: none;">
+        <div class="card-head">
+          <h3>Customer Sign Up</h3>
+          <p>Create your account once for lifetime access</p>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-name-input">Full Name *</label>
+          <div class="staff-input-wrap input-3d-box">
+            <input 
+              type="text" 
+              id="signup-name-input" 
+              placeholder="Enter your full name" 
+              autocomplete="name"
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-mobile-input">Mobile Number *</label>
+          <div class="phone-input-wrap input-3d-box">
+            <span class="country-code">🇮🇳 +91</span>
+            <input 
+              type="tel" 
+              id="signup-mobile-input" 
+              placeholder="Enter 10-digit mobile" 
+              maxlength="10" 
+              autocomplete="tel" 
+              inputmode="numeric"
+              pattern="[0-9]*"
+              oninput="LoginPage.validateMobileInput(this)"
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-password-input">Create Password *</label>
+          <div class="staff-input-wrap input-3d-box">
+            <input 
+              type="password" 
+              id="signup-password-input" 
+              placeholder="Create password (min 4 chars)" 
+              autocomplete="new-password"
+              oninput="LoginPage.checkPasswordMatch()"
+            >
+            <button type="button" class="pwd-eye-btn" aria-label="Show password" onclick="LoginPage.togglePasswordVisibility('signup-password-input', this)">👁️</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-confirm-input">Confirm Password *</label>
+          <div class="staff-input-wrap input-3d-box">
+            <input 
+              type="password" 
+              id="signup-confirm-input" 
+              placeholder="Confirm password" 
+              autocomplete="new-password"
+              oninput="LoginPage.checkPasswordMatch()"
+              onkeydown="if(event.key==='Enter') LoginPage.handlePatientSignup()"
+            >
+            <button type="button" class="pwd-eye-btn" aria-label="Show password" onclick="LoginPage.togglePasswordVisibility('signup-confirm-input', this)">👁️</button>
+          </div>
+          <div id="password-match-badge" class="password-match-badge" style="display: none;"></div>
+          <span class="input-hint" id="patient-signup-error" style="display: none;">Please verify your details.</span>
+        </div>
+
+        <button type="button" class="login-action-btn btn-3d-glow" id="patient-signup-btn" onclick="LoginPage.handlePatientSignup()">
+          <span>Create Account &amp; Login ✓</span>
+        </button>
+
+        <div class="auth-switch-prompt">
+          Already registered? 
+          <button type="button" class="switch-link-btn" onclick="LoginPage.switchPatientMode('login')">Login Here</button>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Bottom Safety Guarantee Note -->
+    <div class="login-footer-guarantee">
+      <span>🛡️ 100% Secure • NABL Accredited Diagnostic Center • Chennai</span>
+    </div>
+
+  </main>
+
+  <!-- =========================================================
+       SCDTECH WORKSPACE CONFIRMATION POPUP (LAB DESK vs HOME COLLECTION)
+       ========================================================= -->
+  <div id="tech-mode-choice-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(3,63,51,0.68); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); align-items:center; justify-content:center; padding:18px;">
+    <div class="glass-3d-card anim-3d-flip" style="width:100%; max-width:400px; background:rgba(255,255,255,0.95); padding:24px 20px; text-align:center;">
+      <div style="display:inline-block; font-size:10px; font-weight:900; color:#047857; background:#ECFDF5; border:1px solid #A7F3D0; padding:4px 12px; border-radius:20px; margin-bottom:8px;">
+        ✓ TECHNICIAN VERIFIED
+      </div>
+      <h3 style="font-size:18px; font-weight:900; color:#10231E; margin-bottom:4px;">Choose Duty Workspace</h3>
+      <p id="tech-choice-subtitle" style="font-size:12px; color:#536E66; margin-bottom:18px;">Where would you like to login right now?</p>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <button type="button" onclick="LoginPage.confirmTechDestination('lab')" style="padding:18px 10px; border-radius:16px; border:2px solid #0F172A; background:#FFFFFF; cursor:pointer; text-align:center; box-shadow:0 8px 18px rgba(15,23,42,0.08);">
+          <span style="font-size:28px; display:block; margin-bottom:6px;">🔬</span>
+          <strong style="font-size:13.5px; color:#0F172A; display:block;">Lab Desk</strong>
+          <span style="font-size:10.5px; color:#64748B;">Walk-in &amp; Billing</span>
+        </button>
+
+        <button type="button" onclick="LoginPage.confirmTechDestination('home')" style="padding:18px 10px; border-radius:16px; border:2px solid #078866; background:#ECFDF5; cursor:pointer; text-align:center; box-shadow:0 8px 18px rgba(7,136,102,0.16);">
+          <span style="font-size:28px; display:block; margin-bottom:6px;">🛵</span>
+          <strong style="font-size:13.5px; color:#045D49; display:block;">Home Collection</strong>
+          <span style="font-size:10.5px; color:#078866;">Doorstep Pickups</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core JavaScript Scripts -->
+  <script src="assets/js/config.js?v=6.0.0"></script>
+  <script src="assets/js/utils.js?v=6.0.0"></script>
+  <script src="assets/js/api.js?v=6.0.0"></script>
+  <script src="assets/js/offline-db.js?v=6.0.0"></script>
+  <script src="assets/js/offline-sync.js?v=6.0.0"></script>
+  <script src="assets/js/auth.js?v=6.0.0"></script>
+  <script src="assets/js/login.js?v=7.0.0"></script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!-- file: reports.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Smart Health Records & Trends - Selfcare Diagnostics</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#078866">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Versioned Stylesheets -->
+  <link rel="stylesheet" href="assets/css/global.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/components.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/responsive.css?v=5.8.0">
+  <link rel="stylesheet" href="assets/css/reports.css?v=5.8.0">
+</head>
+<body>
+
+  <!-- Floating App Header -->
+  <header class="app-header glass-card">
+    <div class="header-left" onclick="window.location.href='customer.html'" style="cursor: pointer;">
+      <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="header-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <div class="fallback-logo" style="display:none;">
+        <h1 class="logo-text">SELFCARE <span class="logo-sub">DIAGNOSTICS</span></h1>
+        <p class="tagline">Empowering Wellness</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="live-records-pill">📊 Smart Health Records</span>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- 1. Real Patient Selector Chips (Customer + Added Family Members Only) -->
+    <section class="patient-selector-section glass-card animate-fade">
+      <div class="section-title-wrap">
+        <div>
+          <h3>👥 Patient Health Profiles</h3>
+          <p>Select a member to view real lab reports and trend analysis</p>
+        </div>
+        <button type="button" class="add-member-mini-btn" onclick="window.location.href='profile.html'">+ Add Member</button>
+      </div>
+
+      <div class="patient-chips-scroll" id="patient-chips-list">
+        <!-- Dynamically populated from actual customer profile & family storage -->
+      </div>
+    </section>
+
+    <!-- STATE A: PATIENT HAS REAL LAB REPORTS -->
+    <div id="patient-records-view" style="display: none;">
+
+      <!-- 2. Health Trends & Last 2 Checkups Comparison Engine -->
+      <section class="comparison-card glass-card animate-fade" id="comparison-section">
+        <div class="card-head-row">
+          <div>
+            <h4 id="patient-comparison-title">Health Progress Tracker</h4>
+            <span class="sub-date" id="comparison-date-range">Comparison</span>
+          </div>
+          <span class="trend-badge-summary" id="overall-trend-badge">-</span>
+        </div>
+
+        <!-- Dynamic Highlight Banner (Well Done / Attention Notice) -->
+        <div id="trend-highlight-banner" class="trend-alert-banner"></div>
+
+        <!-- Dynamic Parameter Differences Grid -->
+        <div class="comparison-grid" id="comparison-parameters-container"></div>
+      </section>
+
+      <!-- 3. Smart Diet, Exercise & Specialist Referral (No Medications) -->
+      <section class="advisory-card glass-card animate-fade" id="advisory-section">
+        <div class="advisory-header">
+          <span class="advisory-icon">🥗</span>
+          <div>
+            <h4>Personalized Diet & Lifestyle Guidance</h4>
+            <p>Recommendations formulated strictly from your verified diagnostic test parameters</p>
+          </div>
+        </div>
+
+        <!-- Foods to Eat & Avoid Split Grid -->
+        <div class="diet-split-grid">
+          <div class="diet-box eat-box">
+            <div class="diet-box-title">
+              <span>✅</span>
+              <h5>Foods to Include</h5>
+            </div>
+            <ul id="foods-to-eat-list" class="diet-list"></ul>
+          </div>
+
+          <div class="diet-box avoid-box">
+            <div class="diet-box-title">
+              <span>🚫</span>
+              <h5>Foods to Avoid</h5>
+            </div>
+            <ul id="foods-to-avoid-list" class="diet-list"></ul>
+          </div>
+        </div>
+
+        <!-- Recommended Physical Activity -->
+        <div class="lifestyle-recommendation-box">
+          <div class="rec-title">
+            <span>🏃</span>
+            <h5>Recommended Physical Routine</h5>
+          </div>
+          <p id="exercise-plan-text">-</p>
+        </div>
+
+        <!-- Specialist Doctor Referral Box -->
+        <div class="doctor-referral-box">
+          <div class="doc-referral-left">
+            <span>🩺</span>
+            <div>
+              <strong>Recommended Specialist Consultation:</strong>
+              <p id="doc-referral-text">-</p>
+            </div>
+          </div>
+          <span class="specialist-pill" id="doc-specialist-badge">Specialist</span>
+        </div>
+
+        <!-- Safety Guardrail Note -->
+        <div class="safety-disclaimer-note">
+          <span>ℹ️ <strong>Medical Safety Note:</strong> Selfcare Diagnostics provides dietary suggestions, lifestyle recommendations, and doctor specialty routing strictly based on observed lab parameters. We do not prescribe medications or clinical diagnosis. Please consult your specialist for prescription medicines.</span>
+        </div>
+      </section>
+
+      <!-- 4. Verified Pathology Reports List -->
+      <section class="reports-history-section">
+        <div class="section-subhead">
+          <h4>📋 Verified Lab Reports</h4>
+          <span>Direct NABL Lab Authenticated</span>
+        </div>
+        <div class="reports-list-container" id="reports-list-container"></div>
+      </section>
+
+    </div>
+
+    <!-- STATE B: EMPTY STATE (NO REAL REPORTS YET FOR THIS MEMBER) -->
+    <section id="patient-empty-state" class="empty-state-card glass-card" style="display: none;">
+      <div class="empty-icon">📑</div>
+      <h3 id="empty-state-title">No Lab Reports Found</h3>
+      <p id="empty-state-desc">There are no completed diagnostic lab tests for this profile yet. Once a sample is tested, your verified reports and health record analysis will appear here automatically.</p>
+      <div class="empty-actions">
+        <button type="button" class="action-btn primary-btn" onclick="window.location.href='tests.html'">Book Diagnostic Test ➔</button>
+        <button type="button" class="action-btn secondary-btn" onclick="window.location.href='packages.html'">View Packages ➔</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =========================================================================
+       MODAL: FULL LAB REPORT BREAKDOWN
+       ========================================================================= -->
+  <div id="report-view-modal" class="sia-modal-overlay" style="display: none;">
+    <div class="sia-modal-content glass-modal-3d animate-3d-pop">
+      <div class="sia-modal-header">
+        <div class="modal-title-wrap">
+          <span>🧪</span>
+          <div>
+            <h3 id="modal-report-title">Lab Report Details</h3>
+            <p id="modal-report-meta" class="sub-meta">-</p>
+          </div>
+        </div>
+        <button class="sia-close-btn" onclick="ReportsPage.closeModal('report-view-modal')">✕</button>
+      </div>
+
+      <div class="sia-modal-body">
+        <div class="lab-stamp-box">
+          <div class="stamp-left">
+            <strong>Selfcare Diagnostics Central Laboratory</strong>
+            <span>100% NABL Quality Certified Protocols • Chennai</span>
+          </div>
+          <span class="report-qr-pill">Verified ✓</span>
+        </div>
+
+        <div class="parameters-table-wrapper">
+          <table class="params-table">
+            <thead>
+              <tr>
+                <th>Investigation</th>
+                <th>Observed</th>
+                <th>Reference Range</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="modal-params-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="modal-report-actions">
+          <button type="button" class="pdf-btn" id="modal-download-pdf-btn">
+            <span>📥</span> Download Certified PDF
+          </button>
+          <button type="button" class="share-btn" id="modal-whatsapp-share-btn">
+            <span>💬</span> Share Report
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5-Tab Fixed Bottom Navigation -->
+  <nav class="bottom-nav">
+    <a href="customer.html" class="nav-item">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="reports.html" class="nav-item active">
+      <span class="nav-icon">📑</span>
+      <span class="nav-label">Reports</span>
+    </a>
+    <a href="bookings.html" class="nav-item">
+      <span class="nav-icon">📍</span>
+      <span class="nav-label">Track Booking</span>
+    </a>
+    <a href="profile.html" class="nav-item">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">My Account</span>
+    </a>
+    <a href="cart.html" class="nav-item">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">Cart</span>
+      <span class="cart-badge" style="display:none;">0</span>
+    </a>
+  </nav>
+
+  <!-- Core JavaScript Stack -->
+  <script src="assets/js/config.js?v=5.8.0"></script>
+  <script src="assets/js/utils.js?v=5.8.0"></script>
+  <script src="assets/js/api.js?v=5.8.0"></script>
+  <script src="assets/js/offline-db.js?v=5.8.0"></script>
+  <script src="assets/js/offline-sync.js?v=5.8.0"></script>
+  <script src="assets/js/auth.js?v=5.8.0"></script>
+  <script src="assets/js/app.js?v=5.8.0"></script>
+  <script src="assets/js/reports.js?v=5.8.0"></script>
+</body>
+</html>
