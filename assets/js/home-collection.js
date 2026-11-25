@@ -1,15 +1,16 @@
 /* file: assets/js/home-collection.js */
 /**
- * Selfcare Diagnostics - Home Collection Captain & Payout Engine v4.3.0
+ * Selfcare Diagnostics - Home Collection Captain & Payout Engine v4.4.0
  * Features:
- * 1. Continuous Rapido-Style Alert Loop (Repeats sound, vibration & OS banner until Accept or Decline).
- * 2. Strict Accept / Decline Locking:
+ * 1. Firebase Cloud Messaging (FCM) Web Push Token Registration for Background / Screen-Off Alerts.
+ * 2. Continuous Rapido-Style Alert Loop (Repeats sound, vibration & OS banner until Accept or Decline).
+ * 3. Strict Accept / Decline Locking:
  *    - Accept opens app directly & locks booking to this technician.
  *    - Decline permanently blocks booking from re-appearing without opening app.
- * 3. Multi-Technician Broadcast & "You Missed / Someone Accepted" Alert when another technician claims first.
- * 4. Strict Customer Saved Coordinates (No Address Text Geocoding) + 10 km Haversine Radius Dispatch Filter.
- * 5. Technician Profile Address + Live GPS Column & Silent 10-Second Background GPS Sync while ONLINE.
- * 6. Next-Day Withdrawal Rule + Strict Balance Cap + Direct WhatsApp Payout to +91 7010174890 with GPay Link.
+ * 4. Multi-Technician Broadcast & "You Missed / Someone Accepted" Alert when another technician claims first.
+ * 5. Strict Customer Saved Coordinates (No Address Text Geocoding) + 10 km Haversine Radius Dispatch Filter.
+ * 6. Technician Profile Address + Live GPS Column & Silent 10-Second Background GPS Sync while ONLINE.
+ * 7. Next-Day Withdrawal Rule + Strict Balance Cap + Direct WhatsApp Payout to +91 7010174890 with GPay Link.
  */
 
 const HomeCollectionApp = {
@@ -199,6 +200,10 @@ const HomeCollectionApp = {
     this.updateNotifUiState();
     this.toggleDuty(savedOnline, true);
 
+    if (savedNotif) {
+      this.initFcmPushNotifications();
+    }
+
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && this.isOnline) {
         this.syncBookings(false);
@@ -291,6 +296,7 @@ const HomeCollectionApp = {
         localStorage.setItem('selfcare_captain_session', JSON.stringify(this.currentCaptain));
 
         this.syncStateToServiceWorker();
+        if (this.notificationsEnabled) this.initFcmPushNotifications();
         if (this.isOnline) this.syncBookings(false);
         Utils.showToast(`Live Location updated (${locStr})`, 'success');
       },
@@ -366,7 +372,7 @@ const HomeCollectionApp = {
   },
 
   /* =========================================================
-     4. NOTIFICATION ALERT TOGGLE & SERVICE WORKER SYNC
+     4. NOTIFICATION ALERT TOGGLE, FCM PUSH & SERVICE WORKER SYNC
      ========================================================= */
   async toggleNotifications(enable) {
     const toggle = document.getElementById('hc-notif-toggle');
@@ -399,7 +405,8 @@ const HomeCollectionApp = {
         localStorage.setItem('selfcare_hc_notif_enabled', 'true');
         this.playRapidoAlertTone();
         this.syncStateToServiceWorker();
-        Utils.showToast('Screen Popup Alerts ON! Continuous Rapido-style alerts enabled.', 'success');
+        this.initFcmPushNotifications();
+        Utils.showToast('Screen Popup Alerts ON! Background & screen-off alerts enabled.', 'success');
       } else {
         this.notificationsEnabled = false;
         localStorage.setItem('selfcare_hc_notif_enabled', 'false');
@@ -415,6 +422,55 @@ const HomeCollectionApp = {
     }
 
     this.updateNotifUiState();
+  },
+
+  async initFcmPushNotifications() {
+    try {
+      if (typeof firebase === 'undefined' || !('Notification' in window)) return;
+      if (Notification.permission !== 'granted') return;
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyDGu9ZYCjHPVU4kZC2jADqoxcc4NLoNB3s",
+        authDomain: "selfcare-diagnostics-84a53.firebaseapp.com",
+        projectId: "selfcare-diagnostics-84a53",
+        storageBucket: "selfcare-diagnostics-84a53.firebasestorage.app",
+        messagingSenderId: "660066717689",
+        appId: "1:660066717689:web:d80396d5cd05300deeb728"
+      };
+
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+
+      const messaging = firebase.messaging();
+      const swReg = await navigator.serviceWorker.ready;
+
+      const fcmToken = await messaging.getToken({
+        vapidKey: 'BGRfn6LPCW4-eDTuK7XSQMv121el0o62wu6Wl9FtY5wwtyOdGhY5Op80r8RlzrNUmiFEpmPdVUmrp2b8Rvi7OgA',
+        serviceWorkerRegistration: swReg
+      });
+
+      if (fcmToken && this.currentCaptain?.id) {
+        localStorage.setItem(`selfcare_hc_fcm_${this.currentCaptain.id}`, fcmToken);
+        if (navigator.onLine && typeof Api !== 'undefined') {
+          Api.request('saveTechnicianFcmToken', {
+            captainId: this.currentCaptain.id,
+            techId: this.currentCaptain.id,
+            fcmToken: fcmToken,
+            lat: this.currentCaptain.lat || '',
+            lng: this.currentCaptain.lng || '',
+            isOnline: this.isOnline
+          }).catch(() => {});
+        }
+      }
+
+      // Sync immediately if push arrives while app is open in foreground
+      messaging.onMessage(() => {
+        if (this.isOnline) this.syncBookings(false);
+      });
+    } catch (e) {
+      console.warn('FCM init warning:', e);
+    }
   },
 
   enableBothDutyAndAlerts() {
@@ -535,6 +591,7 @@ const HomeCollectionApp = {
     this.saveWalletData();
     this.renderProfileView();
     this.syncStateToServiceWorker();
+    if (this.notificationsEnabled) this.initFcmPushNotifications();
 
     if (navigator.onLine && typeof Api !== 'undefined') {
       Api.request('updateCaptainProfile', {
@@ -823,6 +880,7 @@ const HomeCollectionApp = {
 
     this.updateNotifUiState();
     this.syncStateToServiceWorker();
+    if (this.notificationsEnabled) this.initFcmPushNotifications();
     this.renderActiveTrips();
   },
 
