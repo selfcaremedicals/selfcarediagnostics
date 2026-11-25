@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="assets/css/global.css?v=6.7.0">
   <link rel="stylesheet" href="assets/css/components.css?v=6.7.0">
   <link rel="stylesheet" href="assets/css/responsive.css?v=6.7.0">
-  <link rel="stylesheet" href="assets/css/home-collection.css?v=4.0.0">
+  <link rel="stylesheet" href="assets/css/home-collection.css?v=4.3.0">
 
   <!-- Razorpay Checkout SDK -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
@@ -34,7 +34,7 @@
        ========================================================= -->
   <div id="hc-app-shell">
 
-    <!-- Sticky Glass Header with Persistent Online/Offline Duty Switch -->
+    <!-- Sticky Glass Header with Duty Switch + Notification Alert Switch -->
     <header class="hc-header no-print-section">
       <div class="hc-brand-left" onclick="HomeCollectionApp.switchTab('orders')" style="cursor: pointer;">
         <img src="assets/images/logo.png" alt="Selfcare Diagnostics" class="hc-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
@@ -44,13 +44,23 @@
         </div>
       </div>
 
-      <!-- Persistent Duty Toggle Switch -->
-      <div class="hc-duty-pill" id="hc-duty-pill-box">
-        <span class="duty-lbl" id="hc-duty-label">OFFLINE</span>
-        <label class="hc-switch">
-          <input type="checkbox" id="hc-duty-toggle" onchange="HomeCollectionApp.toggleDuty(this.checked)">
-          <span class="hc-slider"></span>
-        </label>
+      <!-- Dual Control Switches: Duty ON/OFF + Mobile Screen Alert ON/OFF -->
+      <div class="hc-header-switches">
+        <div class="hc-duty-pill" id="hc-duty-pill-box" title="Online / Offline Duty">
+          <span class="duty-lbl" id="hc-duty-label">OFF</span>
+          <label class="hc-switch">
+            <input type="checkbox" id="hc-duty-toggle" onchange="HomeCollectionApp.toggleDuty(this.checked)">
+            <span class="hc-slider"></span>
+          </label>
+        </div>
+
+        <div class="hc-duty-pill hc-notif-pill" id="hc-notif-pill-box" title="Mobile Screen Popup Alerts">
+          <span class="duty-lbl" id="hc-notif-label">🔕 OFF</span>
+          <label class="hc-switch">
+            <input type="checkbox" id="hc-notif-toggle" onchange="HomeCollectionApp.toggleNotifications(this.checked)">
+            <span class="hc-slider"></span>
+          </label>
+        </div>
       </div>
       
       <div class="hc-header-right">
@@ -67,8 +77,17 @@
     <!-- Main Workstation -->
     <main class="hc-main-wrapper">
 
+      <!-- Live Alert Status Banner -->
+      <div id="hc-alert-status-banner" class="hc-alert-banner" style="display: none;">
+        <div>
+          <strong id="hc-alert-banner-title">🔔 Screen Popup Alerts Paused</strong>
+          <span id="hc-alert-banner-sub">Keep both Duty ON & 🔔 Alert ON to receive Rapido-style screen popups inside & outside the app.</span>
+        </div>
+        <button type="button" class="hc-pill-btn" onclick="HomeCollectionApp.enableBothDutyAndAlerts()">Turn Both ON</button>
+      </div>
+
       <!-- =========================================================
-           VIEW 1: LIVE CUSTOMER APPOINTMENTS (MULTI-ORDER SUPPORT)
+           VIEW 1: LIVE CUSTOMER APPOINTMENTS (10 KM RADIUS)
            ========================================================= -->
       <div id="hc-view-orders" class="hc-tab-view">
 
@@ -103,13 +122,13 @@
           </div>
         </section>
 
-        <!-- ACTIVE ONGOING PICKUP TRIPS (UNLIMITED MULTI-ORDER STACK) -->
+        <!-- ACTIVE ONGOING PICKUP TRIPS -->
         <div id="hc-active-trips-wrapper" style="display: none;">
           <section class="hc-glass-card hc-active-section-shell">
             <div class="hc-card-header">
               <div>
                 <h4>Active Ongoing Pickups (<span id="hc-active-count-badge">0</span>)</h4>
-                <span class="hc-sub-caption">Unlimited Multi-Order Mode Active</span>
+                <span class="hc-sub-caption">Exact Customer GPS Navigation Active</span>
               </div>
               <span class="hc-verified-badge">● IN PROGRESS</span>
             </div>
@@ -117,12 +136,12 @@
           </section>
         </div>
 
-        <!-- INCOMING CUSTOMER BOOKINGS -->
+        <!-- INCOMING CUSTOMER BOOKINGS (WITHIN 10 KM RADIUS) -->
         <section class="hc-glass-card">
           <div class="hc-card-header" style="flex-wrap: wrap; gap: 8px;">
             <div>
-              <h4>Customer Home Bookings</h4>
-              <span class="hc-sub-caption">Direct Customer Bookings • Accept Multiple Orders</span>
+              <h4>Nearby Customer Bookings (≤ 10 km)</h4>
+              <span class="hc-sub-caption" id="hc-radius-caption">Broadcasted to nearby technicians within 10 km radius</span>
             </div>
             <button type="button" class="hc-pill-btn" onclick="HomeCollectionApp.syncBookings(true)">
               ↻ Sync Live
@@ -132,7 +151,7 @@
           <!-- Schedule Filter Pills -->
           <div class="hc-filter-pills">
             <button type="button" class="hc-filter-btn active" id="hc-flt-ALL" onclick="HomeCollectionApp.setDayFilter('ALL')">
-              All Active (<span id="hc-cnt-all">0</span>)
+              All Nearby (<span id="hc-cnt-all">0</span>)
             </button>
             <button type="button" class="hc-filter-btn" id="hc-flt-TODAY" onclick="HomeCollectionApp.setDayFilter('TODAY')">
               Today On-Time (<span id="hc-cnt-today">0</span>)
@@ -142,16 +161,18 @@
             </button>
           </div>
 
+          <!-- Missed / Taken by Another Technician Banner Stack -->
+          <div id="hc-missed-orders-box" class="hc-cards-stack" style="margin-bottom: 12px;"></div>
+
           <div id="hc-incoming-list" class="hc-cards-stack"></div>
         </section>
       </div>
 
       <!-- =========================================================
-           VIEW 2: WALLET, RAZORPAY SETTLEMENT & WHATSAPP WITHDRAWAL
+           VIEW 2: WALLET, RAZORPAY SETTLEMENT & NEXT-DAY WITHDRAWAL
            ========================================================= -->
       <div id="hc-view-wallet" class="hc-tab-view" style="display: none;">
 
-        <!-- Wallet Balance & Rate Card -->
         <section class="hc-glass-card">
           <div class="hc-card-header">
             <h4>Captain Earnings Wallet</h4>
@@ -160,8 +181,9 @@
 
           <div class="wallet-balance-hero">
             <div>
-              <span class="wallet-sub-lbl">Available Withdrawable Balance</span>
+              <span class="wallet-sub-lbl">Withdrawable Balance (Previous Days)</span>
               <h2 id="hc-wallet-avail" class="wallet-hero-num">₹0</h2>
+              <span id="hc-today-locked-note" class="hc-locked-sub-note" style="display: none;"></span>
             </div>
             <button type="button" class="hc-btn-3d-primary" id="hc-withdraw-main-btn" style="width: auto; padding: 12px 20px;" onclick="HomeCollectionApp.openPayoutModal()">
               Withdraw via WhatsApp ➔
@@ -174,8 +196,8 @@
               <strong class="stat-visits" id="hc-wallet-total">₹0</strong>
             </div>
             <div class="hc-stat-tile hc-3d-tile">
-              <span class="stat-period">Paid Out</span>
-              <strong class="stat-visits" id="hc-wallet-paidout">₹0</strong>
+              <span class="stat-period">Today (Unlocks Tmrw)</span>
+              <strong class="stat-visits" id="hc-wallet-today-hold" style="color:#D97706;">₹0</strong>
             </div>
             <div class="hc-stat-tile hc-3d-tile">
               <span class="stat-period">Cash to Settle</span>
@@ -183,7 +205,11 @@
             </div>
           </div>
 
-          <!-- Mandatory Full Cash Settlement via Razorpay before Withdrawal -->
+          <div class="hc-nextday-banner">
+            <strong>⏳ Next-Day Withdrawal Rule</strong>
+            <span>Today's completed trip earnings unlock tomorrow after midnight (no same-day withdrawal).</span>
+          </div>
+
           <div id="hc-cod-settle-box" class="hc-cod-banner" style="display: none;">
             <div>
               <strong>⚠️ Pending Full Cash Settlement: <span id="hc-cod-due-inline">₹0</span></strong>
@@ -192,6 +218,22 @@
             <button type="button" class="hc-btn-outline-bold" onclick="HomeCollectionApp.payCodViaRazorpay()">
               Settle Full Cash Now
             </button>
+          </div>
+        </section>
+
+        <!-- Linked Payout UPI Strip -->
+        <section class="hc-glass-card">
+          <div class="hc-card-header">
+            <h4>Captain Payout UPI Account</h4>
+            <span class="hc-pill-tag">DIRECT GPAY / UPI</span>
+          </div>
+
+          <div class="hc-bank-strip">
+            <div>
+              <span class="bank-lbl">Registered UPI ID</span>
+              <strong id="hc-linked-upi-text" class="bank-val">Not Set • Update in Profile</strong>
+            </div>
+            <button type="button" class="hc-pill-btn" onclick="HomeCollectionApp.switchTab('profile')">Edit UPI</button>
           </div>
         </section>
 
@@ -220,37 +262,6 @@
           </div>
         </section>
 
-        <!-- Payout Frequency & Linked UPI Strip -->
-        <section class="hc-glass-card">
-          <div class="hc-card-header">
-            <h4>Payout Schedule & UPI Account</h4>
-            <span class="hc-pill-tag" id="hc-cycle-pill">DAILY PAYOUT</span>
-          </div>
-
-          <div class="hc-cycle-grid">
-            <div class="hc-cycle-card active" id="cycle-card-DAILY" onclick="HomeCollectionApp.selectPayoutCycle('DAILY')">
-              <strong>Daily Payout</strong>
-              <span>Every Night 9 PM</span>
-            </div>
-            <div class="hc-cycle-card" id="cycle-card-WEEKLY" onclick="HomeCollectionApp.selectPayoutCycle('WEEKLY')">
-              <strong>Weekly Payout</strong>
-              <span>Every Sunday</span>
-            </div>
-            <div class="hc-cycle-card" id="cycle-card-MONTHLY" onclick="HomeCollectionApp.selectPayoutCycle('MONTHLY')">
-              <strong>Monthly Payout</strong>
-              <span>1st of Month</span>
-            </div>
-          </div>
-
-          <div class="hc-bank-strip">
-            <div>
-              <span class="bank-lbl">Captain Payout UPI ID</span>
-              <strong id="hc-linked-upi-text" class="bank-val">Not Set • Update in Profile</strong>
-            </div>
-            <button type="button" class="hc-pill-btn" onclick="HomeCollectionApp.switchTab('profile')">Edit UPI</button>
-          </div>
-        </section>
-
         <!-- Wallet Transactions Ledger -->
         <section class="hc-glass-card">
           <div class="hc-card-header">
@@ -274,11 +285,10 @@
       </div>
 
       <!-- =========================================================
-           VIEW 4: CAPTAIN SELF-EDITABLE PROFILE, UPI & RATINGS
+           VIEW 4: CAPTAIN SELF-EDITABLE PROFILE, ADDRESS, LIVE LOCATION & UPI
            ========================================================= -->
       <div id="hc-view-profile" class="hc-tab-view" style="display: none;">
         
-        <!-- 3D Glass Captain ID Card -->
         <section class="hc-glass-card hc-profile-hero-card">
           <div class="hc-profile-top-bar">
             <span class="hc-verified-badge">✓ VERIFIED PHLEBOTOMIST</span>
@@ -298,7 +308,7 @@
             </div>
           </div>
 
-          <!-- Editable Captain Profile & UPI Form -->
+          <!-- Editable Captain Profile, Address, Live Location & UPI Form -->
           <div class="hc-prof-edit-form">
             <div class="hc-form-grid-2">
               <div class="hc-glass-field">
@@ -326,9 +336,21 @@
               </div>
             </div>
 
-            <div class="hc-glass-field">
-              <label>Residential Address / Hub Area</label>
-              <input type="text" id="hc-inp-address" placeholder="e.g. Vettuvankeni, ECR, Chennai">
+            <!-- Address & Live GPS Location Columns -->
+            <div class="hc-form-grid-2">
+              <div class="hc-glass-field">
+                <label>Address / Base Area *</label>
+                <input type="text" id="hc-inp-address" placeholder="e.g. Saidapet / Vettuvankeni, Chennai">
+              </div>
+              <div class="hc-glass-field">
+                <label>Live GPS Location (10 km Dispatch) *</label>
+                <div style="display:flex; gap:6px;">
+                  <input type="text" id="hc-inp-location" readonly placeholder="Tap Get Location">
+                  <button type="button" class="hc-pill-btn" style="white-space:nowrap;" onclick="HomeCollectionApp.captureLiveLocationManual()">
+                    📍 Get Location
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div class="hc-form-grid-2">
@@ -354,7 +376,7 @@
             </div>
 
             <button type="button" class="hc-btn-3d-primary" onclick="HomeCollectionApp.saveCaptainProfile()">
-              💾 Save Profile & UPI Details
+              💾 Save Profile, Location & UPI Details
             </button>
           </div>
         </section>
@@ -381,7 +403,7 @@
 
     </main>
 
-    <!-- Fixed 5-Tab Glass Bottom Navigation (Includes ILD Call for Sample Delivery) -->
+    <!-- Fixed 5-Tab Glass Bottom Navigation -->
     <nav class="hc-bottom-bar">
       <button type="button" class="hc-tab-btn active" id="tab-btn-orders" onclick="HomeCollectionApp.switchTab('orders')">
         <span class="nav-ico">🛵</span>
@@ -407,13 +429,14 @@
   </div>
 
   <!-- =========================================================
-       RAPIDO-STYLE FULL-SCREEN INCOMING BOOKING POPUP OVERLAY
+       RAPIDO-STYLE FULL-SCREEN CONTINUOUS INCOMING BOOKING POPUP
+       (Repeats sound & alert until Captain clicks Accept or Decline)
        ========================================================= -->
   <div id="hc-rapido-popup" class="hc-rapido-overlay" style="display: none;">
     <div class="hc-rapido-card">
       <div class="hc-rapido-top">
-        <span class="hc-rapido-live-tag">🔔 NEW HOME COLLECTION REQUEST</span>
-        <div class="hc-rapido-timer" id="hc-rapido-timer">30s</div>
+        <span class="hc-rapido-live-tag">🔔 NEW PICKUP • <span id="hc-rap-distance">≤ 10 km</span></span>
+        <div class="hc-rapido-timer" id="hc-rapido-ring-badge">LIVE</div>
       </div>
 
       <div class="hc-rapido-payout-hero">
@@ -472,23 +495,23 @@
     </div>
   </div>
 
-  <!-- Modal 2: WhatsApp Payout Withdrawal Modal -->
+  <!-- Modal 2: Next-Day WhatsApp Payout Withdrawal Modal -->
   <div id="hc-payout-modal" class="hc-modal-overlay" style="display: none;">
     <div class="hc-modal-card">
       <h3>Withdraw Wallet via WhatsApp</h3>
-      <p>Available Balance: <strong id="hc-modal-avail">₹0</strong> • Cycle: <strong id="hc-modal-cycle">DAILY</strong></p>
+      <p>Withdrawable Balance: <strong id="hc-modal-avail">₹0</strong> (Previous Days Only)</p>
 
       <div class="hc-glass-field">
-        <label>Withdrawal Amount (₹) *</label>
-        <input type="number" id="hc-payout-amt" placeholder="Minimum ₹150">
+        <label>Withdrawal Amount (₹) * (Max: <span id="hc-modal-max-lbl">₹0</span>)</label>
+        <input type="number" id="hc-payout-amt" min="150" step="1" placeholder="Minimum ₹150">
       </div>
 
       <div class="hc-info-box" id="hc-payout-preview-box" style="font-size:11.5px;"></div>
 
       <div class="hc-modal-actions">
         <button type="button" class="hc-btn-secondary" style="flex:1;" onclick="HomeCollectionApp.closeModal('hc-payout-modal')">Cancel</button>
-        <button type="button" class="hc-btn-whatsapp-3d" style="flex:1.6;" onclick="HomeCollectionApp.confirmPayout()">
-          📲 Send on WhatsApp & Reset
+        <button type="button" id="hc-confirm-payout-btn" class="hc-btn-whatsapp-3d" style="flex:1.6;" onclick="HomeCollectionApp.confirmPayout()">
+          📲 Send on WhatsApp
         </button>
       </div>
     </div>
@@ -519,6 +542,6 @@
   <script src="assets/js/api.js?v=6.8.0"></script>
   <script src="assets/js/offline-db.js?v=5.2.0"></script>
   <script src="assets/js/offline-sync.js?v=5.2.0"></script>
-  <script src="assets/js/home-collection.js?v=4.0.0"></script>
+  <script src="assets/js/home-collection.js?v=4.3.0"></script>
 </body>
 </html>
